@@ -1,52 +1,43 @@
-# AGI Research Project
+# AGI Research & Build Project
 
-> A continuously evolving experiment in building self-improving artificial general intelligence.
-
-## Overview
-
-This repository contains an experimental AGI system that:
-- **Researches** latest developments in AI/AGI
-- **Builds** incrementally toward self-improving capabilities
-- **Documents** findings and progress
-- **Tests** hypotheses through controlled experiments
+A continuous research and implementation effort toward AGI-capable AI agents.
 
 ## Philosophy
+- Incremental, working code over perfect architecture
+- Test everything
+- Document findings continuously
+- Safety: All self-modifications require REVIEW
+- Small, daily progress compounds
 
-1. **Incremental Progress** - Small, working improvements beat grand, unbuilt architectures
-2. **Continuous Learning** - The system (and we) learn from every experiment
-3. **Safety First** - Self-modification requires explicit review; never auto-apply
-4. **Document Everything** - Research findings, failed experiments, and insights are as valuable as code
-
-## Project Structure
-
+## Structure
 ```
 agi-research/
-├── core/           # Core AGI components (agent, memory, planning, reflection)
-├── skills/         # Extensible capability modules
-├── experiments/    # Test implementations and validations
-├── tests/          # Validation suite
-├── CURRENT_RESEARCH.md  # Living research journal
-├── ARCHITECTURE.md      # System design decisions
-├── SAFETY.md            # Safety guidelines
-└── README.md       # This file
+├── README.md              # This file
+├── CURRENT_RESEARCH.md    # Weekly research findings
+├── ARCHITECTURE.md        # System design docs
+├── core/                  # Core agent components
+│   ├── agent.py          # Base agent class
+│   ├── memory.py         # Memory management
+│   ├── planner.py        # Task planning
+│   └── reflection.py     # Self-improvement
+├── skills/               # Capability modules
+│   └── [tool modules]
+└── experiments/          # Validation tests
+    └── test_*.py
 ```
 
 ## Quick Start
-
 ```bash
-pip install -r requirements.txt
-python -m pytest tests/
-python experiments/<experiment_name>.py
+cd /home/workspace/agi-research
+python -m experiments.test_agent
 ```
 
 ## Research Focus Areas
+1. Multi-agent orchestration patterns
+2. Memory systems (episodic, semantic, procedural)
+3. Tool use and skill acquisition
+4. Self-reflection and improvement
+5. Reasoning and planning architectures
 
-- Tool-use architectures
-- Memory management
-- Self-reflection and meta-learning
-- Planning and goal decomposition
-- Multi-agent coordination
-- Safe self-modification paradigms
-
----
-*Autonomous agent runs twice daily. Last updated: March 27, 2026*
+## Current Status
+See `CURRENT_RESEARCH.md` for latest findings and active work items.

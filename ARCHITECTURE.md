@@ -1,45 +1,53 @@
-# AGI System Architecture
+# AGI Agent Architecture
 
-## Design Principles
+## ReAct-Based Agent Architecture
 
-1. **Modularity** - Testable components
-2. **Extensibility** - Plugin skill system
-3. **Observability** - Traceable decisions
-4. **Safety** - Human review for self-modification
-
-## Architecture
+The core agent follows the ReAct (Reason + Act) pattern:
 
 ```
-┌─────────────┐
-│   Agent     │ ← Cognitive loop
-│  Core       │   perceive/reason/act/reflect
-└──────┬──────┘
-       │
-┌──────┴──────┬─────────────┬──────────────┐
-│   Memory    │   Planner   │  Reflection  │
-│   System    │             │   Engine     │
-└─────────────┴─────────────┴──────────────┘
-       │
-┌──────┴────────────────────────────────────┐
-│            Skills Registry                │
-│   web_search | code_gen | analysis       │
-└───────────────────────────────────────────┘
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Input     │────▶│   Reason    │────▶│     Act     │
+└─────────────┘     └─────────────┘     └──────┬──────┘
+                                                │
+                                                ▼
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Memory    │◀────│   Reflect   │◀────│   Observe   │
+└─────────────┘     └─────────────┘     └─────────────┘
 ```
 
-## Components
+## Component Details
 
-- **Agent**: Base cognitive loop
-- **Memory**: Working, episodic, semantic tiers
-- **Planner**: Goal decomposition
-- **Reflection**: Meta-learning
-- **Skills**: Extensible capabilities
+### BaseAgent (agent.py)
+- ReAct loop execution
+- Tool calling interface
+- State management
+- Conversation context
 
-## Open Decisions
+### Memory (memory.py)
+- **Working Memory**: Current context window
+- **Episodic Memory**: Past interactions/experiences
+- **Semantic Memory**: Facts, knowledge, embeddings
 
-1. Language: Python vs TypeScript
-2. Memory store: SQLite vs vector DB
-3. Planning: Rules vs LLM-based
-4. Multi-agent coordination
+### Planner (planner.py)
+- Task decomposition
+- Goal management
+- Sub-task creation
+- Dependency tracking
 
----
-*Living document*
+### Reflection (reflection.py)
+- Self-evaluation
+- Performance analysis
+- Strategy adjustment
+- Learning from failures
+
+## Skill System
+Each skill is a module with:
+- Name and description
+- Input/output schema
+- Execute function
+- Error handling
+
+## Future Extensions
+- Multi-agent orchestration
+- Distributed agent networks
+- Hybrid symbolic-neural reasoning
