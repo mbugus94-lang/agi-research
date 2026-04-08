@@ -399,6 +399,72 @@
       "demo_file": "public/demo.html + DEMO.md",
       "commit": "8bd85bc - Interactive multilingual chat demo and comprehensive DEMO.md guide",
       "next_focus": "Complete - demo added, consider actual WhatsApp/Telegram/Discord testing"
+    },
+    "ai-receipt-scanner": {
+      "last_worked": "2026-04-08",
+      "status": "complete",
+      "features_added": [
+        "Demo screenshot added to docs/"
+      ],
+      "demo_added": true,
+      "demo_file": "docs/ai-receipt-scanner-demo.png",
+      "commit": "8cb6151 - add AI demo screenshot to docs",
+      "next_focus": "Complete"
+    },
+    "ai-support-agent": {
+      "last_worked": "2026-04-08",
+      "status": "complete",
+      "features_added": [
+        "Fresh dashboard demo screenshot added"
+      ],
+      "demo_added": true,
+      "demo_file": "docs/ai-support-agent-demo.png",
+      "commit": "2f5e7de - add fresh dashboard demo screenshot",
+      "next_focus": "Complete"
+    },
+    "travel-price-guard": {
+      "last_worked": "2026-04-08",
+      "status": "complete",
+      "features_added": [
+        "Price tracking dashboard demo screenshot added"
+      ],
+      "demo_added": true,
+      "demo_file": "docs/travel-price-guard-demo.png",
+      "commit": "609a361 - add price tracking dashboard demo screenshot",
+      "next_focus": "Complete"
+    },
+    "ai-email-marketing": {
+      "last_worked": "2026-04-08",
+      "status": "complete",
+      "features_added": [
+        "Email campaign dashboard demo screenshot added"
+      ],
+      "demo_added": true,
+      "demo_file": "docs/ai-email-marketing-demo.png",
+      "commit": "82245d8 - add email campaign dashboard demo screenshot",
+      "next_focus": "Complete"
+    },
+    "ai-job-tracker": {
+      "last_worked": "2026-04-08",
+      "status": "complete",
+      "features_added": [
+        "Kanban job tracker dashboard demo screenshot added"
+      ],
+      "demo_added": true,
+      "demo_file": "docs/ai-job-tracker-demo.png",
+      "commit": "bd42ea8 - add Kanban job tracker dashboard demo screenshot",
+      "next_focus": "Complete"
+    },
+    "smb-ai-bookkeeper": {
+      "last_worked": "2026-04-08",
+      "status": "complete",
+      "features_added": [
+        "Bookkeeping dashboard demo screenshot added"
+      ],
+      "demo_added": true,
+      "demo_file": "docs/smb-ai-bookkeeper-demo.png",
+      "commit": "59b199b - add bookkeeping dashboard demo screenshot",
+      "next_focus": "Complete"
     }
   },
   "repos_needing_attention": [
