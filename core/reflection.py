@@ -19,6 +19,44 @@ class PerformanceMetrics:
     errors: List[str] = field(default_factory=list)
     tool_calls: int = 0
     timestamp: datetime = field(default_factory=datetime.now)
+    attempts: List[Dict] = field(default_factory=list)  # For tracking multiple attempts
+    
+    def __post_init__(self):
+        if self.attempts is None:
+            self.attempts = []
+    
+    def record_attempt(self, success: bool, duration: float, cost: float = 0.0):
+        """Record a single attempt."""
+        self.attempts.append({
+            "success": success,
+            "duration": duration,
+            "cost": cost,
+            "timestamp": datetime.now().isoformat()
+        })
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get statistics from all attempts."""
+        if not self.attempts:
+            return {
+                "total_attempts": 0,
+                "successes": 0,
+                "failures": 0,
+                "success_rate": 0.0,
+                "avg_cost": 0.0
+            }
+        
+        total = len(self.attempts)
+        successes = sum(1 for a in self.attempts if a["success"])
+        failures = total - successes
+        avg_cost = sum(a.get("cost", 0) for a in self.attempts) / total
+        
+        return {
+            "total_attempts": total,
+            "successes": successes,
+            "failures": failures,
+            "success_rate": successes / total if total > 0 else 0.0,
+            "avg_cost": avg_cost
+        }
     
     def to_dict(self) -> Dict:
         return {
@@ -28,7 +66,25 @@ class PerformanceMetrics:
             "time_elapsed": self.time_elapsed,
             "errors": self.errors,
             "tool_calls": self.tool_calls,
-            "timestamp": self.timestamp.isoformat()
+            "timestamp": self.timestamp.isoformat(),
+            "attempts": self.attempts
+        }
+
+
+@dataclass
+class ReflectionResult:
+    """Result of reflection on task performance."""
+    insights: List[str] = field(default_factory=list)
+    recommendations: List[str] = field(default_factory=list)
+    confidence: float = 0.5
+    task: str = ""
+    
+    def to_dict(self) -> Dict:
+        return {
+            "insights": self.insights,
+            "recommendations": self.recommendations,
+            "confidence": self.confidence,
+            "task": self.task
         }
 
 
@@ -93,54 +149,91 @@ class Reflector:
         self._save()
         return metric
     
-    def reflect(self, task: str, metrics: PerformanceMetrics) -> Reflection:
+    def reflect(self, history: List[Dict[str, Any]], task: str) -> ReflectionResult:
         """
-        Generate reflection on task performance.
+        Generate reflection from execution history.
         
         Args:
+            history: List of execution step dicts with keys like 'step', 'action', 'success', 'error', 'duration'
             task: The task that was executed
-            metrics: Performance metrics from execution
             
         Returns:
-            Reflection with insights and suggestions
+            ReflectionResult with insights and recommendations
         """
-        # Rule-based reflection for demo
-        # In production, this would use an LLM
+        insights = []
+        recommendations = []
         
-        if metrics.success:
-            what_went_well = "Task completed successfully"
-            confidence = 0.8
-        else:
-            what_went_well = "Attempted all possible steps"
-            confidence = 0.4
+        # Analyze success patterns
+        successes = [h for h in history if h.get("success", False)]
+        failures = [h for h in history if not h.get("success", False)]
         
-        # Analyze step efficiency
-        if metrics.steps_taken > 5:
-            what_could_improve = "Task took many steps - consider more efficient planning"
-            suggested = ["Improve task decomposition", "Use more direct tool calls"]
-        else:
-            what_could_improve = "Efficiency was good"
-            suggested = ["Continue current approach"]
+        if not failures:
+            insights.append("All execution steps completed successfully")
+            recommendations.append("Continue current approach for similar tasks")
+        elif len(failures) > len(successes):
+            insights.append(f"Majority of steps failed ({len(failures)}/{len(history)})")
+            recommendations.append("Consider different strategy or approach")
         
-        # Analyze errors
-        if metrics.errors:
-            what_could_improve += f". Errors encountered: {len(metrics.errors)}"
-            suggested.append("Add error handling for common failure cases")
+        # Detect error patterns
+        error_types = {}
+        for step in failures:
+            error = step.get("error", "")
+            if "timeout" in error.lower():
+                error_types["timeout"] = error_types.get("timeout", 0) + 1
+            elif "api" in error.lower():
+                error_types["api_error"] = error_types.get("api_error", 0) + 1
+            elif "rate limit" in error.lower():
+                error_types["rate_limit"] = error_types.get("rate_limit", 0) + 1
+            else:
+                error_types["other"] = error_types.get("other", 0) + 1
         
-        lessons = self._generate_lessons(metrics)
+        if error_types.get("timeout", 0) >= 2:
+            insights.append(f"Detected {error_types['timeout']} timeout errors")
+            recommendations.append("Add retry logic with exponential backoff")
+            recommendations.append("Consider increasing timeout thresholds")
         
-        reflection = Reflection(
-            task=task,
-            what_went_well=what_went_well,
-            what_could_improve=what_could_improve,
-            lessons_learned=lessons,
-            suggested_changes=suggested,
-            confidence=confidence
+        if error_types.get("rate_limit", 0) >= 1:
+            insights.append("Rate limiting detected")
+            recommendations.append("Implement rate limiting handling")
+            recommendations.append("Add request throttling")
+        
+        # Analyze timing patterns
+        durations = [h.get("duration", 0) for h in history]
+        if durations:
+            avg_duration = sum(durations) / len(durations)
+            if avg_duration > 5.0:
+                insights.append(f"Steps taking long time (avg {avg_duration:.1f}s)")
+                recommendations.append("Optimize slow operations")
+        
+        # Analyze action patterns
+        actions = [h.get("action", "") for h in history]
+        if "decompose" in actions and len(failures) > 0:
+            insights.append("Task decomposition was attempted but errors occurred")
+            recommendations.append("Review decomposition strategy")
+        
+        confidence = len(successes) / len(history) if history else 0.0
+        
+        return ReflectionResult(
+            insights=insights or ["No specific patterns detected"],
+            recommendations=recommendations or ["Continue monitoring"],
+            confidence=confidence,
+            task=task
         )
-        
-        self.reflections.append(reflection)
-        self._save()
-        return reflection
+    
+    def compare_with_baseline(
+        self,
+        new_reflection: ReflectionResult,
+        baseline_reflection: ReflectionResult
+    ) -> str:
+        """Compare new reflection against baseline and describe improvement."""
+        if new_reflection.confidence > baseline_reflection.confidence:
+            improvement = new_reflection.confidence - baseline_reflection.confidence
+            return f"Improved by {improvement:.1%} confidence"
+        elif new_reflection.confidence < baseline_reflection.confidence:
+            decline = baseline_reflection.confidence - new_reflection.confidence
+            return f"Declined by {decline:.1%} confidence - review needed"
+        else:
+            return "No change in performance - stable"
     
     def _generate_lessons(self, metrics: PerformanceMetrics) -> str:
         """Generate lessons learned from metrics."""

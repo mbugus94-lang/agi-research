@@ -16,11 +16,21 @@ class TaskStatus(Enum):
     FAILED = "failed"
 
 
+class PlanStatus(Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 @dataclass
 class Task:
     """A single task node in the plan."""
     id: str
     description: str
+    action: Optional[str] = None
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    estimated_duration: float = 0.0
     status: TaskStatus = TaskStatus.PENDING
     dependencies: List[str] = field(default_factory=list)
     subtasks: List['Task'] = field(default_factory=list)
@@ -34,6 +44,21 @@ class Task:
             for dep in self.get_dependencies()
         )
     
+    def can_execute(self) -> bool:
+        """Check if task can be executed (dependencies satisfied)."""
+        # For simple task with string dependency IDs
+        # In practice, this checks against a task registry
+        return True  # Simplified - assumes dependencies are checked elsewhere
+    
+    def mark_complete(self):
+        """Mark task as completed."""
+        self.status = TaskStatus.COMPLETED
+    
+    def mark_failed(self, error: str = ""):
+        """Mark task as failed with error info."""
+        self.status = TaskStatus.FAILED
+        self.metadata["error"] = error
+    
     def get_dependencies(self) -> List['Task']:
         """Get actual task objects for dependencies."""
         # This is a placeholder - in practice, tasks would reference a task registry
@@ -43,10 +68,53 @@ class Task:
         return {
             "id": self.id,
             "description": self.description,
+            "action": self.action,
+            "parameters": self.parameters,
+            "estimated_duration": self.estimated_duration,
             "status": self.status.value,
             "dependencies": self.dependencies,
             "subtasks": [t.to_dict() for t in self.subtasks],
             "result": self.result,
+            "metadata": self.metadata
+        }
+
+
+@dataclass
+class Plan:
+    """A plan containing multiple tasks to achieve a goal."""
+    goal: str
+    tasks: List[Task] = field(default_factory=list)
+    status: PlanStatus = PlanStatus.PENDING
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def replan(self, fallback_task_id: Optional[str] = None):
+        """Adapt plan when tasks fail."""
+        self.status = PlanStatus.PENDING
+        
+        if fallback_task_id:
+            # Mark failed tasks and add alternative
+            failed_count = sum(1 for t in self.tasks if t.status == TaskStatus.FAILED)
+            
+            # Create alternative task
+            alt_task = Task(
+                id=f"alt_{failed_count}",
+                description=f"Alternative approach (replacing failed tasks)",
+                action="alternative"
+            )
+            
+            # Find first failed task's position and insert alternative
+            for i, task in enumerate(self.tasks):
+                if task.status == TaskStatus.FAILED:
+                    # Update dependencies
+                    alt_task.dependencies = [task.id]  # Depend on what failed
+                    self.tasks.insert(i + 1, alt_task)
+                    break
+    
+    def to_dict(self) -> Dict:
+        return {
+            "goal": self.goal,
+            "status": self.status.value,
+            "tasks": [t.to_dict() for t in self.tasks],
             "metadata": self.metadata
         }
 
@@ -60,6 +128,16 @@ class Planner:
     def __init__(self):
         self.tasks: Dict[str, Task] = {}
         self.current_plan: Optional[Task] = None
+    
+    def create_plan(self, goal: str, tasks: List[Task]) -> Plan:
+        """Create a plan from a goal and task list."""
+        plan = Plan(
+            goal=goal,
+            tasks=tasks,
+            status=PlanStatus.PENDING
+        )
+        self.current_plan = plan
+        return plan
     
     def decompose(self, goal: str, context: str = "") -> Task:
         """

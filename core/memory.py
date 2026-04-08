@@ -53,6 +53,17 @@ class WorkingMemory:
         
         return entry
     
+    def size(self) -> int:
+        """Return current number of entries."""
+        return len(self.entries)
+    
+    def get(self, key: str) -> Optional[Dict]:
+        """Get entry by metadata key."""
+        for entry in self.entries:
+            if entry.metadata.get("id") == key:
+                return entry.metadata
+        return None
+    
     def get_context(self, n: int = None) -> str:
         """Get recent context as formatted string."""
         entries = self.entries[-n:] if n else self.entries
@@ -93,6 +104,28 @@ class EpisodicMemory:
         self.episodes.append(entry)
         self._save()
         return entry
+    
+    def store(self, data: Dict[str, Any]) -> MemoryEntry:
+        """Store an episode from a dict."""
+        return self.add_episode(
+            task=data.get("task", "Unknown task"),
+            outcome=data.get("output", data.get("outcome", "")),
+            lessons=data.get("lessons", ""),
+            metadata=data
+        )
+    
+    def get_recent(self, limit: int = 10) -> List[Dict]:
+        """Get recent episodes."""
+        episodes = self.episodes[-limit:] if limit else self.episodes
+        return [e.to_dict() for e in episodes]
+    
+    def search_by_task(self, task_type: str) -> List[Dict]:
+        """Search episodes by task type."""
+        results = []
+        for episode in self.episodes:
+            if task_type.lower() in episode.metadata.get("task", "").lower():
+                results.append(episode.to_dict())
+        return results
     
     def search(self, query: str, limit: int = 5) -> List[MemoryEntry]:
         """Simple keyword search through episodes."""
@@ -153,6 +186,41 @@ class SemanticMemory:
             "timestamp": datetime.now().isoformat()
         }
         self._save()
+    
+    def store_fact(
+        self,
+        subject: str,
+        predicate: str,
+        object_: str,
+        confidence: float = 1.0
+    ):
+        """Store a semantic fact as subject-predicate-object."""
+        key = f"{subject}_{predicate}"
+        self.facts[key] = {
+            "subject": subject,
+            "predicate": predicate,
+            "object": object_,
+            "confidence": confidence,
+            "timestamp": datetime.now().isoformat()
+        }
+        self._save()
+    
+    def query(
+        self,
+        subject: Optional[str] = None,
+        predicate: Optional[str] = None
+    ) -> List[Dict]:
+        """Query facts by subject and/or predicate."""
+        results = []
+        for key, fact in self.facts.items():
+            match = True
+            if subject and fact.get("subject") != subject:
+                match = False
+            if predicate and fact.get("predicate") != predicate:
+                match = False
+            if match:
+                results.append(fact)
+        return results
     
     def retrieve(self, key: str) -> Optional[Any]:
         """Retrieve a fact."""
