@@ -1,6 +1,39 @@
 {
-  "last_updated": "2026-04-06",
+  "last_updated": "2026-04-08",
   "repos": {
+    "nova-memory": {
+      "last_worked": "2026-04-08",
+      "status": "complete",
+      "features_added": [
+        "Dashboard demo screenshot added to docs/"
+      ],
+      "demo_added": true,
+      "demo_file": "docs/nova-memory-dashboard-demo.png",
+      "commit": "c5e042f - add dashboard demo screenshots",
+      "next_focus": "Complete"
+    },
+    "m-pal": {
+      "last_worked": "2026-04-08",
+      "status": "complete",
+      "features_added": [
+        "SDK demo screenshot added to docs/"
+      ],
+      "demo_added": true,
+      "demo_file": "docs/mpal-sdk-demo.png",
+      "commit": "c5e042f - add dashboard demo screenshots",
+      "next_focus": "Complete"
+    },
+    "NexaPOS-Enhanced": {
+      "last_worked": "2026-04-08",
+      "status": "complete",
+      "features_added": [
+        "Dashboard demo screenshot added to docs/"
+      ],
+      "demo_added": true,
+      "demo_file": "docs/nexapos-demo.png",
+      "commit": "c5e042f - add dashboard demo screenshots",
+      "next_focus": "Complete"
+    },
     "ai-api-monitor": {
       "last_worked": "2026-04-06",
       "status": "complete",
