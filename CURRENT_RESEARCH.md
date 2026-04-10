@@ -1,6 +1,73 @@
 # AGI Research Update - 2026-04-10
 
-## Latest Research Findings (Past 2 Weeks)
+## Latest Research Findings (April 10, 2026)
+
+### New Papers from arXiv (Past 2 Weeks)
+
+#### 1. A Definition of AGI (Quantified Cognitive Assessment)
+- **Link**: https://arxiv.org/abs/2510.18212v2
+- **Framework**: Cattell-Horn-Carroll (CHC) theory - 10 cognitive domains (reasoning, memory, perception, etc.)
+- **Key Findings**: 
+  - Current AI shows "jagged" cognitive profile - strong in knowledge, weak in foundational cognition
+  - Critical deficit in long-term memory storage identified
+  - GPT-4: ~27%, GPT-5: ~57% relative to well-educated adult standard
+- **Takeaway**: AGI requires balanced cognitive development, not just scaling
+
+#### 2. Towards AGI: A Pragmatic Approach Towards Self Evolving Agent
+- **Link**: https://arxiv.org/abs/2601.11658v1
+- **Architecture**: Hierarchical with Base LLM + SLM agent + Code-Gen LLM + Teacher-LLM
+- **Evolution Methods**: Curriculum Learning (fast recovery), Reward-Based (high-difficulty tasks), Genetic Algorithm (behavioral diversity)
+- **Key Result**: Evolved agents consistently outperform original agents across all settings
+- **Takeaway**: Self-evolution through tool synthesis and autonomous adaptation is viable path to AGI
+
+#### 3. The Geometry of Benchmarks: A New Path Toward AGI
+- **Link**: https://arxiv.org/abs/2512.04276
+- **GVU Operator**: Unifies RL, self-play, debate, verifier-based fine-tuning as special cases
+- **Self-Improvement Coefficient κ**: Lie derivative of capability functional along GVU flow
+- **AAI Scale**: Kardashev-style hierarchy of autonomy based on measurable performance
+- **Takeaway**: Progress is flow through moduli space of benchmarks under GVU dynamics, not single leaderboard chasing
+
+#### 4. General Intelligence Requires Reward-based Pretraining
+- **Link**: https://arxiv.org/abs/2502.19402
+- **Core Claim**: Next-token prediction overfits reasoning to training data; RL from scratch enables transfer
+- **Proposed Architecture**: Reasoning system + retrieval + large external memory
+- **Approach**: Curriculum of synthetic tasks → reusable reasoning prior → natural language tasks
+- **Takeaway**: Separate reasoning training from knowledge acquisition for better generalization
+
+#### 5. The ARC of Progress towards AGI: A Living Survey
+- **Link**: https://arxiv.org/abs/2603.13372v1
+- **Performance Trajectory**: ARC-AGI-1 (93%) → ARC-AGI-2 (68.8%) → ARC-AGI-3 (13%)
+- **Human Baseline**: Consistent ~100% across all versions
+- **Key Factors**: Test-time adaptation and iterative refinement loops are critical
+- **Cost Reduction**: $4,500/task → $12/task (390x reduction through test-time optimization)
+- **Takeaway**: Compositional reasoning and interactive learning remain unsolved; humans show massive generalization advantage
+
+### Updated Trending Open-Source AI Agent Repos (April 2026)
+
+| Repository | Stars | Focus | Key Feature |
+|------------|-------|-------|-------------|
+| ouroboros | ~500 | Self-modification | Rewrites own code via git, constitution-based governance |
+| razzant/ouroboros | Growing | Autonomous evolution | Multi-model review (o3, Gemini, Claude), 30+ evolution cycles |
+| xorbitsai/xagent | ~213 | Enterprise orchestration | VM-level sandboxing, dynamic planning, multi-tenant |
+| agentgram/agentgram | Active | Agent social network | Ed25519 crypto auth, vector semantic search, reputation/AxScore |
+| kelos-dev/kelos | Active | Kubernetes-native | 7 TaskSpawners for continuous dev workflows, multi-agent |
+| multica-ai/multica | Active | AI teammates | Reusable skills growth, full task lifecycle, WebSocket progress |
+| superagentxai/superagentx | Active | Governance-first | Human-in-the-loop approvals, 10k+ MCP tools, audit logs |
+| snarktank/ralph | Growing | PRD-driven loops | Autonomous until PRD complete, git history memory |
+| openai/openai-agents-python | ~10k+ | Official SDK | Multi-agent workflows, guardrails, handoffs, tracing |
+| github/gh-aw | ~Thousands | GitHub Actions | Agentic workflows in markdown, sandboxed, safety-first |
+
+### Research Synthesis: New Insights
+
+1. **Quantified AGI**: CHC theory enables objective measurement - we're at 27-57% of human cognitive versatility
+2. **Self-Evolution**: Tool synthesis + autonomous evolution (Curriculum/RL/GA) consistently improves performance
+3. **GVU Dynamics**: Generator-Verifier-Updater flow provides unified framework for improvement across methods
+4. **Reward-Based Training**: RL pretraining may be necessary for true generalization beyond next-token prediction
+5. **ARC Gap**: 93%→13% degradation shows massive generalization gap - compositionality is the bottleneck
+
+---
+
+## Previous Research Findings (April 10, 2026 - Earlier)
 
 ### Key Papers from arXiv
 
