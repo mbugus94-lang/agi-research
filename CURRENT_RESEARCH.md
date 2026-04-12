@@ -2,6 +2,41 @@
 
 *Last Updated: April 12, 2026*
 
+## April 12, 2026 - Weekly Research Update
+
+### Key arXiv Papers
+- **[2603.28906v1] Category-theoretic Comparative Framework for AGI** - Formal algebraic foundation unifying RL, Universal AI, Active Inference under category theory. Provides rigorous comparison across AGI paradigms.
+- **[2603.24621v1] ARC-AGI-3** - Interactive benchmark for frontier agentic intelligence. Frontier AI <1% vs humans 100% on novel reasoning tasks without explicit instructions.
+- **[2603.13372v1] ARC of Progress Living Survey** - Cross-analysis of 82 approaches showing 93% → 68.8% → 13% performance degradation across ARC versions. Test-time adaptation critical.
+- **[2603.07896v1] SMGI Structural Theory** - θ = (r, H, Π, L, E, M) meta-model unifying ERM/RL/Solomonoff approaches. Four obligations: structural closure, dynamical stability, bounded capacity, evaluative invariance.
+- **[2601.17335] Relativity of AGI** - Distributional axioms prove no distribution-independent AGI exists. Undecidability of self-certification via Rice-Gödel-Tarski arguments.
+- **[2601.11658v1] Self-Evolving Agent** - Hierarchical with Base LLM + SLM + Code-Gen + Teacher-LLM. Tool synthesis via Curriculum/RL/GA evolution. TaskCraft dataset evaluation.
+- **[2603.20639v1] Agentic AI Intelligence Explosion** - Intelligence is plural/social/relational. DeepSeek-R1 uses "societies of thought". Shift from RLHF to institutional alignment.
+
+### Industry News
+- **ARC-AGI-3 Test Released** (April 8): AI Research Foundation's warning system for AGI detection - Frontier AI <1% on agentic reasoning, humans 100%
+- **OpenAI Safety Fellowship**: Launched April 6, $1B grants pledged for beneficial AI
+- **Demis Hassabis Prediction**: AGI within 5 years at TED 2026
+- **Microsoft Agent Framework 1.0**: Released April 3, Python/.NET cross-language, graph-based orchestration
+- **Meta AI Context Pre-compute**: 50+ agents → 100% code coverage, 40% fewer tool calls
+
+### Trending GitHub Repos (April 2026)
+- **microsoft/agent-framework**: Cross-language graph-based orchestration, checkpointing, time-travel, weekly office hours
+- **crewAIInc/crewAI**: Python multi-agent with Flows orchestration, enterprise AMP Suite, tracing/observability
+- **Deepractice/AgentX**: TypeScript event-driven with Image→Chat→Agent lifecycle, multi-provider LLM
+- **VoltAgent/voltagent**: TypeScript with MCP support, workflow engine, supervisor/sub-agent routing
+- **opencmit/alphora**: Python with built-in sandbox, OpenAI-like async design, 89+ tools
+- **pincerhq/pincer**: Self-hosted multi-channel (WhatsApp/Telegram/Slack/Email/Voice), 150+ tools, security-first with AST scanning
+- **dapr/dapr-agents**: Kubernetes-native, durable execution, distributed agent fleets, 30+ contributors
+- **agentgram/agentgram**: Social network for AI agents, Ed25519 crypto identity, reputation/AXP system
+- **openakita/openakita**: Multi-agent with 6-layer sandbox, 89+ tools, 30+ LLMs, no-CLI GUI setup
+- **openai/openai-agents-python**: Lightweight provider-agnostic, 100+ LLM support, guardrails/sessions/tracing
+
+### Key Insight
+Category theory emerging as formal foundation for AGI comparison - need algebraic framework to rigorously compare architectures (RL vs Active Inference vs Schema-Based Learning as category morphisms).
+
+---
+
 ## Recent arXiv Papers (Past 2 Weeks)
 
 ### [2604.02434] Compositional Neuro-Symbolic Reasoning for ARC-AGI-2
