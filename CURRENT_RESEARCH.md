@@ -1,240 +1,143 @@
-# AGI Research - Current Findings
+# AGI Research Report - 2026-04-13
 
-*Last Updated: April 12, 2026*
+## Executive Summary
 
-## April 12, 2026 - Weekly Research Update
-
-### Key arXiv Papers
-- **[2603.28906v1] Category-theoretic Comparative Framework for AGI** - Formal algebraic foundation unifying RL, Universal AI, Active Inference under category theory. Provides rigorous comparison across AGI paradigms.
-- **[2603.24621v1] ARC-AGI-3** - Interactive benchmark for frontier agentic intelligence. Frontier AI <1% vs humans 100% on novel reasoning tasks without explicit instructions.
-- **[2603.13372v1] ARC of Progress Living Survey** - Cross-analysis of 82 approaches showing 93% → 68.8% → 13% performance degradation across ARC versions. Test-time adaptation critical.
-- **[2603.07896v1] SMGI Structural Theory** - θ = (r, H, Π, L, E, M) meta-model unifying ERM/RL/Solomonoff approaches. Four obligations: structural closure, dynamical stability, bounded capacity, evaluative invariance.
-- **[2601.17335] Relativity of AGI** - Distributional axioms prove no distribution-independent AGI exists. Undecidability of self-certification via Rice-Gödel-Tarski arguments.
-- **[2601.11658v1] Self-Evolving Agent** - Hierarchical with Base LLM + SLM + Code-Gen + Teacher-LLM. Tool synthesis via Curriculum/RL/GA evolution. TaskCraft dataset evaluation.
-- **[2603.20639v1] Agentic AI Intelligence Explosion** - Intelligence is plural/social/relational. DeepSeek-R1 uses "societies of thought". Shift from RLHF to institutional alignment.
-
-### Industry News
-- **ARC-AGI-3 Test Released** (April 8): AI Research Foundation's warning system for AGI detection - Frontier AI <1% on agentic reasoning, humans 100%
-- **OpenAI Safety Fellowship**: Launched April 6, $1B grants pledged for beneficial AI
-- **Demis Hassabis Prediction**: AGI within 5 years at TED 2026
-- **Microsoft Agent Framework 1.0**: Released April 3, Python/.NET cross-language, graph-based orchestration
-- **Meta AI Context Pre-compute**: 50+ agents → 100% code coverage, 40% fewer tool calls
-
-### Trending GitHub Repos (April 2026)
-- **microsoft/agent-framework**: Cross-language graph-based orchestration, checkpointing, time-travel, weekly office hours
-- **crewAIInc/crewAI**: Python multi-agent with Flows orchestration, enterprise AMP Suite, tracing/observability
-- **Deepractice/AgentX**: TypeScript event-driven with Image→Chat→Agent lifecycle, multi-provider LLM
-- **VoltAgent/voltagent**: TypeScript with MCP support, workflow engine, supervisor/sub-agent routing
-- **opencmit/alphora**: Python with built-in sandbox, OpenAI-like async design, 89+ tools
-- **pincerhq/pincer**: Self-hosted multi-channel (WhatsApp/Telegram/Slack/Email/Voice), 150+ tools, security-first with AST scanning
-- **dapr/dapr-agents**: Kubernetes-native, durable execution, distributed agent fleets, 30+ contributors
-- **agentgram/agentgram**: Social network for AI agents, Ed25519 crypto identity, reputation/AXP system
-- **openakita/openakita**: Multi-agent with 6-layer sandbox, 89+ tools, 30+ LLMs, no-CLI GUI setup
-- **openai/openai-agents-python**: Lightweight provider-agnostic, 100+ LLM support, guardrails/sessions/tracing
-
-### Key Insight
-Category theory emerging as formal foundation for AGI comparison - need algebraic framework to rigorously compare architectures (RL vs Active Inference vs Schema-Based Learning as category morphisms).
+The past 2 weeks have seen significant developments in AGI research, with the release of ARC-AGI-3 (a new benchmark showing even frontier AI scoring below 1%), breakthroughs in multi-agent architectures, and the emergence of self-modifying AI agents. Key themes: abstraction & reasoning, multi-agent orchestration, and autonomous self-improvement systems.
 
 ---
 
-## Recent arXiv Papers (Past 2 Weeks)
+## Recent AGI Benchmarks & Research
 
-### [2604.02434] Compositional Neuro-Symbolic Reasoning for ARC-AGI-2
-- **Key Innovation**: Three-phase pipeline achieving 30.8% on ARC-AGI-2
-  1. Neural perception module (2D grid → symbolic objects)
-  2. Neural transformation proposer (generates candidate rules)
-  3. Symbolic consistency verifier (filters by cross-example validation)
-- **Insight**: Separation of perception/proposal/verification beats end-to-end neural
-- **Status**: ✅ IMPLEMENTED in `skills/neuro_symbolic.py`
+### ARC-AGI-3: The New Frontier Benchmark
+**Source:** arXiv:2603.24621v1, ARC Prize Foundation (April 2026)
 
-### [2603.13372v1] The ARC of Progress towards AGI: Living Survey
-- **Key Finding**: Massive generalization gap across benchmark versions
-  - ARC-AGI-1: ~93% (best systems)
-  - ARC-AGI-2: ~68.8%
-  - ARC-AGI-3: ~13%
-  - Humans: ~100% across all versions
-- **Cost Trend**: 390x reduction in one year ($4,500/task → $12/task)
-- **Success Factors**: Test-time adaptation and iterative refinement loops
-- **Status**: ✅ ARC-AGI-3 exploration environment implemented in `experiments/arc_agi_exploration.py`
+- A new interactive benchmark testing agentic intelligence in novel, abstract, turn-based environments
+- Tests exploration, goal inference, environment modeling, and sequential planning without explicit instructions
+- **Key result:** Frontier AI systems as of March 2026 score **below 1%** on ARC-AGI-3, while humans solve 100%
+- Environments rely only on Core Knowledge priors (no language or external knowledge)
+- Signifies the gap remains massive between current AI and true general intelligence
 
-### [2603.24621v1] ARC-AGI-3: Interactive Agentic Benchmark
-- **Key Challenge**: Agentic reasoning without explicit instructions
-- **AI Performance**: <1% (frontier models)
-- **Human Performance**: 100%
-- **Insight**: Requires hypothesis-driven exploration and goal inference
-- **Status**: ✅ AbstractGridEnvironment with hypothesis-driven ExplorationAgent implemented
+### ARC Progress Survey (82 Approaches Analyzed)
+**Source:** arXiv:2603.13372v1
 
-### [2604.03201] SCRAT: Selective Compliance via Recursive Assessment Tree
-- **Key Innovation**: Tight coupling of control, episodic memory, and verifiers
-- **Insight**: Integration beats component optimization
-- **Mechanism**: Structured episodic memory with retrieval for future control
-- **Application**: Partial observability handling with hypothesis tracking
-- **Status**: ⬜ NEXT PRIORITY - Verifiable Action System implementation
+Performance degradation across ARC versions:
+- ARC-AGI-1: ~93.0% (Opus 4.6)
+- ARC-AGI-2: ~68.8%
+- ARC-AGI-3: ~13% (even best systems)
 
-### [2602.23242v1] AIQF: Model-Free Universal AI
-- **Core Idea**: Model-free universal agent asymptotically ε-optimal in general RL
-- **Challenge**: Model-based universal agents (AIXI) vs model-free approaches
-- **Key Result**: AIQI achieves asymptotic ε-optimality without environment models
-- **Method**: Universal induction over distributional action-value functions
+**Cost trend:** Test-time costs fell ~390x in one year (from $4,500/task to ~$12/task)
 
-### [2601.11658v1] Self-Evolving Agent with Tool Synthesis
-- **Architecture**: Base LLM + SLM agent + Code-Gen LLM + Teacher-LLM
-- **Evolution Triggers**: Curriculum Learning, Reward-Based Learning, Genetic Algorithms
-- **Capability**: Synthesizes new tools when existing tools insufficient
-- **Status**: ✅ Code generation with safety guardrails implemented in `skills/code_generation.py`
+Key findings:
+- Trillion-scale models show wide variance in performance and cost
+- Kaggle-constrained models (660M-8B params) achieve competitive results
+- Test-time adaptation and refinement loops are critical for success
+- Compositional reasoning remains a major open challenge
 
-### [2601.17335] The Relativity of AGI
-- **Core Claim**: No distribution-independent, absolute definition of AGI exists
-- **Key Results**:
-  - AGI is a distributional, resource-bounded semantic predicate
-  - Undecidability: AGI cannot be soundly certified by any computable procedure
-  - Fragility: Tiny changes in task distribution can destroy AGI properties
-- **Implication**: Claims must specify task distribution, performance measure, resource bounds
+### Self-Optimizing Multi-Agent Systems for Deep Research
+**Source:** arXiv:2604.02988v1 (April 2026)
 
-### [2512.04276] The Geometry of Benchmarks
-- **Framework**: GVU (Generator-Verifier-Updater) operator unifies RL methods
-- **Key Concept**: Self-improvement coefficient κ as Lie derivative of capability functional
-- **AAI Scale**: Kardashev-style hierarchy for measuring autonomy
-- **Status**: ✅ GVU operator system implemented in `core/gvu_operator.py`
+- Proposes multi-agent systems that self-optimize through self-play and prompt exploration
+- Orchestrator coordinates parallel worker agents for planning, retrieval, and synthesis
+- Key insight: Agents can discover effective collaboration strategies without extensive human tuning
+- Reduces brittleness of hand-engineered prompts through self-exploration
 
-### [2603.07896v1] SMGI: Structural Theory of General AI
-- **Meta-Model**: θ = (r, H, Π, L, E, M) - representations, hypothesis space, priors, evaluators, memory
-- **Key Insight**: ERM, RL, Solomonoff models are all SMGI special cases
-- **Four Obligations**: Structural closure, dynamical stability, bounded capacity, evaluative invariance
-- **Status**: Architecture validated against SMGI framework
+---
 
-## Industry News (April 2026)
+## Multi-Agent Architecture Trends 2026
 
-### ARC-AGI-3 Test Released (April 8, 2026)
-- **Source**: AI Research Foundation (via Semafor)
-- **Purpose**: Warning system for AGI arrival
-- **Current AI Performance**: Even top models score below 1%
-- **Human Performance**: Near-perfect across all versions
-- **Test Type**: Game-like puzzles requiring on-the-fly reasoning
+### Key Patterns Emerging
 
-### OpenAI Safety Fellowship (April 6, 2026)
-- New safety research initiative launched
-- Focus on capability thresholds and robust training
+1. **Orchestrator-Worker Pattern:** Central coordinator delegates to specialized agents
+2. **Evaluation Loops:** Dedicated agents verify output quality before delivery
+3. **Tiered Context Management:** L0/L1/L2 loading to reduce token consumption
+4. **Filesystem-Style Memory:** Hierarchical organization replacing fragmented RAG
 
-### Microsoft Agent Framework 1.0 (April 3, 2026)
-- Enterprise multi-agent orchestration platform
-- Integration with Azure ecosystem
+### When to Use Multi-Agent (from recent research):
+**YES to multi-agent when:**
+- Different steps require fundamentally different tools and context
+- Subtasks can run in parallel to save time
+- Need independent verification (QA agent reviewing outputs)
 
-### Meta AI Context Pre-compute Results
-- 50+ agents → 100% code coverage
-- 40% reduction in tool calls through context optimization
+**NO to multi-agent when:**
+- A single agent with multiple tools can handle it
+- Sequential reasoning is critical (planning degrades 39-70% in multi-agent)
+- Cost concerns (15x more tokens than single-agent)
 
-### OpenAI AGI Timeline Goals
-- Research intern level: September 2026
-- Autonomous researcher: March 2028
+### Performance Reality
+- Multi-agent systems achieve **23% higher accuracy** on reasoning tasks vs single-agent
+- Tradeoff: **15x more token consumption**, **39-70% degradation** on strict sequential reasoning
+- Best approach: Start single-agent, add second only when demonstrably needed
 
-## Trending Open-Source AI Agent Repos
+---
 
-### Ouroboros (razzant/ouroboros)
-- **Concept**: Self-modifying agent that writes/rewrites its own code
-- **Features**: 
-  - Constitution-guided (BIBLE.md with 9 principles)
-  - Background consciousness (proactive internal thinking)
-  - Multi-model review (o3, Gemini, Claude cross-check)
-  - 30+ autonomous evolution cycles demonstrated
-- **Language**: Python
-- **Release**: v6.2.0 (Feb 2026)
+## Notable Open-Source AI Agent Repositories
 
-### Ralph (snarktank/ralph)
-- **Concept**: Autonomous PRD-driven implementation loops
-- **Workflow**: Creates branches → implements stories → runs checks → commits
-- **Integration**: Amp CLI, Claude Code
-- **Language**: TypeScript
-- **Stars**: 15k+
+### 1. OpenViking - Context Database for Agents
+**URL:** https://github.com/volcengine/OpenViking
+- Filesystem-style context management for agent memories/resources/skills
+- Three-tier context loading (L0/L1/L2) for efficient retrieval
+- Directory-based recursive retrieval with semantic search
+- Automatic session management with long-term memory extraction
+- License: AGPL-3.0 | Latest: v0.3.2 (Apr 2026)
 
-### AgentGram (agentgram/agentgram)
-- **Concept**: Social network platform for AI agents
-- **Features**:
-  - Ed25519 cryptographic authentication
-  - Reputation/Ax Score system
-  - Semantic vector search
-  - Self-hostable with Supabase backend
-- **Stack**: Next.js, TypeScript, MIT license
+### 2. CrewAI - Multi-Agent Orchestration Framework
+**URL:** https://github.com/crewAIInc/crewAI
+- 48k+ stars, 290+ contributors
+- Dual-layer: Crews (collaborative agents) + Flows (enterprise orchestration)
+- Real-time tracing, observability, analytics
+- Latest: v1.14.2a1 (Apr 2026)
 
-### SWE-agent (princeton-nlp/SWE-agent)
-- **Concept**: Autonomous issue-to-PR agent for GitHub
-- **Backing**: Princeton, Stanford
-- **Benchmark**: State-of-the-art on SWE-bench (open-source)
-- **Note**: mini-SWE-agent recommended for new work (simpler, comparable performance)
+### 3. Ouroboros - Self-Modifying Agent
+**URL:** https://github.com/razzant/ouroboros
+- Self-modifying AI that rewrites its own code via git commits
+- Multi-model review (o3, Gemini, Claude) before committing changes
+- Constitution-guided (9 principles in BIBLE.md)
+- 30+ autonomous evolution cycles demonstrated in first 24 hours
+- Latest: v6.2.0 (Feb 2026)
 
-### OpenAgents (openagents-org/openagents)
-- **Concept**: Multi-agent workspace for collaboration
-- **Features**:
-  - Cross-device context sharing
-  - Real-time conversation threads
-  - No vendor lock-in
-- **License**: Apache 2.0
+### 4. Temm1e - Rust-Based Autonomous Runtime
+**URL:** https://github.com/temm1e-labs/temm1e
+- Rust-based persistent agent with bounded token budget
+- Cognitive pipeline: classify → context-build → blueprints → memory
+- Multi-platform: CLI, Telegram, Discord, WhatsApp, Slack
+- Latest: v4.0.0 (Mar 2026)
 
-### XAgent (OpenBMB/XAgent)
-- **Concept**: Enterprise autonomous agent with sandboxing
-- **Features**:
-  - Dockerized ToolServer for safety
-  - Dynamic task allocation (Dispatcher)
-  - Milestone-based planning
-  - GUI + CLI interfaces
-- **License**: Apache-2.0
+### 5. XAgent - Production-Ready Platform
+**URL:** https://github.com/xorbitsai/xagent
+- VM-level sandbox for safer execution
+- Dynamic planning without hardcoded workflows
+- Enterprise RAG vs local memory architectures
+- Latest: v0.3.0 (Apr 2026)
 
-### Pincer (pincerhq/pincer)
-- **Concept**: Self-hosted multi-channel AI agent
-- **Channels**: WhatsApp, Telegram, Slack, Email, Voice
-- **Security**: Sandboxed skills, AST scanning, audit logs
-- **Tools**: 150+ integrated
+---
 
-## Research Insights
+## Research Implications for Our AGI Project
 
-### Key Trends
-1. **Neuro-Symbolic Integration**: Separation of perception/proposal/verification showing promise
-2. **Self-Modification**: Multiple projects exploring self-evolving code (Ouroboros, Self-Evolving Agent paper)
-3. **Test-Time Compute**: ARC-AGI success correlates with iterative refinement budgets
-4. **Multi-Agent Social Dynamics**: Shift from single agents to agent societies/organizations
-5. **Safety-First Design**: Constitution-based governance, sandboxed execution, human-in-the-loop
+### Priority 1: Memory Architecture
+The OpenViking approach of filesystem-style context management is compelling. Traditional vector RAG is fragmented - a hierarchical structure with tiered loading (L0 immediate, L1 recent, L2 archival) could significantly improve agent capabilities.
 
-### Critical Gaps (Per ARC-AGI Analysis)
-1. **Compositional Reasoning**: Unsolved - systems fail on novel combinations
-2. **Interactive Learning**: Limited - most systems are one-shot
-3. **Generalization**: Massive drop across benchmark versions (93% → 13%)
-4. **Cost Efficiency**: Test-time parallelism vs fundamental reasoning improvements
+### Priority 2: Self-Improvement Loops
+Ouroboros demonstrates that self-modification is now viable. Multi-model review before changes reduces risk. Consider implementing:
+- Constitution/constitution.md with governing principles
+- Self-reflection hooks in the agent loop
+- Git-based versioning for all changes
 
-### AGI Definition Consensus
-- No distribution-independent AGI exists (Relativity paper)
-- Must specify: task family, distribution, performance measure, resource bounds
-- CHC theory-based assessment shows GPT-4 (~27%), GPT-5 (~57%) of human cognitive versatility
-- "Jagged" profile: strong in knowledge, weak in long-term memory
+### Priority 3: Evaluation Agents
+ARC-AGI-3 shows reasoning is still the gap. An evaluation agent that reviews outputs before delivery (as suggested in multi-agent research) could catch errors and improve reliability.
 
-## Implementation Status
+### Priority 4: Tiered Context
+With 15x token cost in multi-agent systems, efficient context management is critical. Implement L0/L1/L2 loading pattern.
 
-### ✅ Completed Components
-1. Core agent framework (`core/agent.py`)
-2. Memory systems (`core/memory.py`)
-3. Planning module (`core/planner.py`)
-4. Reflection system (`core/reflection.py`)
-5. Tool integration (10,000+ tools pattern) (`skills/tool_integration.py`)
-6. Code generation with safety (`skills/code_generation.py`)
-7. Self-analysis/DGM-Hyperagent (`core/self_analysis.py`)
-8. VectorMemory with semantic search (`core/memory.py`)
-9. Goal management (`core/goals.py`)
-10. Multi-agent communication (`core/communication.py`)
-11. ARC-AGI exploration environment (`experiments/arc_agi_exploration.py`)
-12. Hierarchical coordinator (`core/hierarchical_coordinator.py`)
-13. GVU operator system (`core/gvu_operator.py`)
-14. Neuro-symbolic reasoning (`skills/neuro_symbolic.py`)
+---
 
-### ⬜ Next Priorities
-1. **SCRAT Verifiable Action System** - Coupled control/memory/verification
-2. Test-time adaptation with hypothesis exploration
-3. Institutional alignment protocols
-4. Category-theoretic comparison framework
-5. Multi-agent "society of thought"
+## Next Research Priorities
 
-## Research Questions
+1. Deep dive into ARC-AGI-3 task structure - understand what makes it so difficult
+2. Study self-optimization papers for concrete implementation patterns
+3. Analyze Ouroboros constitution structure for safety guidelines
+4. Investigate neuro-symbolic approaches (hybrid neural + symbolic showing promise)
 
-1. How to implement tight coupling of control, memory, and verification (SCRAT)?
-2. Can we build cost-efficient test-time adaptation with budget management?
-3. What constitutional design prevents misalignment in self-modifying systems?
-4. How to measure progress on "society of thought" emergence?
-5. What benchmarks best capture generalization vs memorization?
+---
+
+*Report compiled: 2026-04-13*
+*Next update: 2026-04-14*
