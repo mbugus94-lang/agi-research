@@ -7,13 +7,132 @@
 
 ## Build Log
 
+### 2026-04-13 - Run: Tiered Memory System (OpenViking-inspired)
+**Status**: ✅ COMPLETE - 12/12 tests passed
+
+**Research Summary (April 13, 2026)**:
+
+**Major Breakthroughs:**
+- **ARC-AGI-3 Released** (April 8): New benchmark shows frontier AI scores **below 1%** while humans score 100%
+  - Game-like puzzles requiring on-the-fly reasoning without explicit instructions
+  - 93% → 68.8% → 13% degradation across ARC versions
+  - Test-time costs fell 390x in one year ($4,500/task → ~$12/task)
+  - **Key insight:** Compositional reasoning and test-time adaptation remain critical gaps
+
+**Open-Source Trends:**
+- **OpenViking** (volcengine/OpenViking): Context Database with filesystem-style management
+  - Three-tier context loading (L0/L1/L2) reduces token usage by 60-80%
+  - Directory-based recursive retrieval with semantic search
+  - Automatic session management with long-term memory extraction
+  - Visualized retrieval trajectories for observable context
+- **Ouroboros** (razzant/ouroboros): Self-modifying agent with constitution governance
+  - Multi-model review before code changes
+  - 30+ autonomous evolution cycles in first 24 hours
+- **CrewAI** (48k+ stars): Enterprise multi-agent orchestration
+- **Temm1e** (active): Rust-based runtime with bounded token budget reasoning
+
+**Academic Insights:**
+- **[2603.28906v1] Category-theoretic Framework**: Algebraic foundation unifying RL, Active Inference, Schema Learning
+- **[2604.02988v1] Self-Optimizing Multi-Agent Systems**: Agents discover collaboration strategies via self-play
+- **Multi-agent tradeoffs**: 23% higher accuracy but 15x token consumption, 39-70% degradation on sequential reasoning
+
+**Build Task**: Created `core/tiered_memory.py` - OpenViking-inspired Three-Tier Memory System
+
+**Three-Tier Architecture**:
+- **L0 (Immediate)**: Hot context - last 5 messages, active tools, current task
+  - Max 10 entries, auto-promote to L1 when exceeded
+  - Always loaded first in context building
+- **L1 (Working)**: Warm context - recent sessions, relevant history  
+  - Max 100 entries, filled after L0 before token limit
+  - Auto-promote to L2 when old (>24h) or exceeded
+- **L2 (Archival)**: Cold storage - compressed summaries, long-term knowledge
+  - Retrieved via semantic search when query provided
+  - Compressed at 30-50% ratio to save tokens
+
+**Filesystem-Style Organization**:
+- Replaces fragmented vector RAG with hierarchical directories
+- `/tools/web/` - web search tool outputs
+- `/user/preferences/` - user-specific knowledge
+- `/sessions/2026-04/` - historical sessions
+- `walk()` for recursive traversal, `find()` for path navigation
+- `semantic_search()` with relevance ranking
+
+**Key Classes**:
+- `MemoryTier`: Enum for L0_IMMEDIATE, L1_WORKING, L2_ARCHIVAL
+- `MemoryEntry`: Content with metadata (access_count, importance, compression)
+- `MemoryDirectory`: Filesystem node with subdirectories and memories
+- `TieredMemorySystem`: Main manager with tier limits and promotion logic
+
+**Intelligent Features**:
+- `relevance_score`: Combined importance (40%) + recency (30%) + access frequency (20%) + compression (10%)
+- Automatic compression when moving to L2 (50% → 30% ratio)
+- Observable `retrieval_trajectory` showing where context came from
+- Session statistics with access pattern analysis
+
+**Usage**:
+```python
+memory = TieredMemorySystem()
+
+# Store in appropriate tier
+memory.store("Current task", tier=MemoryTier.L0_IMMEDIATE, directory="/tasks/active")
+memory.store("Recent tool output", tier=MemoryTier.L1_WORKING, directory="/tools/web")
+memory.store("Long-term knowledge", tier=MemoryTier.L2_ARCHIVAL, directory="/knowledge")
+
+# Load with tiered priority
+context = memory.load_context(
+    query="relevant context",
+    max_tokens=4000,
+    expand_tiers=True  # Search L2 if room
+)
+# Returns: L0 (all) → L1 (fill remaining) → L2 (if query matches)
+
+# Track retrieval for observability
+print(context["retrieval_trajectory"])
+# ['L0:Current task...', 'L1:Recent tool output...', 'L2[0.85]:Long-term knowledge...']
+```
+
+**Test Results**: 12/12 passed
+1. Basic tier creation ✅
+2. Directory organization ✅
+3. L0 promotion to L1 ✅
+4. Context loading priority ✅
+5. Semantic retrieval ✅
+6. Retrieval trajectory ✅
+7. Access pattern tracking ✅
+8. Compression and archival ✅
+9. Session statistics ✅
+10. Directory walk ✅
+11. Memory serialization ✅
+12. Token efficiency ✅
+
+**Research Synthesis**:
+- OpenViking's filesystem approach provides better organization than flat vector stores
+- Tiered loading with L0→L1→L2 priority achieves 60-80% token reduction
+- Observable retrieval trajectories enable debugging and trust
+- Automatic promotion/demotion keeps hot data in fast tiers
+- Compression enables long-term storage without token bloat
+
+**Files Changed**:
+- `core/tiered_memory.py`: 350+ lines - Three-tier memory with filesystem organization
+- `experiments/test_tiered_memory.py`: 12 comprehensive validation tests
+- `CURRENT_RESEARCH.md`: Updated with April 13 research (ARC-AGI-3, OpenViking, Ouroboros)
+- `AGENTS.md`: This build log entry
+
+**Next Priority**: Neuro-symbolic reasoning module
+- ARC-AGI-3 shows compositional reasoning is the key gap
+- Separate perception (neural) from symbolic filtering (rule-based)
+- Pattern matching and transformation for abstract reasoning
+- Alternative: Constitution framework for self-modifying safety (Ouroboros pattern)
+
+---
+
 ### 2026-04-12 - Run 2: Category-Theoretic AGI Comparison Framework
 **Status**: ✅ COMPLETE - 14/14 tests passed
 
 **Research Summary (April 12, 2026 - Evening)**:
 
 Key arXiv Papers:
-- **[2603.28906v1] Category-theoretic Comparative Framework for AGI** - Formal algebraic foundation using category theory to unify RL, Universal AI, Active Inference, Schema-based Learning
+- **[2603.28906v1] Category-theoretic Framework for AGI** - Formal algebraic foundation using category theory to unify RL, Universal AI, Active Inference, Schema-based Learning
 - **[2603.24621v1] ARC-AGI-3** - Interactive benchmark for frontier agentic intelligence (<1% AI vs 100% human)
 - **[2603.20639v1] Agentic AI Intelligence Explosion** - Distributed/social/relational intelligence vs monolithic
 
@@ -944,7 +1063,7 @@ results = memory.vector.hybrid_search(query, keyword_weight=0.3, semantic_weight
 
 **Next Priority**: Test-time adaptation loops (ARC-AGI lesson)
 - Dynamic refinement during task execution
-- Progressive hypothesis exploration
+- Progressive hypothesis exploration with budget management
 - Cost-efficient inference-time optimization
 - Alternative: VectorMemory with semantic search
 
