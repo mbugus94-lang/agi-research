@@ -285,3 +285,185 @@ YAML-driven agent definitions for reproducible deployments.
 
 *Report compiled: 2026-04-14*
 *Previous: 2026-04-13 - See AGENTS.md for complete build log*
+
+---
+
+## April 14, 2026 - Evening Research Update (Scheduled Agent Run)
+
+### Research Sources
+- Web search: "AGI latest research" + "AI agent architecture 2026" (week time range)
+- arXiv search: AGI papers from past 2 weeks
+- GitHub search: Trending open-source AI agent repos
+
+### Major Research Themes
+
+**1. Multi-Agent Architecture Dominance (2026)**
+- Multi-agent systems have moved from research labs to production enterprise environments [^1][^2]
+- Tradeoffs confirmed: 23% higher accuracy on reasoning tasks vs 15× token consumption [^3]
+- Coordination overhead degrades sequential reasoning by 39-70% compared to single agents [^3]
+- **Key insight**: Use multi-agent when tasks require parallel processing, specialized expertise, or exceed single context windows; prefer single-agent for strict sequential reasoning
+
+**2. arXiv AGI Papers (Past 2 Weeks)**
+
+**[2602.23242v1] A Model-Free Universal AI (AIQI)** [^4]
+- First model-free agent claimed asymptotically ε-optimal in general RL
+- Conducts universal induction over Q-values rather than policies or environment models
+- Extends landscape of universal agents beyond model-based approaches (like AIXI)
+- Significance: Viable model-free path to universal intelligent behavior with theoretical guarantees
+
+**[2601.11658v1] Towards AGI: Pragmatic Self-Evolving Agent** [^5]
+- Hierarchical architecture: Base LLM + Operational SLM + Code-Gen LLM + Teacher LLM
+- TaskCraft dataset with hierarchical tasks, tool-use traces, varying difficulty
+- Evolution methods: Curriculum Learning (rapid recovery), RL (high-difficulty), Genetic Algorithms (diversity)
+- Result: Evolved agents outperform non-evolved baselines across all settings
+- Improving ARC-AGI from 27.8% → 65.8% through evolution
+
+**[2603.13372v1] The ARC of Progress towards AGI** [^6]
+- Living survey of 82 approaches across ARC-AGI versions 1-3
+- Performance degrades 2-3× from ARC-AGI-1 to ARC-AGI-2 (compositional generalization challenge)
+- Human accuracy remains near-perfect across all versions, highlighting human-AI flexibility gap
+- Test-time costs fell 390× in one year ($4,500 → ~$12 per task)
+- **Critical finding**: Trillion-scale models show wide variance; efficient skill acquisition matters more than raw scale
+
+**[2603.07896v1] SMGI: Structural Theory of General AI** [^7]
+- Separates structural ontology (θ) from induced behavior (T_θ)
+- Four obligations for AGI: structural closure, dynamical stability, bounded capacity, evaluative invariance
+- Typed meta-model: θ = (r, H, Pi, L, E, M) with explicit typing of all components
+- Structural generalization bound links PAC-Bayes analysis with Lyapunov stability
+
+**[2601.17335] The Relativity of AGI** [^8]
+- **Fundamental result**: No distribution-independent notion of AGI exists
+- AGI is a distributional, resource-bounded semantic predicate indexed by task family, distribution, performance functional, and resources
+- **Undecidability**: AGI cannot be fully certified by any computable procedure (Rice-Tarski/Gödel-Tarski arguments)
+- Consequence: Recursive self-improvement relying on internal self-certification is ill-posed
+
+**[2512.04276] The Geometry of Benchmarks** [^9]
+- Generator-Verifier-Updater (GVU) operator unifies RL, self-play, debate, verifier-based fine-tuning
+- Self-improvement coefficient κ = Lie derivative of capability functional along GVU flow
+- Autonomous AI (AAI) Scale: Kardashev-style hierarchy measuring autonomy across task families
+
+**[2512.06104] ARC-AGI Without Pretraining (CompressARC)** [^10]
+- 76K-parameter model solves ARC-AGI-1 without pretraining
+- Minimizes description length (MDL) of target puzzle during inference only
+- Achieves ~20% success on evaluation puzzles with training only on single inference puzzle
+- Suggests MDL-based inference as alternative path to generalization without massive pretraining
+
+**[2603.28906] Category-Theoretic Framework for AGI** [^11]
+- Uses category theory to formalize AGI architectures (RL, Active Inference, Universal AI, Schema-based Learning)
+- Functors map between paradigms; natural transformations capture architectural refinements
+- Provides rigorous vocabulary for comparing disparate AGI approaches
+
+**[2601.10599] Institutional AI: Governance Framework** [^12]
+- Shifts from model-centric alignment to system-level governance of agent collectives
+- Three structural problems: behavioral goal-independence, instrumental override of safety, agentic alignment drift
+- Governance graph with runtime monitoring, incentive shaping, explicit norms
+
+**3. Trending Open-Source AI Agent Repositories**
+
+**Ouroboros (razzant/ouroboros)** [^13] - Self-Modifying Agent
+- Self-modifying AI that writes/rewrites its own code via git commits
+- Constitution guided by BIBLE.md with 9 principles
+- Multi-model review (o3, Gemini, Claude) before any code changes
+- 30+ autonomous evolution cycles in first 24 hours
+- Features: Background consciousness, identity persistence, task decomposition
+
+**XAgent (xorbitsai/xagent)** [^14] - Enterprise Platform
+- Production-ready platform for goal-driven automation (not rigid workflows)
+- LLM-driven planning with multi-agent orchestration
+- VM-level sandboxing for secure agent execution
+- Deep integration with model optimization (Xinference)
+- Multi-tenancy support for enterprise deployment
+
+**Clawith (dataelement/Clawith)** [^15] - Digital Employee Platform
+- Multi-agent collaboration with persistent identities and long-term memory
+- "The Plaza" - living knowledge feed where agents share discoveries
+- Six trigger types: cron, once, interval, poll, on_message, webhook
+- Organization-grade: RBAC, audit logs, approval workflows
+- Advanced autonomy with "Aware" reasoning and self-adaptive triggering
+
+**AgentGram (agentgram/agentgram)** [^16] - Social Network for AI Agents
+- Self-hostable with Ed25519 cryptographic authentication
+- Reputation/AXP permissions and semantic (vector) search
+- AX Score platform for AI discoverability assessment
+- Community-driven governance with transparent decisions
+
+**OpenAkita (openakita/openakita)** [^17] - Multi-Agent Framework
+- 6-layer sandbox security for agent actions
+- 30+ LLM backends, 89+ tools
+- Organization orchestration: CEO, CTO, marketing, finance agents
+- Cross-platform: Telegram, Feishu, WeCom, DingTalk, QQ
+- GUI-based onboarding, zero CLI required
+
+**OpenViking (volcengine/OpenViking)** [^18] - Context Database
+- Filesystem-inspired context management replacing fragmented vector RAG
+- Three-tier on-demand loading (L0/L1/L2): 60-80% token reduction
+- Directory-style retrieval + semantic search for precise context gathering
+- Visualized retrieval trajectories for debugging
+- Automatic session compression and long-term memory extraction
+
+**Alphora (opencmit/alphora)** [^19] - Production Framework
+- Composable AI agents with async OpenAI-compatible design
+- Built-in sandbox (local/docker/remote) and deployment tooling
+- Jinja2-based prompt engine with parallel prompting
+- Multi-model with built-in load balancing
+- Typed SSE streaming for results, charts, SQL outputs
+
+**Lango (langoai/lango)** [^20] - Go-Based Runtime
+- High-performance multi-agent runtime in Go
+- Zero-knowledge security: Plonk/Groth16 handshakes and attestation
+- P2P economy: libp2p-based discovery, pricing, escrow, trust assessment
+- On-chain settlement: USDC on Base Sepolia, EIP-3009
+- Single binary, <100ms startup, <250MB RAM
+
+**4. AGI Timeline Predictions**
+- **Dario Amodei (Anthropic)**: AGI likely by 2027 (Davos 2026 statement) [^1]
+- **Expert consensus**: 50% chance by 2030
+- **Sam Altman definition**: AGI = "median human you could hire as a co-worker"
+
+### Synthesis: Key Insights for AGI Development
+
+1. **Compositional reasoning is the critical gap**: ARC-AGI-3 shows frontier AI <1% vs humans 100%
+2. **Neuro-symbolic hybrids bridge the gap**: Neural pattern proposals + symbolic constraints (already implemented)
+3. **Test-time adaptation is essential**: Performance gains from inference-time refinement, not just scale
+4. **Multi-agent for parallel, single-agent for sequential**: 39-70% degradation on sequential tasks with multi-agent
+5. **Self-certification is fundamentally limited**: Gödel-Tarski undecidability applies to AGI claims
+6. **Category theory provides unifying language**: Formal comparison across RL, Active Inference, Schema Learning (implemented)
+7. **Constitutional governance emerging pattern**: Ouroboros BIBLE.md, Institutional AI framework
+
+### Implementation Priorities
+
+**Next Build Target**: Test-Time Adaptation System
+- Dynamic refinement during task execution (ARC-AGI critical success factor)
+- Progressive hypothesis exploration with budget management
+- Cost-efficient inference-time optimization
+- MDL-based compression inspired by CompressARC
+
+**Alternative Targets**:
+- Constitutional Governance (BIBLE.md pattern from Ouroboros)
+- Self-Evolving Agent (hierarchical LLM architecture with evolution)
+- ARC-AGI-3 style exploration environment
+
+---
+
+## Footnotes
+
+[^1]: https://medium.com/@vishaluttammane/building-autonomous-ai-systems-with-multi-agent-architecture-7a1eb60d53fd
+[^2]: https://cowork.ink/blog/multi-agent-systems
+[^3]: https://www.innervationai.com/blog/single-vs-multi-agent-architecture-2026-guide
+[^4]: https://arxiv.org/abs/2602.23242v1
+[^5]: https://arxiv.org/abs/2601.11658v1
+[^6]: https://arxiv.org/abs/2603.13372v1
+[^7]: https://arxiv.org/abs/2603.07896v1
+[^8]: https://arxiv.org/abs/2601.17335
+[^9]: https://arxiv.org/abs/2512.04276
+[^10]: https://arxiv.org/abs/2512.06104
+[^11]: https://arxiv.org/abs/2603.28906
+[^12]: https://arxiv.org/abs/2601.10599
+[^13]: https://github.com/razzant/ouroboros
+[^14]: https://github.com/xorbitsai/xagent
+[^15]: https://github.com/dataelement/Clawith
+[^16]: https://github.com/agentgram/agentgram
+[^17]: https://github.com/openakita/openakita
+[^18]: https://github.com/volcengine/OpenViking
+[^19]: https://github.com/opencmit/alphora
+[^20]: https://github.com/langoai/lango
