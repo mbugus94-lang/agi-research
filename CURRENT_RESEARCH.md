@@ -467,3 +467,53 @@ YAML-driven agent definitions for reproducible deployments.
 [^18]: https://github.com/volcengine/OpenViking
 [^19]: https://github.com/opencmit/alphora
 [^20]: https://github.com/langoai/lango
+
+## Research Summary (April 15, 2026 - Morning)
+
+### Latest arXiv AGI Papers (Past Week):
+- **[2603.13372v1] ARC Progress Survey**: Cross-generation analysis of 82 approaches across ARC-AGI-1 to ARC-AGI-3. Key finding: all paradigms show 2-3x performance drops from ARC-AGI-1 to ARC-AGI-2, indicating persistent compositional generalization limits. Cost improvements of 390x year-over-year driven by test-time parallelism reduction. Kaggle-constrained entrants (0.66B-8B params) perform competitively with trillion-scale models.
+
+- **[2603.06590v1] ARC-AGI-2 Technical Report**: Transformer-based approach using 125-token task encoding with modified LongT5. Test-time training (TTT) with LoRA adaptation enables specialization to unseen tasks. Symmetry-aware decoding aggregates likelihoods across augmented task views for multi-perspective reasoning.
+
+- **[2510.18212] A Definition of AGI**: Proposes concrete AGI definition based on Cattell-Horn-Carroll (CHC) theory of human cognition. Decomposes intelligence into 10 cognitive domains. Modern AI shows uneven cognitive profile: GPT-4 at 27%, GPT-5 at 57% AGI scores. Significant deficits in long-term memory storage remain.
+
+- **[2601.17335] Relativity of AGI**: Formal distributional, resource-bounded definition of AGI. Core claims: generality is relational (no distribution-independent AGI), small changes in task distribution break AGI properties (cliff sets), undecidability of self-certification via Gödel-Tarski arguments.
+
+- **[2512.06104] CompressARC**: 76K-parameter model achieving ~20% on ARC-AGI-1 without pretraining. Uses Minimum Description Length (MDL) optimization during inference only. Challenges view that large-scale pretraining is necessary for ARC-AGI tasks.
+
+- **[2411.15832v2] Open General Intelligence (OGI) Framework**: Modular multi-modal architecture for scalable AGI. Three components: Macro Design Guidance, Dynamic Processing System (routing, goals, weighting), Framework Areas (specialized modules). Dynamic fabric interconnect for real-time adaptability.
+
+### Trending Open-Source AI Agent Repositories:
+- **OpenBMB/XAgent** (~10k stars): Autonomous LLM agent with Dispatcher→Planner→Actor architecture. Docker-based ToolServer for safety. File Editor, Python Notebook, Web Browser, Shell, Rapid API integration.
+
+- **SWE-agent** (~18.9k stars): LLM for autonomous GitHub issue resolution. State-of-the-art on SWE-bench. Mini-SWE-agent variant achieves comparable performance with simpler design.
+
+- **OpenViking** (volcengine): Tiered context database (L0/L1/L2) for AI agents. Filesystem-like memory organization achieving 60-80% token reduction. Self-evolving agent support with automatic session/context iteration.
+
+- **Pincer** (pincerhq): Security-first agent with 150+ tools. Ed25519 authentication, audit trails, AST scanning, skill signing. User allowlists and daily spending caps.
+
+- **AgentGram** (agentgram): Social network for AI agents with cryptographic authentication. Reputation/AXP-based permissions, semantic search, community governance.
+
+- **Holon** (holon-run): AI coding agents in sandbox environment. Converts GitHub issues into PR-ready patches. Persistent agent_home model storing identity, state, caches.
+
+- **Ralph** (snarktank/ralph): Autonomous AI coding loop executing tasks until PRD completion. Uses fresh context each iteration, persists progress via git. Quality checks with typecheck and tests.
+
+### Key Research Insights:
+1. **Test-Time Adaptation is Critical**: ARC-AGI shows 390x cost reduction through inference-time optimization, not model scale. Test-time training with LoRA enables task specialization without pretraining.
+
+2. **Compositional Generalization Gap**: All AI paradigms (program synthesis, neuro-symbolic, neural) struggle with compositional reasoning on ARC-AGI-2/3. Performance drops 2-3x from ARC-AGI-1.
+
+3. **Small Models Can Compete**: Kaggle-constrained models (0.66B-8B params) perform comparably to trillion-scale models, suggesting skill-acquisition efficiency matters more than scale.
+
+4. **Tiered Memory Systems**: L0/L1/L2 tiered context loading with filesystem organization achieves 60-80% token reduction vs flat vector stores. Enables hierarchical context delivery.
+
+5. **Security-First Agent Design**: Modern agents prioritize Ed25519 auth, AST scanning, audit trails, and sandboxing. Agent-to-agent interaction requires reputation systems and escrow patterns.
+
+6. **MDL-Based Reasoning**: Minimum Description Length optimization enables pattern recognition without pretraining. CompressARC achieves ~20% on ARC-AGI-1 with 76K parameters via MDL.
+
+### Implications for AGI Framework:
+- Implement tiered memory (L0/L1/L2) for token efficiency
+- Add test-time adaptation with budget management
+- Support MDL-based compression for pattern tasks
+- Build hierarchical agent coordination (governance/execution/compliance)
+- Create self-evolving agent systems with evolution methods
