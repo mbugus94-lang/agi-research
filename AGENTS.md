@@ -6,6 +6,78 @@
 - **Purpose**: Continuously research AGI developments and incrementally build an AGI agent framework
 
 ## Build Log
+### 2026-04-16 - Scheduled Run: Hierarchical Task Planner (ARC-AGI-3 Inspired)
+**Status**: ✅ COMPLETE - 36/36 tests passed
+
+**Research Summary (April 16, 2026)**:
+
+**Key arXiv Papers (Past 2 Weeks)**:
+- **[2603.24621v1] ARC-AGI-3**: New frontier benchmark exposing fundamental AI reasoning gaps
+  - Turn-based interactive environments requiring goal inference without explicit instructions
+  - **Performance gap:** Frontier AI scores **below 1%** vs humans at **100%**
+  - Tests internal world-model building, exploratory planning, hypothesis generation
+  - Critical insight: Compositional reasoning remains the key bottleneck
+
+- **[2603.13372v1] ARC Progress Survey**: 82 approaches analyzed showing persistent degradation
+  - All paradigms (neural, neuro-symbolic, program synthesis) show **2-3x performance decline** across ARC versions
+  - Test-time adaptation and refinement loops are critical success factors
+  - **390x cost reduction** in one year ($4,500/task → ~$12/task) but scores still lag
+
+- **[2603.28906v1] Category-Theoretic Framework**: Formal unification of AGI architectures
+  - Categories represent architectures, functors map between paradigms
+  - Natural transformations capture architectural refinements
+  - Unifies RL, Active Inference, Universal AI, Schema Learning
+
+- **[2601.11658v1] Self-Evolving Agent**: Hierarchical LLM architecture (Base/SLM/Code-Gen/Teacher)
+  - Autonomous tool synthesis when existing tools fail
+  - Evolution methods: Curriculum Learning, RL, Genetic Algorithms
+  - TaskCraft dataset evaluation with tool-use traces
+
+**Trending Open-Source AI Agent Repos**:
+- **Ouroboros** (razzant/ouroboros): Self-modifying agent with constitutional governance (BIBLE.md)
+- **OpenViking** (volcengine/OpenViking): Tiered context database L0/L1/L2, filesystem-style
+- **AgentGram** (agentgram/agentgram): Social network for AI agents with reputation/AXP
+- **Lango** (langoai/lango): Multi-agent runtime in Go with zk security (Plonk/Groth16)
+- **Agentspan** (agentspan-ai/agentspan): Distributed durable runtime with crash recovery
+- **Kelos** (kelos-dev/kelos): Kubernetes-native AI coding agents
+- **Clawith** (dataelement/Clawith): Multi-agent collaboration platform with persistent identities
+
+**Build Task**: Created `core/planner.py` - Hierarchical Task Planner with Exploratory Planning
+
+**Core Insight (from ARC-AGI-3 findings):** Agents fail at goal inference without explicit instructions. Need hierarchical task decomposition, exploratory hypothesis generation, and resource-aware planning with budget management.
+
+**Implementation Features**:
+
+1. **Task Type Analysis**: Automatic classification based on task description keywords
+   - `EXPLORATORY`: Tasks requiring hypothesis generation
+   - `SEQUENTIAL`: Tasks with ordered steps
+   - `PARALLEL`: Tasks with independent components
+   - `ATOMIC`: Simple tasks that cannot be decomposed
+
+2. **Hierarchical Decomposition**: Recursive decomposition with configurable depth
+
+3. **Exploratory Planning (ARC-AGI-3 Style)**:
+   - Hypothesis generation with confidence scores (0.0-1.0)
+   - Multiple parallel hypotheses tested
+   - Synthesis task combines results
+
+4. **Resource Budget Management**:
+   - Tracks API calls, compute time, tokens, iterations
+   - Budget exhaustion detection
+   - Automatic consumption tracking
+
+5. **Dynamic Replanning**: Failure triggers replanning with alternative approaches
+
+**Test Results**: 36/36 passed
+
+**Files Changed**:
+- `core/planner.py`: 450+ lines - Hierarchical planner with exploratory planning
+- `experiments/test_planner.py`: 400+ lines - 36 comprehensive validation tests
+- `CURRENT_RESEARCH.md`: Updated with April 16 research
+
+**Next Priority**: Constitutional Governance Framework (Ouroboros BIBLE.md pattern)
+
+---
 
 ### 2026-04-15 - Scheduled Run: Self-Evolving Agent System (arXiv:2601.11658v1)
 **Status**: ✅ COMPLETE - 15/15 tests passed
