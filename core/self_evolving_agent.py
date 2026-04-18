@@ -522,7 +522,11 @@ class TeacherLLM:
         
         # Determine next difficulty
         if avg_performance > self.performance_thresholds["excellent"]:
-            next_difficulty = min(current_stage.value + 1, 5)
+            old_difficulty = self.current_difficulty
+            self.current_difficulty = min(
+                TaskDifficulty(self.current_difficulty.value + 1),
+                TaskDifficulty.RESEARCH
+            )
         elif avg_performance > self.performance_thresholds["good"]:
             next_difficulty = current_stage.value
         else:

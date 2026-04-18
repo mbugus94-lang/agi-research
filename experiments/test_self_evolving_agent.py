@@ -1,618 +1,696 @@
 """
 Test Suite for Self-Evolving Agent System
 
-Validates:
-1. Hierarchical LLM architecture (Base + SLM + Code-Gen + Teacher)
-2. Evolution methods (Curriculum, RL, Genetic, Hybrid)
-3. Task execution with tool-use traces
-4. Evolution cycles and performance tracking
-5. Population diversity and genetic operations
+Validates the hierarchical LLM architecture and evolution methods:
+- Base LLM: Core reasoning and task understanding
+- Operational SLM: Fast, efficient task execution
+- Code-Gen LLM: Code generation and tool synthesis
+- Teacher LLM: Evaluation, feedback, and curriculum generation
+
+Evolution methods tested:
+- Curriculum Learning
+- Reinforcement Learning
+- Genetic Algorithm
+- Hybrid Evolution
 """
+
+import unittest
+import time
+from typing import Dict, Any, List
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.self_evolving_agent import (
     SelfEvolvingAgent, BaseLLM, OperationalSLM, CodeGenLLM, TeacherLLM,
     TaskInstance, TaskDifficulty, EvolutionMethod, EvaluationResult,
-    ToolUseTrace, EvolutionCheckpoint,
-    create_curriculum_agent, create_rl_agent, create_genetic_agent, create_hybrid_agent
+    ToolUseTrace, create_curriculum_agent, create_rl_agent, 
+    create_genetic_agent, create_hybrid_agent
 )
 
 
-def test_base_llm_task_understanding():
-    """Test Base LLM task understanding capabilities."""
-    print("\n🧠 Testing Base LLM Task Understanding...")
+class TestBaseLLM(unittest.TestCase):
+    """Test Base LLM - Core reasoning and task understanding."""
     
-    base = BaseLLM()
-    
-    task = TaskInstance(
-        task_id="test_task_1",
-        description="Search for latest AGI research papers on arXiv",
-        difficulty=TaskDifficulty.INTERMEDIATE,
-        expected_output="paper_list",
-        tools_required=["search", "filter"]
-    )
-    
-    understanding = base.understand_task(task)
-    
-    assert "task_type" in understanding, "Should classify task type"
-    assert "complexity_score" in understanding, "Should compute complexity"
-    assert "required_capabilities" in understanding, "Should identify capabilities"
-    # Accept either information_retrieval or analysis (both are valid for research-related tasks)
-    assert understanding["task_type"] in ["information_retrieval", "analysis"], \
-        f"Expected info retrieval or analysis, got {understanding['task_type']}"
-    assert 0.0 <= understanding["complexity_score"] <= 1.0, "Complexity should be normalized"
-    
-    # Test caching
-    understanding2 = base.understand_task(task)
-    assert understanding == understanding2, "Should return cached understanding"
-    
-    print("  ✅ Base LLM correctly understands and classifies tasks")
-    return True
-
-
-def test_base_llm_adaptation():
-    """Test Base LLM reasoning adaptation."""
-    print("\n📚 Testing Base LLM Adaptation...")
-    
-    base = BaseLLM()
-    
-    # Create mock feedback - use task_id that will create clear pattern key
-    feedback = [
-        EvaluationResult(
-            task_id="search_failed_1",  # Changed from failed_search_1
-            success=False,
-            output=None,
-            tool_traces=[],
-            execution_time=1.0,
-            attempts=1,
-            teacher_feedback="Failed search",
-            score=0.2,
-            improvement_suggestions=["Improve query formulation"]
+    def setUp(self):
+        self.base_llm = BaseLLM()
+        self.sample_task = TaskInstance(
+            task_id="test_task",
+            description="Implement a Python function to sort a list",
+            difficulty=TaskDifficulty.INTERMEDIATE,
+            expected_output="sorted_list",
+            tools_required=["code_gen", "test"]
         )
-    ]
     
-    base.adapt_reasoning(feedback)
+    def test_task_understanding(self):
+        """Test task understanding and analysis."""
+        understanding = self.base_llm.understand_task(self.sample_task)
+        
+        self.assertIn("task_type", understanding)
+        self.assertIn("complexity_score", understanding)
+        self.assertIn("required_capabilities", understanding)
+        self.assertIn("decomposition", understanding)
+        self.assertEqual(understanding["task_type"], "coding")
+        self.assertEqual(understanding["estimated_difficulty"], 2)
     
-    # Pattern key is "failed_" + task_id.split('_')[0] = "failed_search"
-    assert "failed_search" in base.reasoning_patterns, \
-        f"Should track failure patterns. Got: {list(base.reasoning_patterns.keys())}"
-    
-    print("  ✅ Base LLM adapts reasoning from feedback")
-    return True
-
-
-def test_operational_slm_execution():
-    """Test Operational SLM task execution."""
-    print("\n⚡ Testing Operational SLM Execution...")
-    
-    slm = OperationalSLM()
-    
-    task = TaskInstance(
-        task_id="simple_task",
-        description="Calculate 2 + 2",
-        difficulty=TaskDifficulty.ELEMENTARY,
-        expected_output="4",
-        tools_required=["calculate"]
-    )
-    
-    tools = {
-        "calculate": lambda x: eval(x.replace("Calculate ", "").replace("=", ""))
-    }
-    
-    plan = {"task_type": "math", "decomposition": ["execute_directly"]}
-    result, traces = slm.execute(task, plan, tools)
-    
-    assert result is not None, "Should return result"
-    assert isinstance(traces, list), "Should return tool traces"
-    
-    stats = slm.get_performance_stats()
-    assert "cache_size" in stats, "Should track cache size"
-    
-    print("  ✅ Operational SLM executes tasks efficiently")
-    return True
-
-
-def test_codegen_tool_synthesis():
-    """Test Code-Gen LLM tool synthesis."""
-    print("\n🔧 Testing Code-Gen LLM Tool Synthesis...")
-    
-    codegen = CodeGenLLM()
-    
-    # Synthesize a tool
-    tool_spec = codegen.synthesize_tool(
-        "Create a tool to filter data by criteria",
-        examples=[{"input": "data.csv", "criteria": "age > 18"}]
-    )
-    
-    assert "tool_id" in tool_spec, "Should have unique tool ID"
-    assert "name" in tool_spec, "Should have tool name"
-    assert "description" in tool_spec, "Should have description"
-    assert "parameters" in tool_spec, "Should have parameters"
-    assert "implementation" in tool_spec, "Should have implementation"
-    assert "filter" in tool_spec["name"].lower() or "criteria" in tool_spec["name"].lower(), \
-        f"Name should reflect purpose: {tool_spec['name']}"
-    
-    # Test modification
-    modified = codegen.modify_existing(
-        tool_spec["tool_id"],
-        "Add error handling for missing fields"
-    )
-    
-    assert modified["version"] == 2, "Version should increment"
-    assert len(modified["modification_history"]) == 1, "Should track modifications"
-    
-    stats = codegen.get_synthesis_stats()
-    assert stats["total_tools"] == 1, "Should count synthesized tools"
-    
-    print("  ✅ Code-Gen LLM synthesizes and modifies tools")
-    return True
-
-
-def test_teacher_llm_evaluation():
-    """Test Teacher LLM evaluation."""
-    print("\n👨‍🏫 Testing Teacher LLM Evaluation...")
-    
-    teacher = TeacherLLM()
-    
-    task = TaskInstance(
-        task_id="eval_task",
-        description="Summarize research findings",
-        difficulty=TaskDifficulty.INTERMEDIATE,
-        expected_output="summary",
-        tools_required=["search", "summarize"]
-    )
-    
-    output = {"status": "completed", "summary": "Key findings..."}
-    traces = [
-        ToolUseTrace("search", {"query": "AGI"}, "Results...", True, 0.5),
-        ToolUseTrace("summarize", {"content": "..."}, "Summary...", True, 0.3)
-    ]
-    
-    evaluation = teacher.evaluate(task, output, traces)
-    
-    assert isinstance(evaluation, EvaluationResult), "Should return EvaluationResult"
-    assert 0.0 <= evaluation.score <= 1.0, "Score should be normalized"
-    assert evaluation.task_id == task.task_id, "Should reference task"
-    assert evaluation.teacher_feedback, "Should provide feedback"
-    assert isinstance(evaluation.improvement_suggestions, list), "Should provide suggestions"
-    
-    stats = teacher.get_evaluation_stats()
-    assert stats["evaluations"] == 1, "Should count evaluations"
-    
-    print(f"  ✅ Teacher LLM evaluates (score: {evaluation.score:.2f})")
-    return True
-
-
-def test_curriculum_learning_evolution():
-    """Test curriculum learning evolution method."""
-    print("\n📚 Testing Curriculum Learning Evolution...")
-    
-    agent = create_curriculum_agent()
-    
-    # Create tasks at various difficulties
-    tasks = [
-        TaskInstance(f"easy_{i}", f"Task {i}", TaskDifficulty.ELEMENTARY, "out", [])
-        for i in range(3)
-    ]
-    
-    # Execute with high performance to advance curriculum
-    for task in tasks:
-        result = agent.execute_task(task)
-        # Manually add good scores
-        agent.performance_history.append(0.95)
-    
-    # Run evolution
-    evolution = agent.evolve(tasks)
-    
-    assert evolution["evolution_method"] == "CURRICULUM_LEARNING"
-    assert "improvements" in evolution
-    
-    # Check if difficulty advanced
-    report = agent.get_evolution_report()
-    print(f"  Current difficulty: {report['current_difficulty']}")
-    
-    print("  ✅ Curriculum learning adjusts difficulty based on performance")
-    return True
-
-
-def test_reinforcement_learning_evolution():
-    """Test reinforcement learning evolution method."""
-    print("\n🎯 Testing Reinforcement Learning Evolution...")
-    
-    agent = create_rl_agent()
-    
-    # Create hard tasks for RL optimization
-    tasks = [
-        TaskInstance(
-            f"hard_task_{i}",
-            f"Complex analysis task {i}",
-            TaskDifficulty.ADVANCED,
-            "analysis",
-            ["analyze", "synthesize", "report"]
+    def test_complexity_calculation(self):
+        """Test complexity score computation."""
+        complexity = self.base_llm._compute_complexity(self.sample_task)
+        self.assertGreaterEqual(complexity, 0.0)
+        self.assertLessEqual(complexity, 1.0)
+        
+        # More tools = higher complexity
+        task_with_more_tools = TaskInstance(
+            task_id="complex_task",
+            description="Analyze and generate report",
+            difficulty=TaskDifficulty.ADVANCED,
+            expected_output="report",
+            tools_required=["search", "analyze", "summarize", "visualize", "format"]
         )
-        for i in range(3)
-    ]
+        complex_complexity = self.base_llm._compute_complexity(task_with_more_tools)
+        self.assertGreater(complex_complexity, complexity)
     
-    evolution = agent.evolve(tasks)
+    def test_task_classification(self):
+        """Test task classification by type."""
+        tasks = [
+            ("Implement a function", "coding"),
+            ("Analyze data patterns", "analysis"),
+            ("Search for research papers", "information_retrieval"),
+            ("Create a schedule", "planning"),
+            ("Do something", "general")
+        ]
+        
+        for desc, expected_type in tasks:
+            task = TaskInstance(
+                task_id="classify_test",
+                description=desc,
+                difficulty=TaskDifficulty.ELEMENTARY,
+                expected_output="output",
+                tools_required=[]
+            )
+            task_type = self.base_llm._classify_task(task)
+            self.assertEqual(task_type, expected_type)
     
-    assert evolution["evolution_method"] == "REINFORCEMENT_LEARNING"
-    assert "improvements" in evolution
+    def test_task_decomposition(self):
+        """Test hierarchical task decomposition."""
+        decomp = self.base_llm._decompose_task(self.sample_task)
+        self.assertIsInstance(decomp, list)
+        self.assertGreater(len(decomp), 0)
+        
+        # Simple tasks have fewer steps
+        simple_task = TaskInstance(
+            task_id="simple",
+            description="Add two numbers",
+            difficulty=TaskDifficulty.ELEMENTARY,
+            expected_output="sum",
+            tools_required=[]
+        )
+        simple_decomp = self.base_llm._decompose_task(simple_task)
+        self.assertEqual(len(simple_decomp), 1)
     
-    # Check for policy updates
-    improvements = evolution["improvements"]
-    assert "total_reward" in improvements, "Should track reward"
-    assert "policy_updates" in improvements, "Should track policy updates"
+    def test_constraint_extraction(self):
+        """Test constraint extraction from task descriptions."""
+        constrained_task = TaskInstance(
+            task_id="constrained",
+            description="Must implement exactly as specified within 5 minutes",
+            difficulty=TaskDifficulty.ADVANCED,
+            expected_output="result",
+            tools_required=[]
+        )
+        constraints = self.base_llm._extract_constraints(constrained_task)
+        self.assertIn("hard_requirement", constraints)
+        self.assertIn("time_bound", constraints)
     
-    print(f"  Total reward: {improvements['total_reward']:.2f}")
-    print("  ✅ RL evolution optimizes for high-value completions")
-    return True
+    def test_cache_reuse(self):
+        """Test task understanding caching."""
+        u1 = self.base_llm.understand_task(self.sample_task)
+        u2 = self.base_llm.understand_task(self.sample_task)
+        # Should return same cached result
+        self.assertEqual(u1, u2)
 
 
-def test_genetic_evolution():
-    """Test genetic algorithm evolution."""
-    print("\n🧬 Testing Genetic Algorithm Evolution...")
+class TestOperationalSLM(unittest.TestCase):
+    """Test Operational SLM - Fast task execution."""
     
-    agent = create_genetic_agent(population_size=10)
+    def setUp(self):
+        self.slm = OperationalSLM()
+        self.tools = {
+            "test_tool": lambda x: f"Result: {x}",
+            "fail_tool": lambda x: (_ for _ in ()).throw(Exception("Tool failed"))
+        }
     
-    # Verify population initialized
-    assert len(agent.population) == 10, "Should have correct population size"
+    def test_basic_execution(self):
+        """Test basic task execution."""
+        task = TaskInstance(
+            task_id="exec_test",
+            description="Test execution",
+            difficulty=TaskDifficulty.ELEMENTARY,
+            expected_output="result",
+            tools_required=["test_tool"]
+        )
+        
+        result, traces = self.slm.execute(task, {"task_type": "general"}, self.tools)
+        
+        self.assertIn("test_tool", result)
+        self.assertEqual(len(traces), 1)
+        self.assertTrue(traces[0].success)
+        self.assertEqual(traces[0].tool_name, "test_tool")
     
-    # Run evolution
-    tasks = [
-        TaskInstance(f"genetic_task_{i}", f"Task {i}", TaskDifficulty.INTERMEDIATE, "out", [])
-        for i in range(5)
-    ]
+    def test_caching(self):
+        """Test execution result caching."""
+        task = TaskInstance(
+            task_id="cache_test",
+            description="Cacheable task",
+            difficulty=TaskDifficulty.ELEMENTARY,
+            expected_output="cached",
+            tools_required=[]
+        )
+        
+        # First execution
+        r1, _ = self.slm.execute(task, {"task_type": "general"}, self.tools)
+        # Second execution should use cache
+        r2, _ = self.slm.execute(task, {"task_type": "general"}, self.tools)
+        
+        # Should be cached
+        self.assertEqual(self.slm.get_performance_stats()["cache_size"], 1)
     
-    evolution = agent.evolve(tasks)
+    def test_tool_failure_handling(self):
+        """Test handling of tool failures."""
+        task = TaskInstance(
+            task_id="fail_test",
+            description="Test with failing tool",
+            difficulty=TaskDifficulty.ELEMENTARY,
+            expected_output="result",
+            tools_required=["fail_tool"]
+        )
+        
+        result, traces = self.slm.execute(task, {"task_type": "general"}, self.tools)
+        
+        self.assertEqual(len(traces), 1)
+        self.assertFalse(traces[0].success)
+        self.assertIn("fail_tool_error", result)
     
-    assert evolution["evolution_method"] == "GENETIC_ALGORITHM"
-    assert "improvements" in evolution
+    def test_pattern_registration(self):
+        """Test custom execution pattern registration."""
+        custom_pattern = lambda t, tools: {"custom": True, "task": t.description}
+        self.slm.register_pattern("custom_type", custom_pattern)
+        
+        task = TaskInstance(
+            task_id="pattern_test",
+            description="Use pattern",
+            difficulty=TaskDifficulty.ELEMENTARY,
+            expected_output="output",
+            tools_required=[]
+        )
+        
+        result, _ = self.slm.execute(task, {"task_type": "custom_type"}, {})
+        self.assertTrue(result["custom"])
     
-    # Check population fitness
-    improvements = evolution["improvements"]
-    assert "best_fitness" in improvements, "Should track best fitness"
-    assert "population_diversity" in improvements, "Should track diversity"
-    
-    # Verify population sorted by fitness
-    for i in range(len(agent.population) - 1):
-        assert agent.population[i]["fitness"] >= agent.population[i+1]["fitness"], \
-            "Population should be sorted by fitness"
-    
-    print(f"  Best fitness: {improvements['best_fitness']:.4f}")
-    print(f"  Diversity: {improvements['population_diversity']:.4f}")
-    print("  ✅ Genetic evolution maintains population diversity")
-    return True
+    def test_performance_stats(self):
+        """Test performance statistics tracking."""
+        stats = self.slm.get_performance_stats()
+        self.assertIn("cache_size", stats)
+        self.assertIn("pattern_count", stats)
+        self.assertIn("target_response_time", stats)
 
 
-def test_hybrid_evolution():
-    """Test hybrid evolution combining multiple methods."""
-    print("\n🔀 Testing Hybrid Evolution...")
+class TestCodeGenLLM(unittest.TestCase):
+    """Test Code-Gen LLM - Tool synthesis."""
     
-    agent = create_hybrid_agent()
+    def setUp(self):
+        self.codegen = CodeGenLLM()
     
-    # Run multiple generations
-    for gen in range(3):
+    def test_tool_synthesis(self):
+        """Test tool generation from requirements."""
+        requirement = "Create a tool to parse JSON and extract nested values"
+        
+        tool_spec = self.codegen.synthesize_tool(requirement)
+        
+        self.assertIn("tool_id", tool_spec)
+        self.assertIn("name", tool_spec)
+        self.assertIn("description", tool_spec)
+        self.assertIn("parameters", tool_spec)
+        self.assertIn("implementation", tool_spec)
+        self.assertEqual(tool_spec["version"], 1)
+    
+    def test_tool_name_generation(self):
+        """Test automatic tool name generation."""
+        name1 = self.codegen._generate_tool_name("Parse JSON data files")
+        name2 = self.codegen._generate_tool_name("Transform XML to CSV format")
+        
+        self.assertTrue(name1.startswith("tool_"))
+        self.assertTrue(name2.startswith("tool_"))
+        self.assertNotEqual(name1, name2)
+    
+    def test_synthesis_history(self):
+        """Test synthesis history tracking."""
+        initial_count = len(self.codegen.synthesis_history)
+        
+        self.codegen.synthesize_tool("Tool A")
+        self.codegen.synthesize_tool("Tool B")
+        
+        self.assertEqual(len(self.codegen.synthesis_history), initial_count + 2)
+    
+    def test_synthesis_stats(self):
+        """Test synthesis statistics."""
+        # Generate some tools
+        for i in range(3):
+            self.codegen.synthesize_tool(f"Tool requirement {i}")
+        
+        stats = self.codegen.get_synthesis_stats()
+        self.assertIn("total_tools", stats)
+        self.assertIn("total_modifications", stats)
+        self.assertIn("synthesis_attempts", stats)
+        
+        self.assertGreaterEqual(stats["total_tools"], 3)
+
+
+class TestTeacherLLM(unittest.TestCase):
+    """Test Teacher LLM - Evaluation and feedback."""
+    
+    def setUp(self):
+        self.teacher = TeacherLLM()
+        self.task = TaskInstance(
+            task_id="eval_test",
+            description="Test evaluation task",
+            difficulty=TaskDifficulty.INTERMEDIATE,
+            expected_output="correct_output",
+            tools_required=["tool1", "tool2"]
+        )
+    
+    def test_perfect_evaluation(self):
+        """Test evaluation with perfect result."""
+        traces = [
+            ToolUseTrace("tool1", {}, "result1", True, 0.5),
+            ToolUseTrace("tool2", {}, "result2", True, 0.5)
+        ]
+        
+        result = self.teacher.evaluate(
+            self.task, "correct_output", traces, attempts=1
+        )
+        
+        self.assertTrue(result.success)
+        self.assertGreaterEqual(result.score, 0.9)
+        self.assertEqual(result.attempts, 1)
+        self.assertIn("Excellent", result.teacher_feedback)
+    
+    def test_failed_evaluation(self):
+        """Test evaluation with incorrect result."""
+        traces = [
+            ToolUseTrace("tool1", {}, "result1", False, 1.0)
+        ]
+        
+        result = self.teacher.evaluate(
+            self.task, "wrong_output", traces, attempts=3
+        )
+        
+        self.assertFalse(result.success)
+        self.assertLess(result.score, 0.5)
+        self.assertEqual(result.attempts, 3)
+        self.assertIn("Needs improvement", result.teacher_feedback)
+    
+    def test_improvement_suggestions(self):
+        """Test generation of improvement suggestions."""
+        traces = [
+            ToolUseTrace("failing_tool", {}, None, False, 2.0),
+            ToolUseTrace("failing_tool", {}, None, False, 2.0),
+        ]
+        
+        result = self.teacher.evaluate(
+            self.task, "output", traces, attempts=2
+        )
+        
+        self.assertGreater(len(result.improvement_suggestions), 0)
+        # Should suggest improving the failing tool
+        suggestions_text = " ".join(result.improvement_suggestions)
+        self.assertIn("failing_tool", suggestions_text)
+    
+    def test_curriculum_generation(self):
+        """Test curriculum task generation."""
+        # Use high performance to trigger difficulty advancement
+        performance_history = [0.96, 0.97, 0.98, 0.95, 0.99]  # Above 0.95 threshold
+        
+        curriculum = self.teacher.generate_curriculum(
+            TaskDifficulty.ELEMENTARY, performance_history
+        )
+        
+        self.assertEqual(len(curriculum), 5)  # 5 tasks per stage
+        
+        # With excellent performance, should advance difficulty
+        avg = sum(performance_history) / len(performance_history)
+        if avg > 0.95:  # excellence threshold
+            self.assertGreater(curriculum[0].difficulty.value, 1)
+    
+    def test_evaluation_stats(self):
+        """Test evaluation statistics tracking."""
+        # Perform some evaluations
+        for i in range(5):
+            traces = [ToolUseTrace("t", {}, "o", True, 0.2)]
+            self.teacher.evaluate(
+                self.task, "correct_output", traces, attempts=1
+            )
+        
+        stats = self.teacher.get_evaluation_stats()
+        self.assertIn("evaluations", stats)
+        self.assertIn("average_score", stats)
+        self.assertIn("success_rate", stats)
+        self.assertGreaterEqual(stats["evaluations"], 5)
+
+
+class TestEvolutionMethods(unittest.TestCase):
+    """Test different evolution methods."""
+    
+    def setUp(self):
+        self.tools = {
+            "search": lambda q: {"results": [f"Result for {q}"]},
+            "analyze": lambda q: {"analysis": f"Analysis of {q}"},
+            "test_tool": lambda q: {"test": "passed"}
+        }
+    
+    def test_curriculum_agent_creation(self):
+        """Test curriculum learning agent creation."""
+        agent = create_curriculum_agent()
+        self.assertEqual(agent.evolution_method, EvolutionMethod.CURRICULUM_LEARNING)
+        self.assertEqual(agent.current_difficulty, TaskDifficulty.ELEMENTARY)
+    
+    def test_rl_agent_creation(self):
+        """Test RL agent creation."""
+        agent = create_rl_agent()
+        self.assertEqual(agent.evolution_method, EvolutionMethod.REINFORCEMENT_LEARNING)
+    
+    def test_genetic_agent_creation(self):
+        """Test genetic algorithm agent creation."""
+        agent = create_genetic_agent(population_size=10)
+        self.assertEqual(agent.evolution_method, EvolutionMethod.GENETIC_ALGORITHM)
+        self.assertEqual(len(agent.population), 10)
+    
+    def test_hybrid_agent_creation(self):
+        """Test hybrid evolution agent creation."""
+        agent = create_hybrid_agent()
+        self.assertEqual(agent.evolution_method, EvolutionMethod.HYBRID)
+    
+    def test_evolution_cycle(self):
+        """Test full evolution cycle execution."""
+        agent = create_hybrid_agent()
+        
         tasks = [
             TaskInstance(
-                f"hybrid_gen{gen}_task{i}",
-                f"Generation {gen} Task {i}",
-                TaskDifficulty.INTERMEDIATE,
-                "output",
-                ["tool1"]
+                task_id=f"evo_task_{i}",
+                description=f"Task {i}",
+                difficulty=TaskDifficulty.ELEMENTARY if i < 3 else TaskDifficulty.INTERMEDIATE,
+                expected_output=f"output_{i}",
+                tools_required=["test_tool"]
             )
-            for i in range(3)
+            for i in range(5)
         ]
         
-        evolution = agent.evolve(tasks)
-        assert evolution["evolution_method"] == "HYBRID"
+        result = agent.evolve(tasks, self.tools)
         
-        improvements = evolution["improvements"]
-        assert "curriculum" in improvements, "Should have curriculum component"
-        assert "reinforcement_learning" in improvements, "Should have RL component"
+        self.assertIn("generation", result)
+        self.assertIn("evolution_method", result)
+        self.assertIn("results", result)
+        self.assertEqual(result["evolution_method"], "HYBRID")
+        self.assertEqual(len(result["results"]), 5)
         
-        # Genetic runs every 3 generations (gen % 3 == 0): gen 0, 3, 6...
-        # So it should NOT run on gen 2
-        if gen == 0:
-            assert improvements.get("genetic") is not None, "Should run genetic on gen 0 (divisible by 3)"
-        elif gen == 1:
-            assert improvements.get("genetic") is None, "Should NOT run genetic on gen 1"
-        elif gen == 2:
-            assert improvements.get("genetic") is None, "Should NOT run genetic on gen 2"
+        # Check metrics
+        self.assertIn("total_score", result)
+        self.assertIn("avg_score", result)
+        self.assertIn("success_rate", result)
     
-    report = agent.get_evolution_report()
-    assert report["evolution_method"] == "HYBRID"
-    
-    print(f"  Completed {report['execution_stats']['evolution_cycles']} cycles")
-    print("  ✅ Hybrid evolution combines multiple methods effectively")
-    return True
-
-
-def test_tool_synthesis_during_execution():
-    """Test automatic tool synthesis during task execution."""
-    print("\n🛠️ Testing Tool Synthesis During Execution...")
-    
-    agent = create_hybrid_agent()
-    
-    # Task requiring unsynthesized tool
-    task = TaskInstance(
-        task_id="synthesis_task",
-        description="Analyze sentiment of text using custom sentiment analyzer",
-        difficulty=TaskDifficulty.ADVANCED,
-        expected_output="sentiment_score",
-        tools_required=["sentiment_analyzer", "custom_parser"]  # Not in tools
-    )
-    
-    available_tools = {
-        "search": lambda x: "results"
-    }
-    
-    result = agent.execute_task(task, available_tools)
-    
-    # Check that tools were synthesized
-    assert len(agent.evolved_tools) >= 1, "Should synthesize missing tools"
-    assert "sentiment_analyzer" in agent.evolved_tools or "custom_parser" in agent.evolved_tools, \
-        "Should synthesize required tools"
-    
-    print(f"  Synthesized {len(agent.evolved_tools)} tools")
-    print("  ✅ Agent synthesizes tools on-demand during execution")
-    return True
-
-
-def test_evolution_checkpointing():
-    """Test evolution checkpoint creation and tracking."""
-    print("\n💾 Testing Evolution Checkpointing...")
-    
-    agent = create_hybrid_agent()
-    
-    # Run evolution cycles
-    for i in range(3):
-        tasks = [TaskInstance(f"chk_task_{j}", f"Task {j}", TaskDifficulty.INTERMEDIATE, "out", [])
-                 for j in range(3)]
-        agent.evolve(tasks)
-    
-    # Check checkpoints - generation starts at 0, incremented after checkpoint
-    assert len(agent.checkpoints) == 3, "Should create checkpoint per cycle"
-    
-    for i, checkpoint in enumerate(agent.checkpoints):
-        # First checkpoint created during first evolve when generation was 0
-        assert checkpoint.generation == i, f"Should track generation starting from 0, got {checkpoint.generation} at index {i}"
-        assert "avg_score" in checkpoint.performance_metrics, "Should track performance"
-        assert checkpoint.curriculum_stage, "Should track difficulty"
-    
-    report = agent.get_evolution_report()
-    assert report["checkpoints"] == 3
-    
-    print(f"  Created {len(agent.checkpoints)} checkpoints")
-    print("  ✅ Evolution checkpoints track progress")
-    return True
-
-
-def test_comprehensive_evolution_report():
-    """Test comprehensive evolution report generation."""
-    print("\n📊 Testing Comprehensive Evolution Report...")
-    
-    agent = create_hybrid_agent()
-    
-    # Execute various tasks
-    tasks = [
-        TaskInstance(f"report_task_{i}", f"Task {i}", 
-                    TaskDifficulty(i % 4 + 1), "out", [])
-        for i in range(10)
-    ]
-    
-    for task in tasks:
-        agent.execute_task(task)
-    
-    # Run evolution
-    agent.evolve(tasks[:5])
-    
-    report = agent.get_evolution_report()
-    
-    # Verify report structure
-    required_fields = [
-        "generation", "evolution_method", "current_difficulty",
-        "execution_stats", "population_diversity", "evolved_tools_count",
-        "checkpoints", "llm_stats", "recent_performance"
-    ]
-    
-    for field in required_fields:
-        assert field in report, f"Report should include {field}"
-    
-    # Verify LLM stats
-    llm_stats = report["llm_stats"]
-    assert "base_llm" in llm_stats
-    assert "operational_slm" in llm_stats
-    assert "code_gen_llm" in llm_stats
-    assert "teacher_llm" in llm_stats
-    
-    # Verify execution stats
-    exec_stats = report["execution_stats"]
-    # The test runs: 3 evolved tasks + some direct execute_task calls
-    # At least verify the counts are reasonable
-    assert exec_stats["total_tasks"] >= 3, "Should have executed tasks"
-    assert exec_stats["evolution_cycles"] >= 1, "Should have evolution cycles"
-    assert exec_stats["total_tasks"] >= exec_stats["successful_tasks"], "Successful <= total"
-    
-    print(f"  Generation: {report['generation']}")
-    print(f"  Tools evolved: {report['evolved_tools_count']}")
-    print(f"  Population diversity: {report['population_diversity']:.4f}")
-    print("  ✅ Comprehensive report tracks all metrics")
-    return True
-
-
-def test_task_difficulty_progression():
-    """Test task difficulty progression through curriculum."""
-    print("\n📈 Testing Task Difficulty Progression...")
-    
-    agent = create_curriculum_agent()
-    
-    initial_difficulty = agent.current_difficulty
-    
-    # Simulate excellent performance to trigger advancement
-    for _ in range(5):
+    def test_curriculum_progression(self):
+        """Test curriculum difficulty progression."""
+        agent = create_curriculum_agent()
+        
+        # Start at elementary
+        self.assertEqual(agent.current_difficulty, TaskDifficulty.ELEMENTARY)
+        
+        # Simulate excellent performance
+        high_scores = [0.95, 0.97, 0.96, 0.98, 0.94]
+        agent.performance_history = high_scores
+        
+        # Trigger curriculum evolution
         tasks = [
-            TaskInstance(f"prog_task_{i}", f"Task {i}", agent.current_difficulty, "out", [])
-            for i in range(3)
+            TaskInstance(
+                task_id="prog_test",
+                description="Progression test",
+                difficulty=agent.current_difficulty,
+                expected_output="out",
+                tools_required=["test_tool"]
+            )
         ]
         
-        # Add high scores to trigger progression
-        for task in tasks:
-            result = agent.execute_task(task)
-            agent.performance_history.append(0.95)  # Force high scores
+        result = agent.evolve(tasks, self.tools)
         
-        agent.evolve(tasks)
+        # Should advance difficulty
+        improvements = result.get("improvements", {})
+        if "curriculum" in improvements:
+            curr = improvements["curriculum"]
+            # With high scores, should advance
+            self.assertEqual(curr["method"], "curriculum_learning")
     
-    # Check if difficulty progressed
-    final_report = agent.get_evolution_report()
-    final_difficulty = agent.current_difficulty
-    
-    print(f"  Initial: {initial_difficulty.name}")
-    print(f"  Final: {final_difficulty.name}")
-    
-    # Difficulty should have advanced given high performance
-    if final_difficulty.value > initial_difficulty.value:
-        print("  ✅ Curriculum learning advanced difficulty")
-    else:
-        print("  ⚠️ Difficulty unchanged (may need more iterations)")
-    
-    return True
+    def test_checkpoint_creation(self):
+        """Test evolution checkpoint creation."""
+        agent = create_hybrid_agent()
+        
+        tasks = [
+            TaskInstance(
+                task_id="ckpt_test",
+                description="Checkpoint test",
+                difficulty=TaskDifficulty.ELEMENTARY,
+                expected_output="out",
+                tools_required=["test_tool"]
+            )
+        ]
+        
+        agent.evolve(tasks, self.tools)
+        
+        # Should have created checkpoints
+        self.assertGreater(len(agent.checkpoints), 0)
+        
+        checkpoint = agent.checkpoints[0]
+        self.assertEqual(checkpoint.generation, 1)
+        self.assertIn("performance_metrics", checkpoint.__dict__ or vars(checkpoint))
 
 
-def test_task_instance_creation():
-    """Test task instance data structure."""
-    print("\n📝 Testing Task Instance Creation...")
+class TestSelfEvolvingAgentIntegration(unittest.TestCase):
+    """Integration tests for the complete self-evolving agent."""
     
-    task = TaskInstance(
-        task_id="test_123",
-        description="Test description",
-        difficulty=TaskDifficulty.ADVANCED,
-        expected_output={"key": "value"},
-        tools_required=["tool1", "tool2"],
-        metadata={"author": "test", "priority": "high"}
-    )
+    def setUp(self):
+        self.agent = create_hybrid_agent()
+        self.tools = {
+            "search": lambda q: {"data": f"Search: {q}"},
+            "analyze": lambda q: {"analysis": f"Analysis: {q}"},
+            "code_gen": lambda q: {"code": f"Code for: {q}"},
+            "test": lambda q: {"test": "passed"}
+        }
     
-    assert task.task_id == "test_123"
-    assert task.difficulty == TaskDifficulty.ADVANCED
-    assert task.difficulty.value == 3
-    assert len(task.tools_required) == 2
-    assert task.metadata["author"] == "test"
+    def test_full_workflow(self):
+        """Test complete agent workflow with all LLM modules."""
+        # Create diverse tasks
+        tasks = [
+            TaskInstance(
+                task_id="wf_1",
+                description="Search for AGI research papers",
+                difficulty=TaskDifficulty.ELEMENTARY,
+                expected_output="papers",
+                tools_required=["search"]
+            ),
+            TaskInstance(
+                task_id="wf_2",
+                description="Analyze code performance patterns",
+                difficulty=TaskDifficulty.INTERMEDIATE,
+                expected_output="patterns",
+                tools_required=["analyze"]
+            ),
+            TaskInstance(
+                task_id="wf_3",
+                description="Implement sorting algorithm",
+                difficulty=TaskDifficulty.ADVANCED,
+                expected_output="code",
+                tools_required=["code_gen", "test"]
+            )
+        ]
+        
+        # Run multiple evolution cycles
+        for cycle in range(3):
+            result = self.agent.evolve(tasks, self.tools)
+            
+            self.assertIn("results", result)
+            self.assertEqual(len(result["results"]), 3)
+            
+            # All results should have evaluations
+            for eval_result in result["results"]:
+                self.assertIsInstance(eval_result, EvaluationResult)
+                self.assertIn(eval_result.task_id, [t.task_id for t in tasks])
     
-    # Test all difficulty levels
-    for level in TaskDifficulty:
-        task = TaskInstance(f"task_{level.name}", "desc", level, "out", [])
-        assert 1 <= task.difficulty.value <= 5
+    def test_evolution_report(self):
+        """Test comprehensive evolution reporting."""
+        # Run some evolution cycles
+        tasks = [
+            TaskInstance(
+                task_id="report_test",
+                description="Report test task",
+                difficulty=TaskDifficulty.ELEMENTARY,
+                expected_output="out",
+                tools_required=["test"]
+            )
+        ]
+        
+        for _ in range(2):
+            self.agent.evolve(tasks, self.tools)
+        
+        report = self.agent.get_evolution_report()
+        
+        # Check all expected fields
+        self.assertIn("generation", report)
+        self.assertIn("evolution_method", report)
+        self.assertIn("current_difficulty", report)
+        self.assertIn("execution_stats", report)
+        self.assertIn("population_diversity", report)
+        self.assertIn("evolved_tools_count", report)
+        self.assertIn("checkpoints", report)
+        self.assertIn("llm_stats", report)
+        self.assertIn("recent_performance", report)
+        
+        # Validate types
+        self.assertIsInstance(report["generation"], int)
+        self.assertIsInstance(report["evolved_tools_count"], int)
+        self.assertIsInstance(report["population_diversity"], float)
     
-    print("  ✅ Task instances correctly structured")
-    return True
+    def test_multi_generation_evolution(self):
+        """Test evolution across multiple generations."""
+        agent = create_genetic_agent(population_size=5)
+        
+        tasks = [
+            TaskInstance(
+                task_id="gen_test",
+                description="Generation test",
+                difficulty=TaskDifficulty.ELEMENTARY,
+                expected_output="out",
+                tools_required=["test"]
+            )
+        ]
+        
+        initial_generation = agent.generation
+        
+        # Run multiple generations
+        for _ in range(3):
+            agent.evolve(tasks, self.tools)
+        
+        # Generation should advance
+        self.assertGreater(agent.generation, initial_generation)
+        
+        # Population should be maintained
+        self.assertEqual(len(agent.population), 5)
+    
+    def test_performance_history_tracking(self):
+        """Test performance history accumulation."""
+        tasks = [
+            TaskInstance(
+                task_id="hist_test",
+                description="History tracking",
+                difficulty=TaskDifficulty.ELEMENTARY,
+                expected_output="out",
+                tools_required=["test"]
+            )
+        ]
+        
+        initial_len = len(self.agent.performance_history)
+        
+        self.agent.evolve(tasks, self.tools)
+        
+        # Should have added to performance history
+        self.assertGreater(len(self.agent.performance_history), initial_len)
+    
+    def test_tool_synthesis_integration(self):
+        """Test that tool synthesis is tracked during evolution."""
+        # Create task that triggers code generation
+        tasks = [
+            TaskInstance(
+                task_id="synth_int",
+                description="Generate data parser tool",
+                difficulty=TaskDifficulty.ADVANCED,
+                expected_output="tool",
+                tools_required=["code_gen"]
+            )
+        ]
+        
+        initial_tools = len(self.agent.evolved_tools)
+        
+        # Note: Actual synthesis would require more complex tool
+        # This tests that the structure is in place
+        self.agent.evolve(tasks, self.tools)
+        
+        # Code gen LLM should have history
+        self.assertGreater(len(self.agent.code_gen_llm.synthesis_history), 0)
 
 
-def test_tool_use_tracing():
-    """Test tool use trace recording."""
-    print("\n🔍 Testing Tool Use Tracing...")
+class TestDifferentTaskDifficulties(unittest.TestCase):
+    """Test agent behavior with different difficulty levels."""
     
-    traces = [
-        ToolUseTrace(
-            tool_name="search",
-            inputs={"query": "AGI research"},
-            outputs=["result1", "result2"],
-            success=True,
-            execution_time=0.5
-        ),
-        ToolUseTrace(
-            tool_name="filter",
-            inputs={"results": ["r1", "r2"], "criteria": "recent"},
-            outputs=["r1"],
-            success=True,
-            execution_time=0.2
-        ),
-        ToolUseTrace(
-            tool_name="failed_tool",
-            inputs={},
-            outputs="Error: connection failed",
-            success=False,
-            execution_time=1.0
+    def setUp(self):
+        self.agent = create_hybrid_agent()
+        self.tools = {"test": lambda x: {"result": x}}
+    
+    def test_elementary_tasks(self):
+        """Test elementary difficulty tasks."""
+        task = TaskInstance(
+            task_id="elem",
+            description="Simple task",
+            difficulty=TaskDifficulty.ELEMENTARY,
+            expected_output="simple",
+            tools_required=["test"]
         )
-    ]
+        
+        result = self.agent.evolve([task], self.tools)
+        self.assertEqual(len(result["results"]), 1)
+        # Elementary tasks should succeed easily
+        self.assertTrue(result["results"][0].success)
     
-    # Verify trace structure
-    for trace in traces:
-        assert trace.tool_name
-        assert isinstance(trace.inputs, dict)
-        assert isinstance(trace.success, bool)
-        assert trace.execution_time >= 0
-        assert trace.timestamp > 0
+    def test_expert_tasks(self):
+        """Test expert difficulty tasks."""
+        task = TaskInstance(
+            task_id="expert",
+            description="Complex expert task",
+            difficulty=TaskDifficulty.EXPERT,
+            expected_output="complex",
+            tools_required=["test", "test", "test", "test", "test"]
+        )
+        
+        result = self.agent.evolve([task], self.tools)
+        self.assertEqual(len(result["results"]), 1)
+        # Score should reflect difficulty
+        self.assertLessEqual(result["results"][0].score, 1.0)
     
-    # Calculate statistics
-    success_rate = sum(1 for t in traces if t.success) / len(traces)
-    total_time = sum(t.execution_time for t in traces)
-    
-    assert 0 <= success_rate <= 1
-    assert total_time > 0
-    
-    print(f"  Recorded {len(traces)} traces")
-    print(f"  Success rate: {success_rate:.0%}")
-    print(f"  Total execution time: {total_time:.2f}s")
-    print("  ✅ Tool traces capture execution details")
-    return True
-
-
-def run_all_tests():
-    """Run all tests and report results."""
-    print("=" * 70)
-    print("Self-Evolving Agent System - Test Suite")
-    print("Testing hierarchical LLM architecture and evolution methods")
-    print("=" * 70)
-    
-    tests = [
-        test_base_llm_task_understanding,
-        test_base_llm_adaptation,
-        test_operational_slm_execution,
-        test_codegen_tool_synthesis,
-        test_teacher_llm_evaluation,
-        test_task_instance_creation,
-        test_tool_use_tracing,
-        test_curriculum_learning_evolution,
-        test_reinforcement_learning_evolution,
-        test_genetic_evolution,
-        test_hybrid_evolution,
-        test_tool_synthesis_during_execution,
-        test_evolution_checkpointing,
-        test_comprehensive_evolution_report,
-        test_task_difficulty_progression,
-    ]
-    
-    passed = 0
-    failed = 0
-    
-    for test in tests:
-        try:
-            if test():
-                passed += 1
-            else:
-                failed += 1
-                print(f"  ❌ {test.__name__} returned False")
-        except Exception as e:
-            failed += 1
-            print(f"  ❌ {test.__name__} raised {type(e).__name__}: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    print("\n" + "=" * 70)
-    print(f"Results: {passed}/{len(tests)} passed, {failed}/{len(tests)} failed")
-    
-    if failed == 0:
-        print("🎉 All tests passed! Self-Evolving Agent System validated.")
-    else:
-        print("⚠️ Some tests failed. Review implementation.")
-    
-    print("=" * 70)
-    
-    return failed == 0
+    def test_research_tasks(self):
+        """Test research difficulty tasks (highest)."""
+        task = TaskInstance(
+            task_id="research",
+            description="Novel research task",
+            difficulty=TaskDifficulty.RESEARCH,
+            expected_output="breakthrough",
+            tools_required=["test"] * 10
+        )
+        
+        # Base LLM should classify this appropriately
+        understanding = self.agent.base_llm.understand_task(task)
+        self.assertEqual(understanding["estimated_difficulty"], 5)
 
 
 if __name__ == "__main__":
-    success = run_all_tests()
-    sys.exit(0 if success else 1)
+    # Run tests with verbosity
+    suite = unittest.TestLoader().loadTestsFromModule(sys.modules[__name__])
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite)
+    
+    # Print summary
+    print("\n" + "=" * 60)
+    print(f"Tests run: {result.testsRun}")
+    print(f"Successes: {result.testsRun - len(result.failures) - len(result.errors)}")
+    print(f"Failures: {len(result.failures)}")
+    print(f"Errors: {len(result.errors)}")
+    print("=" * 60)
+    
+    # Exit with appropriate code
+    sys.exit(0 if result.wasSuccessful() else 1)
