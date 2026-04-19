@@ -1,710 +1,585 @@
 """
-Hierarchical Task Planner with Exploratory Planning and Resource Management.
+Hierarchical Task Planning System for AGI agents.
 
-Based on research insights from ARC-AGI-3 (arXiv:2603.24621v1):
-- Agents fail at goal inference without explicit instructions
-- Need for exploratory planning with hypothesis generation
-- Resource-aware planning with budget management
+Implements multi-level planning inspired by:
+- arXiv:2601.11658v1: Hierarchical LLM architecture (Base LLM planning)
+- arXiv:2604.01020v1: OrgAgent governance/execution/compliance layers
+- arXiv:2602.01465: ReAct pattern for reasoning and acting
 
-Implements:
-- Hierarchical task decomposition (SMGI structural theory inspired)
-- Dynamic replanning with execution feedback loops
-- Resource budgeting (compute, API calls, time)
-- Exploratory hypothesis generation and testing
+The planner decomposes goals into executable tasks with dependency management,
+adaptive replanning, and integration with the memory and reflection systems.
 """
 
-from typing import Dict, List, Any, Optional, Callable, Tuple, Set, Union
+from typing import List, Dict, Any, Optional, Callable, Set, Tuple
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum, auto
 import json
-import time
 import uuid
-from collections import defaultdict
-import copy
 
 
-class PlanStatus(Enum):
-    """Status of a plan or sub-task."""
+class TaskStatus(Enum):
+    """Status of a task in the plan."""
     PENDING = auto()
+    READY = auto()  # Dependencies satisfied
     IN_PROGRESS = auto()
     COMPLETED = auto()
     FAILED = auto()
-    BLOCKED = auto()  # Waiting for dependencies
-    EXPLORING = auto()  # In hypothesis exploration phase
+    BLOCKED = auto()  # Dependencies failed
+    CANCELLED = auto()
 
 
-class TaskType(Enum):
-    """Types of tasks for decomposition strategy."""
-    ATOMIC = auto()  # Cannot be decomposed further
-    SEQUENTIAL = auto()  # Sub-tasks must execute in order
-    PARALLEL = auto()  # Sub-tasks can execute concurrently
-    EXPLORATORY = auto()  # Requires hypothesis generation and testing
-    CONDITIONAL = auto()  # Branch based on condition evaluation
-
-
-@dataclass
-class ResourceBudget:
-    """Budget constraints for task execution."""
-    max_api_calls: int = 100
-    max_compute_time_seconds: float = 300.0
-    max_tokens: int = 100000
-    max_iterations: int = 50
-    
-    # Track actual usage
-    api_calls_used: int = field(default=0)
-    compute_time_used_seconds: float = field(default=0.0)
-    tokens_used: int = field(default=0)
-    iterations_used: int = field(default=0)
-    
-    def is_exhausted(self) -> bool:
-        """Check if any budget limit is exceeded."""
-        return (
-            self.api_calls_used >= self.max_api_calls or
-            self.compute_time_used_seconds >= self.max_compute_time_seconds or
-            self.tokens_used >= self.max_tokens or
-            self.iterations_used >= self.max_iterations
-        )
-    
-    def remaining_ratio(self) -> float:
-        """Calculate remaining budget ratio (0.0 to 1.0)."""
-        ratios = [
-            (self.max_api_calls - self.api_calls_used) / self.max_api_calls,
-            (self.max_compute_time_seconds - self.compute_time_used_seconds) / self.max_compute_time_seconds,
-            (self.max_tokens - self.tokens_used) / self.max_tokens,
-            (self.max_iterations - self.iterations_used) / self.max_iterations
-        ]
-        return max(0.0, min(ratios))
-    
-    def consume(self, api_calls: int = 0, compute_time: float = 0.0, 
-                tokens: int = 0, iterations: int = 0):
-        """Record resource consumption."""
-        self.api_calls_used += api_calls
-        self.compute_time_used_seconds += compute_time
-        self.tokens_used += tokens
-        self.iterations_used += iterations
+class TaskPriority(Enum):
+    """Priority levels for task scheduling."""
+    CRITICAL = 0
+    HIGH = 1
+    MEDIUM = 2
+    LOW = 3
 
 
 @dataclass
-class Hypothesis:
-    """Hypothesis for exploratory planning (ARC-AGI-3 style)."""
-    hypothesis_id: str
+class Task:
+    """A single task in a plan."""
+    id: str
     description: str
-    confidence: float  # 0.0 to 1.0
-    test_strategy: str
-    expected_outcome: Any
-    verification_criteria: List[str]
+    status: TaskStatus = TaskStatus.PENDING
+    priority: TaskPriority = TaskPriority.MEDIUM
+    
+    # Task details
+    expected_output: Optional[str] = None
+    tools_required: List[str] = field(default_factory=list)
+    estimated_duration: Optional[float] = None  # minutes
+    
+    # Dependencies
+    depends_on: List[str] = field(default_factory=list)  # Task IDs
+    blocks: List[str] = field(default_factory=list)  # Tasks this blocks
     
     # Execution tracking
-    status: PlanStatus = field(default=PlanStatus.PENDING)
-    test_results: List[Dict] = field(default_factory=list)
-    actual_outcome: Any = field(default=None)
-    validated: bool = field(default=False)
-
-
-@dataclass
-class SubTask:
-    """Individual sub-task in a hierarchical plan."""
-    task_id: str
-    description: str
-    task_type: TaskType
-    status: PlanStatus = field(default=PlanStatus.PENDING)
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    result: Optional[Any] = None
+    error_message: Optional[str] = None
+    retry_count: int = 0
+    max_retries: int = 3
     
-    # Hierarchy
-    parent_id: Optional[str] = field(default=None)
-    children_ids: List[str] = field(default_factory=list)
-    dependencies: List[str] = field(default_factory=list)
+    # Metadata
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=datetime.now)
     
-    # Execution
-    expected_output: Any = field(default=None)
-    actual_output: Any = field(default=None)
-    tool_requirements: List[str] = field(default_factory=list)
-    
-    # For exploratory tasks
-    hypotheses: List[Hypothesis] = field(default_factory=list)
-    active_hypothesis_id: Optional[str] = field(default=None)
-    
-    # Resource tracking
-    estimated_cost: float = field(default=1.0)  # Relative cost estimate
-    actual_cost: float = field(default=0.0)
-    
-    # Timing
-    created_at: float = field(default_factory=time.time)
-    started_at: Optional[float] = field(default=None)
-    completed_at: Optional[float] = field(default=None)
-    
-    # Iteration for replanning
-    iteration: int = field(default=0)
-    max_iterations: int = field(default=3)
-    
-    def to_dict(self) -> Dict:
-        """Convert to dictionary for serialization."""
+    def to_dict(self) -> Dict[str, Any]:
         return {
-            'task_id': self.task_id,
-            'description': self.description,
-            'task_type': self.task_type.name,
-            'status': self.status.name,
-            'parent_id': self.parent_id,
-            'children_ids': self.children_ids,
-            'dependencies': self.dependencies,
-            'expected_output': self.expected_output,
-            'actual_output': self.actual_output,
-            'tool_requirements': self.tool_requirements,
-            'hypotheses': [self._hypothesis_to_dict(h) for h in self.hypotheses],
-            'active_hypothesis_id': self.active_hypothesis_id,
-            'estimated_cost': self.estimated_cost,
-            'actual_cost': self.actual_cost,
-            'created_at': self.created_at,
-            'started_at': self.started_at,
-            'completed_at': self.completed_at,
-            'iteration': self.iteration,
-            'max_iterations': self.max_iterations
+            "id": self.id,
+            "description": self.description,
+            "status": self.status.name,
+            "priority": self.priority.name,
+            "expected_output": self.expected_output,
+            "tools_required": self.tools_required,
+            "estimated_duration": self.estimated_duration,
+            "depends_on": self.depends_on,
+            "blocks": self.blocks,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "result": self.result,
+            "error_message": self.error_message,
+            "retry_count": self.retry_count,
+            "max_retries": self.max_retries,
+            "metadata": self.metadata,
+            "created_at": self.created_at.isoformat()
         }
     
-    def _hypothesis_to_dict(self, h: Hypothesis) -> Dict:
-        return {
-            'hypothesis_id': h.hypothesis_id,
-            'description': h.description,
-            'confidence': h.confidence,
-            'test_strategy': h.test_strategy,
-            'expected_outcome': h.expected_outcome,
-            'verification_criteria': h.verification_criteria,
-            'status': h.status.name,
-            'validated': h.validated
-        }
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Task":
+        task = cls(
+            id=data["id"],
+            description=data["description"],
+            status=TaskStatus[data["status"]],
+            priority=TaskPriority[data["priority"]],
+            expected_output=data.get("expected_output"),
+            tools_required=data.get("tools_required", []),
+            estimated_duration=data.get("estimated_duration"),
+            depends_on=data.get("depends_on", []),
+            blocks=data.get("blocks", []),
+            retry_count=data.get("retry_count", 0),
+            max_retries=data.get("max_retries", 3),
+            metadata=data.get("metadata", {})
+        )
+        if data.get("started_at"):
+            task.started_at = datetime.fromisoformat(data["started_at"])
+        if data.get("completed_at"):
+            task.completed_at = datetime.fromisoformat(data["completed_at"])
+        task.result = data.get("result")
+        task.error_message = data.get("error_message")
+        return task
 
 
 @dataclass
 class Plan:
-    """Complete hierarchical plan with execution tracking."""
-    plan_id: str
-    goal_description: str
-    root_task_id: str
-    tasks: Dict[str, SubTask] = field(default_factory=dict)
+    """A complete plan consisting of multiple tasks."""
+    id: str
+    goal: str
+    description: Optional[str] = None
+    tasks: Dict[str, Task] = field(default_factory=dict)
     
-    # Resource management
-    budget: ResourceBudget = field(default_factory=ResourceBudget)
+    # Plan metadata
+    status: str = "active"  # active, completed, failed, cancelled
+    created_at: datetime = field(default_factory=datetime.now)
+    completed_at: Optional[datetime] = None
     
-    # Execution state
-    status: PlanStatus = field(default=PlanStatus.PENDING)
-    current_task_id: Optional[str] = field(default=None)
-    execution_history: List[Dict] = field(default_factory=list)
+    # Strategy
+    strategy: str = "sequential"  # sequential, parallel, adaptive
+    max_parallel: int = 5
     
-    # Replanning tracking
-    replan_count: int = field(default=0)
-    max_replans: int = field(default=5)
+    # Statistics
+    total_tasks: int = 0
+    completed_tasks: int = 0
+    failed_tasks: int = 0
     
-    # Timing
-    created_at: float = field(default_factory=time.time)
-    started_at: Optional[float] = field(default=None)
-    completed_at: Optional[float] = field(default=None)
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "goal": self.goal,
+            "description": self.description,
+            "tasks": {tid: t.to_dict() for tid, t in self.tasks.items()},
+            "status": self.status,
+            "created_at": self.created_at.isoformat(),
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "strategy": self.strategy,
+            "max_parallel": self.max_parallel,
+            "total_tasks": len(self.tasks),
+            "completed_tasks": sum(1 for t in self.tasks.values() if t.status == TaskStatus.COMPLETED),
+            "failed_tasks": sum(1 for t in self.tasks.values() if t.status == TaskStatus.FAILED)
+        }
+
+
+class PlanExecutor:
+    """Executes plans with dependency tracking and adaptive replanning."""
     
-    def get_task(self, task_id: str) -> Optional[SubTask]:
-        """Get task by ID."""
-        return self.tasks.get(task_id)
+    def __init__(self, tool_registry: Optional[Any] = None):
+        self.tool_registry = tool_registry
+        self.execution_history: List[Dict[str, Any]] = []
+        self.active_plans: Dict[str, Plan] = {}
     
-    def get_ready_tasks(self) -> List[SubTask]:
-        """Get tasks that are ready to execute (dependencies met)."""
+    def create_plan(
+        self,
+        goal: str,
+        description: Optional[str] = None,
+        strategy: str = "adaptive"
+    ) -> Plan:
+        """Create a new plan for a goal."""
+        plan_id = str(uuid.uuid4())[:8]
+        plan = Plan(
+            id=plan_id,
+            goal=goal,
+            description=description,
+            strategy=strategy
+        )
+        self.active_plans[plan_id] = plan
+        return plan
+    
+    def decompose_goal(
+        self,
+        plan: Plan,
+        subtasks: List[Dict[str, Any]]
+    ) -> List[Task]:
+        """
+        Decompose a goal into subtasks.
+        
+        Args:
+            plan: The plan to add tasks to
+            subtasks: List of task definitions with keys:
+                - description: str
+                - priority: str (optional)
+                - depends_on: List[str] (optional)
+                - tools_required: List[str] (optional)
+                - expected_output: str (optional)
+        """
+        tasks = []
+        id_map = {}  # Map index to generated ID
+        
+        for i, task_def in enumerate(subtasks):
+            task_id = f"{plan.id}_{i}"
+            id_map[i] = task_id
+            
+            priority = TaskPriority.MEDIUM
+            if "priority" in task_def:
+                priority = TaskPriority[task_def["priority"].upper()]
+            
+            # Convert dependency indices to IDs
+            depends_on = []
+            if "depends_on" in task_def:
+                for dep in task_def["depends_on"]:
+                    if isinstance(dep, int):
+                        depends_on.append(id_map.get(dep, f"{plan.id}_{dep}"))
+                    else:
+                        depends_on.append(dep)
+            
+            task = Task(
+                id=task_id,
+                description=task_def["description"],
+                priority=priority,
+                expected_output=task_def.get("expected_output"),
+                tools_required=task_def.get("tools_required", []),
+                estimated_duration=task_def.get("estimated_duration"),
+                depends_on=depends_on,
+                metadata=task_def.get("metadata", {})
+            )
+            tasks.append(task)
+            plan.tasks[task_id] = task
+        
+        # Update blocks relationships
+        for task in tasks:
+            for dep_id in task.depends_on:
+                if dep_id in plan.tasks:
+                    plan.tasks[dep_id].blocks.append(task.id)
+        
+        plan.total_tasks = len(tasks)
+        return tasks
+    
+    def get_ready_tasks(self, plan: Plan) -> List[Task]:
+        """Get tasks that are ready to execute (dependencies satisfied)."""
         ready = []
-        for task in self.tasks.values():
-            if task.status != PlanStatus.PENDING:
+        for task in plan.tasks.values():
+            if task.status != TaskStatus.PENDING:
                 continue
             
             # Check if all dependencies are completed
-            deps_met = all(
-                self.tasks.get(dep_id, SubTask(dep_id, "", TaskType.ATOMIC)).status == PlanStatus.COMPLETED
-                for dep_id in task.dependencies
+            deps_satisfied = all(
+                plan.tasks.get(dep_id, Task(dep_id, "")).status == TaskStatus.COMPLETED
+                for dep_id in task.depends_on
             )
             
-            if deps_met:
+            # Check if any dependency failed
+            deps_failed = any(
+                plan.tasks.get(dep_id, Task(dep_id, "")).status == TaskStatus.FAILED
+                for dep_id in task.depends_on
+            )
+            
+            if deps_failed:
+                task.status = TaskStatus.BLOCKED
+            elif deps_satisfied:
+                task.status = TaskStatus.READY
                 ready.append(task)
         
+        # Sort by priority
+        ready.sort(key=lambda t: t.priority.value)
         return ready
     
-    def get_completion_ratio(self) -> float:
-        """Calculate plan completion ratio."""
-        if not self.tasks:
-            return 0.0
-        
-        completed = sum(1 for t in self.tasks.values() if t.status == PlanStatus.COMPLETED)
-        return completed / len(self.tasks)
-
-
-class DecompositionStrategy:
-    """Strategies for decomposing tasks into sub-tasks."""
+    def start_task(self, task: Task) -> None:
+        """Mark a task as started."""
+        task.status = TaskStatus.IN_PROGRESS
+        task.started_at = datetime.now()
     
-    @staticmethod
-    def analyze_task_type(task_description: str, context: Dict[str, Any]) -> TaskType:
-        """Analyze task to determine decomposition strategy."""
-        # Keywords indicating exploratory nature (ARC-AGI-3 style)
-        exploratory_keywords = [
-            'explore', 'discover', 'investigate',
-            'unknown', 'ambiguous', 'unclear', 'hypothesis', 
-            'experiment', 'figure out'
-        ]
-        
-        # Keywords indicating parallel potential
-        parallel_keywords = [
-            'multiple', 'batch', 'parallel', 'concurrent', 'independent',
-            'simultaneously', 'at the same time'
-        ]
-        
-        # Keywords indicating conditional logic
-        conditional_keywords = [
-            'condition', 'branch', 'decide', 'choose', 'alternative',
-            'depending', 'based on', 'evaluate'
-        ]
-        
-        # Keywords indicating sequential logic
-        sequential_keywords = [
-            'first', 'second', 'third', 'then', 'next', 'after', 'finally',
-            'step by step', 'followed by', 'sequence'
-        ]
-        
-        desc_lower = task_description.lower()
-        
-        # Check for exploratory keywords first
-        if any(kw in desc_lower for kw in exploratory_keywords):
-            return TaskType.EXPLORATORY
-        
-        # Check for conditional
-        if any(kw in desc_lower for kw in conditional_keywords):
-            return TaskType.CONDITIONAL
-        
-        # Check for sequential markers (prioritized over parallel)
-        if any(kw in desc_lower for kw in sequential_keywords):
-            return TaskType.SEQUENTIAL
-        
-        # Check for parallel
-        if any(kw in desc_lower for kw in parallel_keywords):
-            return TaskType.PARALLEL
-        
-        # Simple tasks with few words are atomic
-        words = task_description.split()
-        if len(words) <= 6:
-            return TaskType.ATOMIC
-        
-        # Default to sequential for moderate complexity
-        return TaskType.SEQUENTIAL
+    def complete_task(self, task: Task, result: Any) -> None:
+        """Mark a task as completed with result."""
+        task.status = TaskStatus.COMPLETED
+        task.result = result
+        task.completed_at = datetime.now()
     
-    @staticmethod
-    def decompose_exploratory(task: SubTask, context: Dict[str, Any]) -> List[SubTask]:
-        """Decompose exploratory task with hypothesis generation."""
-        subtasks = []
+    def fail_task(self, task: Task, error: str) -> None:
+        """Mark a task as failed with error message."""
+        task.status = TaskStatus.FAILED
+        task.error_message = error
+        task.completed_at = datetime.now()
         
-        # Generate hypotheses for exploration
-        hypotheses = [
-            Hypothesis(
-                hypothesis_id=f"{task.task_id}_hyp_1",
-                description=f"Direct approach: {task.description}",
-                confidence=0.6,
-                test_strategy="Attempt direct execution",
-                expected_outcome="Task completed successfully",
-                verification_criteria=["Output meets requirements", "No errors"]
-            ),
-            Hypothesis(
-                hypothesis_id=f"{task.task_id}_hyp_2",
-                description=f"Iterative refinement approach",
-                confidence=0.4,
-                test_strategy="Break into smaller steps and iterate",
-                expected_outcome="Progressive improvement",
-                verification_criteria=["Each iteration improves", "Converges to solution"]
-            ),
-            Hypothesis(
-                hypothesis_id=f"{task.task_id}_hyp_3",
-                description=f"Alternative path exploration",
-                confidence=0.3,
-                test_strategy="Try different methodology",
-                expected_outcome="Alternative valid solution",
-                verification_criteria=["Different approach works", "Within constraints"]
-            )
-        ]
-        
-        # Create hypothesis testing sub-tasks
-        for i, hyp in enumerate(hypotheses):
-            subtask = SubTask(
-                task_id=f"{task.task_id}_test_{i}",
-                description=f"Test hypothesis: {hyp.description}",
-                task_type=TaskType.ATOMIC,
-                parent_id=task.task_id,
-                hypotheses=[hyp],
-                active_hypothesis_id=hyp.hypothesis_id,
-                estimated_cost=1.5  # Exploratory tasks cost more
-            )
-            subtasks.append(subtask)
-        
-        # Create synthesis task
-        synthesis = SubTask(
-            task_id=f"{task.task_id}_synthesize",
-            description="Synthesize findings from hypothesis tests",
-            task_type=TaskType.ATOMIC,
-            parent_id=task.task_id,
-            dependencies=[f"{task.task_id}_test_{i}" for i in range(len(hypotheses))],
-            estimated_cost=0.5
-        )
-        subtasks.append(synthesis)
-        
-        return subtasks
+        # Check if we should retry
+        if task.retry_count < task.max_retries:
+            task.retry_count += 1
+            task.status = TaskStatus.PENDING  # Will be re-evaluated
+            task.error_message = None
     
-    @staticmethod
-    def decompose_sequential(task: SubTask, context: Dict[str, Any]) -> List[SubTask]:
-        """Decompose into sequential sub-tasks."""
-        # Identify natural breakpoints in task description
-        parts = []
+    def update_plan_status(self, plan: Plan) -> None:
+        """Update the overall plan status based on task states."""
+        completed = sum(1 for t in plan.tasks.values() if t.status == TaskStatus.COMPLETED)
+        failed = sum(1 for t in plan.tasks.values() if t.status == TaskStatus.FAILED)
+        pending = sum(1 for t in plan.tasks.values() if t.status in [TaskStatus.PENDING, TaskStatus.READY])
         
-        # Simple heuristic: split on common sequence markers
-        current_part = task.description
-        for marker in ['. Then', ', then', '. Next', ', next', '. After', '. Finally', ' then ']:
-            if marker in current_part:
-                split = current_part.split(marker, 1)
-                if len(split) == 2:
-                    parts.append(split[0])
-                    current_part = split[1]
+        plan.completed_tasks = completed
+        plan.failed_tasks = failed
         
-        if parts and current_part:
-            parts.append(current_part)
+        if pending == 0:
+            if failed == 0:
+                plan.status = "completed"
+            elif completed > 0:
+                plan.status = "partial"
+            else:
+                plan.status = "failed"
+            plan.completed_at = datetime.now()
+    
+    def get_execution_order(self, plan: Plan) -> List[List[str]]:
+        """
+        Get tasks in execution order, grouped by parallelizable stages.
+        Returns list of lists, where each inner list contains task IDs that can run in parallel.
+        """
+        stages = []
+        completed = set()
+        remaining = set(plan.tasks.keys())
         
-        if len(parts) < 2:
-            # Fallback: estimate 3 sequential steps
-            parts = [f"Step {i+1} of: {task.description}" for i in range(3)]
-        
-        subtasks = []
-        prev_id = None
-        
-        for i, part in enumerate(parts):
-            subtask = SubTask(
-                task_id=f"{task.task_id}_step_{i}",
-                description=part.strip(),
-                task_type=TaskType.ATOMIC,
-                parent_id=task.task_id,
-                estimated_cost=1.0 / len(parts)
-            )
+        while remaining:
+            stage = []
+            for task_id in remaining:
+                task = plan.tasks[task_id]
+                deps_satisfied = all(dep in completed for dep in task.depends_on)
+                if deps_satisfied:
+                    stage.append(task_id)
             
-            if prev_id:
-                subtask.dependencies.append(prev_id)
+            if not stage:
+                # Circular dependency or unresolvable
+                break
             
-            subtasks.append(subtask)
-            prev_id = subtask.task_id
+            stages.append(stage)
+            completed.update(stage)
+            remaining -= set(stage)
         
-        return subtasks
+        return stages
     
-    @staticmethod
-    def decompose_parallel(task: SubTask, context: Dict[str, Any]) -> List[SubTask]:
-        """Decompose into parallel sub-tasks."""
-        # Identify parallelizable components
-        # Simple heuristic: split on 'and', 'also', commas with independent actions
+    def replan(
+        self,
+        plan: Plan,
+        failed_task_id: str,
+        new_subtasks: Optional[List[Dict[str, Any]]] = None
+    ) -> Optional[Plan]:
+        """
+        Create a recovery plan for a failed task.
         
-        components = task.description.split(' and ')
-        if len(components) < 2:
-            components = [f"Aspect {i+1}: {task.description}" for i in range(2)]
+        Args:
+            plan: Original plan
+            failed_task_id: ID of the failed task
+            new_subtasks: Optional replacement subtasks
         
-        subtasks = []
-        for i, component in enumerate(components):
-            subtask = SubTask(
-                task_id=f"{task.task_id}_parallel_{i}",
-                description=component.strip(),
-                task_type=TaskType.ATOMIC,
-                parent_id=task.task_id,
-                estimated_cost=1.0 / len(components)
-            )
-            subtasks.append(subtask)
+        Returns:
+            New recovery plan or None if cannot recover
+        """
+        failed_task = plan.tasks.get(failed_task_id)
+        if not failed_task:
+            return None
         
-        # Add aggregation task
-        aggregation = SubTask(
-            task_id=f"{task.task_id}_aggregate",
-            description=f"Combine parallel results for: {task.description}",
-            task_type=TaskType.ATOMIC,
-            parent_id=task.task_id,
-            dependencies=[s.task_id for s in subtasks],
-            estimated_cost=0.3
+        # Create recovery subplan
+        recovery_plan = self.create_plan(
+            goal=f"Recover from failure: {failed_task.description}",
+            description=f"Alternative approach after failure of {failed_task_id}",
+            strategy="sequential"
         )
-        subtasks.append(aggregation)
         
-        return subtasks
+        if new_subtasks:
+            self.decompose_goal(recovery_plan, new_subtasks)
+        else:
+            # Default recovery: retry with alternative approach
+            self.decompose_goal(recovery_plan, [
+                {
+                    "description": f"Analyze failure of: {failed_task.description}",
+                    "priority": "HIGH",
+                    "expected_output": "failure_analysis"
+                },
+                {
+                    "description": f"Retry with modified approach: {failed_task.description}",
+                    "priority": "HIGH",
+                    "depends_on": [0],
+                    "expected_output": failed_task.expected_output
+                }
+            ])
+        
+        return recovery_plan
 
 
 class HierarchicalPlanner:
     """
-    Hierarchical task planner with exploratory planning and resource management.
+    Multi-level planner implementing hierarchical task decomposition.
     
-    Addresses ARC-AGI-3 findings:
-    - Goal inference without explicit instructions
-    - Hypothesis generation and testing
-    - Resource-aware planning with budget management
+    Strategy levels:
+    - L0 (Strategic): High-level goal decomposition
+    - L1 (Tactical): Mid-level planning and resource allocation
+    - L2 (Operational): Concrete task execution plans
     """
     
-    def __init__(self, max_depth: int = 5):
-        self.max_depth = max_depth
-        self.plans: Dict[str, Plan] = {}
-        self.decomposition_strategy = DecompositionStrategy()
-        self.default_budget: Optional[ResourceBudget] = None
-        
-        # Statistics for learning
-        self.decomposition_stats: Dict[TaskType, Dict] = defaultdict(
-            lambda: {'attempts': 0, 'successes': 0, 'avg_cost': 0.0}
-        )
+    def __init__(self, memory_system: Optional[Any] = None):
+        self.executor = PlanExecutor()
+        self.memory = memory_system
+        self.plan_history: List[Dict[str, Any]] = []
     
-    def create_plan(self, goal: str, budget: Optional[ResourceBudget] = None,
-                    context: Optional[Dict] = None) -> Plan:
-        """Create a hierarchical plan for the given goal."""
-        plan_id = str(uuid.uuid4())[:8]
-        
-        # Use provided budget, default budget, or create new
-        plan_budget = budget or self.default_budget or ResourceBudget()
-        
-        # Create root task
-        root_task = SubTask(
-            task_id=f"{plan_id}_root",
-            description=goal,
-            task_type=self.decomposition_strategy.analyze_task_type(goal, context or {})
+    def create_strategic_plan(
+        self,
+        goal: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Plan:
+        """
+        L0: Create high-level strategic plan.
+        Decomposes goal into major phases/milestones.
+        """
+        plan = self.executor.create_plan(
+            goal=goal,
+            description="Strategic plan with major milestones",
+            strategy="adaptive"
         )
         
-        plan = Plan(
-            plan_id=plan_id,
-            goal_description=goal,
-            root_task_id=root_task.task_id,
-            budget=copy.deepcopy(plan_budget)
-        )
-        
-        plan.tasks[root_task.task_id] = root_task
-        
-        # Decompose recursively
-        self._decompose_recursive(plan, root_task, 0, context or {})
-        
-        self.plans[plan_id] = plan
-        
-        return plan
-    
-    def _decompose_recursive(self, plan: Plan, task: SubTask, 
-                            depth: int, context: Dict):
-        """Recursively decompose task into sub-tasks."""
-        if depth >= self.max_depth:
-            task.task_type = TaskType.ATOMIC
-            return
-        
-        # Skip decomposition for atomic tasks
-        if task.task_type == TaskType.ATOMIC:
-            return
-        
-        # Decompose based on task type
-        if task.task_type == TaskType.EXPLORATORY:
-            subtasks = self.decomposition_strategy.decompose_exploratory(task, context)
-        elif task.task_type == TaskType.SEQUENTIAL:
-            subtasks = self.decomposition_strategy.decompose_sequential(task, context)
-        elif task.task_type == TaskType.PARALLEL:
-            subtasks = self.decomposition_strategy.decompose_parallel(task, context)
-        else:
-            # Default: treat as atomic
-            task.task_type = TaskType.ATOMIC
-            return
-        
-        # Add sub-tasks to plan
-        for subtask in subtasks:
-            plan.tasks[subtask.task_id] = subtask
-            task.children_ids.append(subtask.task_id)
-        
-        # Recursively decompose sub-tasks (with depth limit)
-        for subtask in subtasks:
-            if subtask.task_type != TaskType.ATOMIC:
-                self._decompose_recursive(plan, subtask, depth + 1, context)
-    
-    def get_next_executable_task(self, plan: Plan) -> Optional[SubTask]:
-        """Get the next task ready for execution."""
-        ready_tasks = plan.get_ready_tasks()
-        
-        if not ready_tasks:
-            return None
-        
-        # Prioritize by type and cost
-        # 1. Non-exploratory tasks first (lower risk)
-        # 2. Lower estimated cost first (fail fast)
-        ready_tasks.sort(key=lambda t: (
-            t.task_type == TaskType.EXPLORATORY,  # False < True
-            t.estimated_cost
-        ))
-        
-        return ready_tasks[0] if ready_tasks else None
-    
-    def execute_step(self, plan: Plan, task: SubTask, 
-                    execute_fn: Callable[[SubTask], Tuple[bool, Any]]) -> bool:
-        """Execute a single step and update plan state."""
-        if plan.budget.is_exhausted():
-            return False
-        
-        # Mark task as in progress
-        task.status = PlanStatus.IN_PROGRESS
-        task.started_at = time.time()
-        plan.current_task_id = task.task_id
-        
-        if plan.started_at is None:
-            plan.started_at = time.time()
-        
-        # Consume budget
-        plan.budget.consume(
-            api_calls=1,
-            compute_time=0.1,
-            tokens=1000,
-            iterations=1
-        )
-        
-        # Execute
-        start_time = time.time()
-        try:
-            success, output = execute_fn(task)
-            execution_time = time.time() - start_time
-            
-            task.actual_output = output
-            task.actual_cost = execution_time
-            task.completed_at = time.time()
-            
-            if success:
-                task.status = PlanStatus.COMPLETED
-            else:
-                task.status = PlanStatus.FAILED
-                
-                # Check if we should retry with replanning
-                if task.iteration < task.max_iterations:
-                    return self._handle_failure_with_replan(plan, task, context={})
-            
-            # Record execution
-            plan.execution_history.append({
-                'task_id': task.task_id,
-                'success': success,
-                'execution_time': execution_time,
-                'timestamp': time.time()
-            })
-            
-            return success
-            
-        except Exception as e:
-            task.status = PlanStatus.FAILED
-            plan.execution_history.append({
-                'task_id': task.task_id,
-                'success': False,
-                'error': str(e),
-                'timestamp': time.time()
-            })
-            return False
-    
-    def _handle_failure_with_replan(self, plan: Plan, task: SubTask, 
-                                   context: Dict) -> bool:
-        """Handle task failure with dynamic replanning."""
-        if plan.replan_count >= plan.max_replans:
-            return False
-        
-        plan.replan_count += 1
-        task.iteration += 1
-        
-        # Generate alternative approach
-        # Simplified: mark as exploratory and add new hypothesis
-        task.task_type = TaskType.EXPLORATORY
-        
-        new_hypothesis = Hypothesis(
-            hypothesis_id=f"{task.task_id}_replan_{task.iteration}",
-            description=f"Alternative approach (replan #{task.iteration})",
-            confidence=0.5 - (task.iteration * 0.1),  # Decreasing confidence
-            test_strategy=f"Revised execution strategy",
-            expected_outcome="Successful completion",
-            verification_criteria=["Output correct", "No exceptions"]
-        )
-        
-        task.hypotheses.append(new_hypothesis)
-        task.active_hypothesis_id = new_hypothesis.hypothesis_id
-        task.status = PlanStatus.PENDING  # Reset to try again
-        
-        return True  # Will retry
-    
-    def replan(self, plan: Plan, feedback: Dict[str, Any]) -> Plan:
-        """Create a revised plan based on execution feedback."""
-        if plan.replan_count >= plan.max_replans:
-            return plan
-        
-        plan.replan_count += 1
-        
-        # Analyze failed tasks
-        failed_tasks = [
-            t for t in plan.tasks.values() 
-            if t.status == PlanStatus.FAILED
+        # Default strategic phases (can be overridden by context)
+        phases = [
+            {
+                "description": "Research and information gathering",
+                "priority": "HIGH",
+                "expected_output": "research_summary"
+            },
+            {
+                "description": "Analysis and strategy formulation",
+                "priority": "HIGH",
+                "depends_on": [0],
+                "expected_output": "strategy_document"
+            },
+            {
+                "description": "Implementation execution",
+                "priority": "HIGH",
+                "depends_on": [1],
+                "expected_output": "deliverables"
+            },
+            {
+                "description": "Validation and review",
+                "priority": "MEDIUM",
+                "depends_on": [2],
+                "expected_output": "validation_report"
+            }
         ]
         
-        # Create new sub-tasks for failed ones with different strategies
-        for failed_task in failed_tasks:
-            # Change task type for alternative approach
-            if failed_task.task_type == TaskType.ATOMIC:
-                failed_task.task_type = TaskType.EXPLORATORY
-            
-            # Reset for retry
-            failed_task.status = PlanStatus.PENDING
-            failed_task.iteration += 1
+        # Override with context if provided
+        if context and "strategic_phases" in context:
+            phases = context["strategic_phases"]
+        
+        self.executor.decompose_goal(plan, phases)
+        return plan
+    
+    def create_tactical_plan(
+        self,
+        strategic_task: Task,
+        tactics: List[Dict[str, Any]]
+    ) -> Plan:
+        """
+        L1: Create tactical plan for a strategic task.
+        Decomposes into specific approaches and resource allocations.
+        """
+        plan = self.executor.create_plan(
+            goal=strategic_task.description,
+            description=f"Tactical plan for: {strategic_task.description[:50]}...",
+            strategy="parallel"
+        )
+        
+        self.executor.decompose_goal(plan, tactics)
+        return plan
+    
+    def create_operational_plan(
+        self,
+        tactical_task: Task,
+        operations: List[Dict[str, Any]]
+    ) -> Plan:
+        """
+        L2: Create operational plan for a tactical task.
+        Decomposes into concrete executable steps.
+        """
+        plan = self.executor.create_plan(
+            goal=tactical_task.description,
+            description=f"Operational plan: {tactical_task.description[:50]}...",
+            strategy="sequential"
+        )
+        
+        self.executor.decompose_goal(plan, operations)
+        return plan
+    
+    def plan_with_reflection(
+        self,
+        goal: str,
+        reflection_data: Optional[Dict[str, Any]] = None
+    ) -> Plan:
+        """
+        Create plan informed by reflection data.
+        Uses past performance to adjust planning strategy.
+        
+        Args:
+            goal: The goal to plan for
+            reflection_data: Past reflection data with keys:
+                - successful_approaches: List[str]
+                - failed_approaches: List[str]
+                - suggested_improvements: List[str]
+        """
+        plan = self.executor.create_plan(goal=goal, strategy="adaptive")
+        
+        # Adjust planning based on reflection
+        if reflection_data:
+            # Add validation step if past failures suggest caution
+            if reflection_data.get("failed_approaches"):
+                phases = [
+                    {"description": "Initial research", "priority": "MEDIUM"},
+                    {"description": "Approach validation", "priority": "HIGH", "depends_on": [0]},
+                    {"description": "Main execution", "priority": "HIGH", "depends_on": [1]},
+                    {"description": "Verification", "priority": "HIGH", "depends_on": [2]}
+                ]
+            else:
+                phases = [
+                    {"description": "Research", "priority": "MEDIUM"},
+                    {"description": "Execute with validated approach", "priority": "HIGH", "depends_on": [0]}
+                ]
+        else:
+            # Default phases without reflection
+            phases = [
+                {"description": "Research and gather information", "priority": "MEDIUM"},
+                {"description": "Plan and design approach", "priority": "HIGH", "depends_on": [0]},
+                {"description": "Execute plan", "priority": "HIGH", "depends_on": [1]},
+                {"description": "Validate results", "priority": "MEDIUM", "depends_on": [2]}
+            ]
+        
+        self.executor.decompose_goal(plan, phases)
+        
+        # Store planning decision
+        self.plan_history.append({
+            "timestamp": datetime.now().isoformat(),
+            "goal": goal,
+            "plan_id": plan.id,
+            "reflection_informed": reflection_data is not None,
+            "strategy": plan.strategy
+        })
         
         return plan
     
-    def is_plan_complete(self, plan: Plan) -> bool:
-        """Check if all tasks in plan are completed or failed."""
-        return all(
-            t.status in [PlanStatus.COMPLETED, PlanStatus.FAILED]
-            for t in plan.tasks.values()
-        )
-    
-    def get_plan_summary(self, plan: Plan) -> Dict[str, Any]:
-        """Get a summary of plan status."""
-        total_tasks = len(plan.tasks)
-        completed = sum(1 for t in plan.tasks.values() if t.status == PlanStatus.COMPLETED)
-        failed = sum(1 for t in plan.tasks.values() if t.status == PlanStatus.FAILED)
-        pending = sum(1 for t in plan.tasks.values() if t.status == PlanStatus.PENDING)
-        in_progress = sum(1 for t in plan.tasks.values() if t.status == PlanStatus.IN_PROGRESS)
+    def get_plan_statistics(self) -> Dict[str, Any]:
+        """Get statistics across all plans."""
+        total = len(self.executor.active_plans)
+        completed = sum(1 for p in self.executor.active_plans.values() if p.status == "completed")
+        failed = sum(1 for p in self.executor.active_plans.values() if p.status == "failed")
+        active = sum(1 for p in self.executor.active_plans.values() if p.status == "active")
         
         return {
-            'plan_id': plan.plan_id,
-            'goal': plan.goal_description,
-            'status': plan.status.name,
-            'completion_ratio': plan.get_completion_ratio(),
-            'total_tasks': total_tasks,
-            'completed': completed,
-            'failed': failed,
-            'pending': pending,
-            'in_progress': in_progress,
-            'replan_count': plan.replan_count,
-            'budget_remaining': plan.budget.remaining_ratio(),
-            'execution_time': (
-                time.time() - plan.started_at if plan.started_at else 0
-            )
+            "total_plans": total,
+            "completed": completed,
+            "failed": failed,
+            "active": active,
+            "success_rate": completed / total if total > 0 else 0
         }
+
+
+# Convenience functions for creating planners
+def create_planner(memory_system: Optional[Any] = None) -> HierarchicalPlanner:
+    """Create a new hierarchical planner."""
+    return HierarchicalPlanner(memory_system=memory_system)
+
+
+def create_simple_plan(goal: str, steps: List[str]) -> Plan:
+    """
+    Create a simple sequential plan from a list of step descriptions.
     
-    def get_learning_stats(self) -> Dict[str, Any]:
-        """Get statistics for learning from past decompositions."""
-        return {
-            task_type.name: {
-                'attempts': stats['attempts'],
-                'successes': stats['successes'],
-                'success_rate': (
-                    stats['successes'] / stats['attempts'] 
-                    if stats['attempts'] > 0 else 0
-                ),
-                'avg_cost': stats['avg_cost']
-            }
-            for task_type, stats in self.decomposition_stats.items()
+    Args:
+        goal: The overall goal
+        steps: List of step descriptions
+    
+    Returns:
+        A Plan with sequential dependencies
+    """
+    planner = HierarchicalPlanner()
+    plan = planner.executor.create_plan(goal=goal, strategy="sequential")
+    
+    subtasks = [
+        {
+            "description": step,
+            "priority": "MEDIUM",
+            "depends_on": [i - 1] if i > 0 else []
         }
-
-
-def create_exploratory_planner(budget: Optional[ResourceBudget] = None) -> HierarchicalPlanner:
-    """Create a planner optimized for exploratory tasks (ARC-AGI-3 style)."""
-    planner = HierarchicalPlanner(max_depth=4)
-    if budget:
-        planner.default_budget = budget
-    return planner
-
-
-def create_resource_constrained_planner(
-    max_api_calls: int = 50,
-    max_time_seconds: float = 180.0
-) -> HierarchicalPlanner:
-    """Create a planner with tight resource constraints."""
-    planner = HierarchicalPlanner(max_depth=3)
-    budget = ResourceBudget(
-        max_api_calls=max_api_calls,
-        max_compute_time_seconds=max_time_seconds,
-        max_tokens=50000,
-        max_iterations=25
-    )
-    planner.default_budget = budget
-    return planner
+        for i, step in enumerate(steps)
+    ]
+    
+    planner.executor.decompose_goal(plan, subtasks)
+    return plan

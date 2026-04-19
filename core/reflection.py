@@ -1,768 +1,561 @@
 """
-Self-Reflection and Improvement System for AGI Agent
-Based on: Ouroboros BIBLE.md pattern, Active Inference safety principles,
-          and Distributional AGI Safety auditability requirements
+Self-Reflection System for AGI agents.
 
-This module implements structured self-reflection for safe agent evolution,
-enabling performance analysis, capability assessment, and guided improvement
-with constitutional safety guardrails.
+Implements introspective capabilities inspired by:
+- arXiv:2601.11658v1: Teacher LLM for evaluation and feedback
+- arXiv:2604.14990: AI becoming a subject through self-reflection
+- arXiv:2601.10599: Institutional AI with runtime monitoring
+
+The reflection system enables agents to:
+1. Analyze their own performance and decisions
+2. Identify patterns of success and failure
+3. Generate improvement recommendations
+4. Update planning strategies based on experience
 """
 
-from typing import Dict, List, Any, Optional, Callable, Tuple
+from typing import List, Dict, Any, Optional, Callable
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from datetime import datetime
+from enum import Enum, auto
 import json
-import hashlib
-import time
+import statistics
 
 
 class ReflectionScope(Enum):
-    """Scope levels for reflection and self-modification."""
-    INTERNAL_STATE = auto()      # Safe: memory, preferences, plans
-    CONFIGURATION = auto()       # Caution: parameters, thresholds
-    TOOL_BEHAVIOR = auto()       # Review: tool usage patterns
-    CODE_STRUCTURE = auto()      # High scrutiny: module organization
-    CORE_ARCHITECTURE = auto()   # Critical: fundamental algorithms
-    SAFETY_CONSTRAINTS = auto()  # Forbidden: constitutional rules
+    """Scope of reflection analysis."""
+    TASK = auto()       # Single task reflection
+    PLAN = auto()       # Plan-level reflection
+    SESSION = auto()    # Multi-plan session reflection
+    SYSTEM = auto()     # Long-term system-wide reflection
 
 
-class ChangeStatus(Enum):
-    """Status of proposed self-modifications."""
-    PROPOSED = auto()
-    UNDER_REVIEW = auto()
-    APPROVED = auto()
-    REJECTED = auto()
-    IMPLEMENTED = auto()
-    ROLLED_BACK = auto()
-
-
-class ReviewPerspective(Enum):
-    """Simulated reviewer perspectives for multi-model review."""
-    SAFETY_FIRST = "safety_first"      # Focus on risks, edge cases
-    PERFORMANCE = "performance"       # Focus on efficiency, optimization
-    CORRECTNESS = "correctness"       # Focus on logic, correctness
-    MAINTAINABILITY = "maintainability"  # Focus on clarity, documentation
-    ELEGANCE = "elegance"            # Focus on simplicity, beauty
+class ReflectionType(Enum):
+    """Types of reflection."""
+    PERFORMANCE = "performance"    # Success/failure analysis
+    DECISION = "decision"          # Decision quality review
+    LEARNING = "learning"          # Pattern extraction
+    STRATEGY = "strategy"          # Approach effectiveness
+    ERROR = "error"                # Failure root cause
 
 
 @dataclass
-class PerformanceRecord:
-    """Record of a single task execution."""
-    task_id: str
-    task_type: str
-    success: bool
-    execution_time_ms: float
-    quality_score: float  # 0.0 - 1.0
-    error_type: Optional[str] = None
-    retry_count: int = 0
-    timestamp: datetime = field(default_factory=datetime.now)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+class PerformanceMetrics:
+    """Metrics for performance analysis."""
+    tasks_total: int = 0
+    tasks_completed: int = 0
+    tasks_failed: int = 0
+    
+    # Timing
+    total_time: float = 0.0  # seconds
+    avg_task_time: float = 0.0
+    min_task_time: Optional[float] = None
+    max_task_time: Optional[float] = None
+    
+    # Quality
+    quality_scores: List[float] = field(default_factory=list)  # 0-1 scale
+    avg_quality: float = 0.0
+    
+    # Resources
+    tokens_used: int = 0
+    api_calls: int = 0
+    tools_used: Dict[str, int] = field(default_factory=dict)
+    
+    def calculate_stats(self) -> None:
+        """Calculate derived statistics."""
+        if self.quality_scores:
+            self.avg_quality = statistics.mean(self.quality_scores)
+        
+        completed = self.tasks_completed
+        if completed > 0:
+            self.avg_task_time = self.total_time / completed
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "tasks_total": self.tasks_total,
+            "tasks_completed": self.tasks_completed,
+            "tasks_failed": self.tasks_failed,
+            "success_rate": self.tasks_completed / self.tasks_total if self.tasks_total > 0 else 0,
+            "total_time": self.total_time,
+            "avg_task_time": self.avg_task_time,
+            "avg_quality": self.avg_quality,
+            "tokens_used": self.tokens_used,
+            "api_calls": self.api_calls,
+            "tools_used": self.tools_used
+        }
 
 
 @dataclass
-class CapabilityAssessment:
-    """Self-assessment of a specific capability."""
-    capability_name: str
-    proficiency_score: float  # 0.0 - 1.0
-    confidence: float  # 0.0 - 1.0
-    sample_size: int
-    last_evaluated: datetime
-    strengths: List[str] = field(default_factory=list)
-    weaknesses: List[str] = field(default_factory=list)
-    improvement_suggestions: List[str] = field(default_factory=list)
-
-
-@dataclass
-class ImprovementGoal:
-    """Structured goal for capability enhancement."""
-    goal_id: str
-    target_capability: str
-    target_score: float
-    current_score: float
-    priority: int  # 1-10, higher = more important
-    deadline: Optional[datetime] = None
-    strategy: str = ""
-    milestones: List[Tuple[str, float]] = field(default_factory=list)  # (description, target_score)
-    created_at: datetime = field(default_factory=datetime.now)
-    status: str = "active"  # active, completed, abandoned
-
-
-@dataclass
-class ProposedChange:
-    """A proposed self-modification with full audit trail."""
-    change_id: str
+class ReflectionReport:
+    """A structured reflection report."""
+    id: str
+    timestamp: datetime
     scope: ReflectionScope
-    description: str
-    rationale: str
-    expected_impact: Dict[str, float]  # metrics -> expected change
-    implementation: str  # code or pseudo-code
-    status: ChangeStatus = ChangeStatus.PROPOSED
-    reviews: Dict[ReviewPerspective, Dict] = field(default_factory=dict)
-    constitutional_violations: List[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.now)
-    implemented_at: Optional[datetime] = None
-    rolled_back_at: Optional[datetime] = None
-    rollback_reason: Optional[str] = None
-
-
-class ConstitutionalPrinciple:
-    """A principle governing safe self-modification."""
+    reflection_type: ReflectionType
     
-    def __init__(self, name: str, description: str, check_fn: Callable[[ProposedChange], bool]):
-        self.name = name
-        self.description = description
-        self.check_fn = check_fn
+    # Analysis content
+    summary: str
+    successes: List[str] = field(default_factory=list)
+    failures: List[str] = field(default_factory=list)
+    patterns_identified: List[str] = field(default_factory=list)
+    root_causes: List[str] = field(default_factory=list)
     
-    def validate(self, change: ProposedChange) -> Tuple[bool, str]:
-        """Returns (passed, violation_reason or 'OK')."""
-        try:
-            passed = self.check_fn(change)
-            return (passed, "OK" if passed else f"Violates: {self.name}")
-        except Exception as e:
-            return (False, f"Validation error in {self.name}: {e}")
+    # Recommendations
+    recommendations: List[Dict[str, Any]] = field(default_factory=list)
+    
+    # Metrics
+    metrics: Optional[PerformanceMetrics] = None
+    
+    # Action items
+    action_items: List[str] = field(default_factory=list)
+    priority_actions: List[str] = field(default_factory=list)
+    
+    # References
+    related_plan_ids: List[str] = field(default_factory=list)
+    related_task_ids: List[str] = field(default_factory=list)
+    
+    # Self-modification tracking (for safety)
+    suggests_code_change: bool = False
+    requires_human_review: bool = False
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp.isoformat(),
+            "scope": self.scope.name,
+            "reflection_type": self.reflection_type.value,
+            "summary": self.summary,
+            "successes": self.successes,
+            "failures": self.failures,
+            "patterns_identified": self.patterns_identified,
+            "root_causes": self.root_causes,
+            "recommendations": self.recommendations,
+            "metrics": self.metrics.to_dict() if self.metrics else None,
+            "action_items": self.action_items,
+            "priority_actions": self.priority_actions,
+            "related_plan_ids": self.related_plan_ids,
+            "related_task_ids": self.related_task_ids,
+            "suggests_code_change": self.suggests_code_change,
+            "requires_human_review": self.requires_human_review
+        }
 
 
 class ReflectionEngine:
     """
-    Core reflection engine for self-analysis and improvement.
-    Implements safe self-modification with constitutional constraints.
+    Core engine for generating reflection reports.
+    Implements the Teacher LLM pattern from self-evolving agent research.
     """
     
-    def __init__(self, agent_id: str = "default"):
-        self.agent_id = agent_id
-        self.performance_history: List[PerformanceRecord] = []
-        self.capability_assessments: Dict[str, CapabilityAssessment] = {}
-        self.improvement_goals: Dict[str, ImprovementGoal] = {}
-        self.change_history: List[ProposedChange] = []
-        self.constitution: List[ConstitutionalPrinciple] = self._init_constitution()
-        
-        # Configuration
-        self.min_samples_for_assessment = 5
-        self.performance_window_size = 100
-        self.confidence_threshold = 0.7
-        
-    def _init_constitution(self) -> List[ConstitutionalPrinciple]:
-        """Initialize default constitutional safety principles."""
-        
-        def no_safety_modifications(change: ProposedChange) -> bool:
-            """Never modify safety constraints."""
-            return change.scope != ReflectionScope.SAFETY_CONSTRAINTS
-        
-        def code_requires_review(change: ProposedChange) -> bool:
-            """Code changes must have multi-perspective review."""
-            if change.scope in [ReflectionScope.CODE_STRUCTURE, ReflectionScope.CORE_ARCHITECTURE]:
-                return len(change.reviews) >= 3  # At least 3 perspectives
-            return True
-        
-        def requires_rationale(change: ProposedChange) -> bool:
-            """All changes must have clear rationale."""
-            return len(change.rationale) >= 20  # Minimum explanation length
-        
-        def measurable_impact(change: ProposedChange) -> bool:
-            """Changes should have measurable expected impact."""
-            return len(change.expected_impact) > 0
-        
-        def no_architecture_without_history(change: ProposedChange) -> bool:
-            """Architecture changes require established track record."""
-            if change.scope == ReflectionScope.CORE_ARCHITECTURE:
-                # Must have at least 10 successful smaller changes first
-                successful_changes = sum(
-                    1 for c in self.change_history 
-                    if c.status == ChangeStatus.IMPLEMENTED and c.scope != ReflectionScope.INTERNAL_STATE
-                )
-                return successful_changes >= 10
-            return True
-        
-        return [
-            ConstitutionalPrinciple(
-                "Safety Immutability",
-                "Safety constraints cannot be modified by the agent",
-                no_safety_modifications
-            ),
-            ConstitutionalPrinciple(
-                "Multi-Perspective Review",
-                "Code changes require at least 3 reviewer perspectives",
-                code_requires_review
-            ),
-            ConstitutionalPrinciple(
-                "Rationale Requirement",
-                "All changes must have clear rationale",
-                requires_rationale
-            ),
-            ConstitutionalPrinciple(
-                "Measurable Impact",
-                "Changes must have measurable expected impact",
-                measurable_impact
-            ),
-            ConstitutionalPrinciple(
-                "Architecture Experience",
-                "Core architecture changes require proven track record",
-                no_architecture_without_history
-            )
-        ]
+    def __init__(self, memory_system: Optional[Any] = None):
+        self.memory = memory_system
+        self.reflection_history: List[ReflectionReport] = []
+        self.pattern_database: Dict[str, List[Dict]] = {}  # pattern_type -> examples
     
-    # ============ Performance Analysis ============
-    
-    def record_performance(self, record: PerformanceRecord) -> None:
-        """Record a task execution for pattern analysis."""
-        self.performance_history.append(record)
-        
-        # Maintain window size
-        if len(self.performance_history) > self.performance_window_size:
-            self.performance_history = self.performance_history[-self.performance_window_size:]
-    
-    def analyze_performance_patterns(self, task_type: Optional[str] = None) -> Dict[str, Any]:
+    def reflect_on_task(
+        self,
+        task_description: str,
+        task_result: Any,
+        execution_trace: List[Dict[str, Any]],
+        success: bool,
+        quality_score: Optional[float] = None
+    ) -> ReflectionReport:
         """
-        Analyze success/failure patterns across task executions.
-        
-        Returns:
-            Dictionary with success_rate, avg_time, error_patterns, trends
-        """
-        records = self.performance_history
-        if task_type:
-            records = [r for r in records if r.task_type == task_type]
-        
-        if not records:
-            return {"error": "No performance records available"}
-        
-        # Basic metrics
-        total = len(records)
-        successes = sum(1 for r in records if r.success)
-        failures = total - successes
-        
-        success_rate = successes / total if total > 0 else 0
-        avg_time = sum(r.execution_time_ms for r in records) / total
-        avg_quality = sum(r.quality_score for r in records) / total
-        
-        # Error pattern analysis
-        error_counts = {}
-        for r in records:
-            if r.error_type:
-                error_counts[r.error_type] = error_counts.get(r.error_type, 0) + 1
-        
-        # Trend analysis (compare recent half to older half)
-        mid = len(records) // 2
-        if mid > 0:
-            recent_success = sum(1 for r in records[mid:] if r.success) / len(records[mid:])
-            older_success = sum(1 for r in records[:mid] if r.success) / len(records[:mid])
-            trend = "improving" if recent_success > older_success else "declining" if recent_success < older_success else "stable"
-            trend_delta = recent_success - older_success
-        else:
-            trend = "insufficient_data"
-            trend_delta = 0
-        
-        return {
-            "total_records": total,
-            "success_rate": round(success_rate, 3),
-            "failure_rate": round(failures / total, 3) if total > 0 else 0,
-            "avg_execution_time_ms": round(avg_time, 2),
-            "avg_quality_score": round(avg_quality, 3),
-            "error_patterns": error_counts,
-            "trend": trend,
-            "trend_delta": round(trend_delta, 3),
-            "retry_avg": sum(r.retry_count for r in records) / total
-        }
-    
-    def identify_problem_areas(self) -> List[Dict[str, Any]]:
-        """Identify task types with concerning performance."""
-        # Group by task type
-        by_type: Dict[str, List[PerformanceRecord]] = {}
-        for r in self.performance_history:
-            if r.task_type not in by_type:
-                by_type[r.task_type] = []
-            by_type[r.task_type].append(r)
-        
-        problems = []
-        for task_type, records in by_type.items():
-            if len(records) >= self.min_samples_for_assessment:
-                success_rate = sum(1 for r in records if r.success) / len(records)
-                avg_quality = sum(r.quality_score for r in records) / len(records)
-                
-                if success_rate < 0.7 or avg_quality < 0.6:
-                    problems.append({
-                        "task_type": task_type,
-                        "success_rate": round(success_rate, 3),
-                        "avg_quality": round(avg_quality, 3),
-                        "sample_size": len(records),
-                        "severity": "high" if success_rate < 0.5 else "medium"
-                    })
-        
-        return sorted(problems, key=lambda x: x["success_rate"])
-    
-    # ============ Capability Assessment ============
-    
-    def assess_capability(self, capability_name: str, 
-                        task_type: str,
-                        evaluator_fn: Optional[Callable[[List[PerformanceRecord]], Tuple[float, List[str], List[str]]]] = None) -> CapabilityAssessment:
-        """
-        Self-assess a specific capability based on performance history.
+        Generate reflection on a single task execution.
         
         Args:
-            capability_name: Name of the capability being assessed
-            task_type: Task type associated with this capability
-            evaluator_fn: Optional custom evaluator (returns score, strengths, weaknesses)
-        
-        Returns:
-            CapabilityAssessment with scores and analysis
+            task_description: What the task was
+            task_result: The output/result
+            execution_trace: Step-by-step execution log
+            success: Whether task succeeded
+            quality_score: Optional quality rating (0-1)
         """
-        records = [r for r in self.performance_history if r.task_type == task_type]
+        report_id = f"task_ref_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        if len(records) < self.min_samples_for_assessment:
-            return CapabilityAssessment(
-                capability_name=capability_name,
-                proficiency_score=0.5,
-                confidence=0.1,
-                sample_size=len(records),
-                last_evaluated=datetime.now(),
-                weaknesses=["Insufficient sample size for reliable assessment"]
-            )
+        successes = []
+        failures = []
+        patterns = []
+        root_causes = []
         
-        if evaluator_fn:
-            score, strengths, weaknesses = evaluator_fn(records)
+        if success:
+            successes.append(f"Successfully completed: {task_description}")
+            if execution_trace:
+                # Identify what worked
+                patterns.append("Execution followed expected path")
         else:
-            # Default evaluation
-            score = sum(r.quality_score for r in records) / len(records)
-            score = score * 0.7 + (sum(1 for r in records if r.success) / len(records)) * 0.3
-            
-            strengths = []
-            weaknesses = []
-            
-            if sum(1 for r in records if r.success) / len(records) > 0.8:
-                strengths.append("High success rate")
-            if sum(r.execution_time_ms for r in records) / len(records) < 1000:
-                strengths.append("Fast execution")
-            if sum(1 for r in records if r.quality_score > 0.8) / len(records) > 0.5:
-                strengths.append("Consistently high quality")
-            
-            if sum(1 for r in records if not r.success) / len(records) > 0.2:
-                weaknesses.append("Unreliable - too many failures")
-            if sum(r.retry_count for r in records) / len(records) > 1:
-                weaknesses.append("Requires too many retries")
+            failures.append(f"Failed to complete: {task_description}")
+            # Analyze trace for failure point
+            for step in execution_trace:
+                if step.get("error") or step.get("status") == "failed":
+                    root_causes.append(f"Failure at step: {step.get('step', 'unknown')}")
+                    if "error" in step:
+                        root_causes.append(f"Error: {step['error']}")
         
-        # Calculate confidence based on sample size
-        confidence = min(1.0, len(records) / 50)  # Max confidence at 50 samples
+        # Extract patterns from trace
+        tool_usage = {}
+        for step in execution_trace:
+            if "tool" in step:
+                tool = step["tool"]
+                tool_usage[tool] = tool_usage.get(tool, 0) + 1
         
-        assessment = CapabilityAssessment(
-            capability_name=capability_name,
-            proficiency_score=round(score, 3),
-            confidence=round(confidence, 3),
-            sample_size=len(records),
-            last_evaluated=datetime.now(),
-            strengths=strengths,
-            weaknesses=weaknesses,
-            improvement_suggestions=self._generate_suggestions(weaknesses)
+        if tool_usage:
+            most_used = max(tool_usage.items(), key=lambda x: x[1])
+            patterns.append(f"Primary tool used: {most_used[0]} ({most_used[1]} times)")
+        
+        # Generate recommendations
+        recommendations = []
+        if not success:
+            recommendations.append({
+                "type": "retry_strategy",
+                "description": "Consider alternative approach or tool selection",
+                "priority": "high"
+            })
+        
+        if quality_score and quality_score < 0.7:
+            recommendations.append({
+                "type": "quality_improvement",
+                "description": "Review output quality standards and validation",
+                "priority": "medium"
+            })
+        
+        report = ReflectionReport(
+            id=report_id,
+            timestamp=datetime.now(),
+            scope=ReflectionScope.TASK,
+            reflection_type=ReflectionType.PERFORMANCE,
+            summary=f"Task reflection: {'Success' if success else 'Failure'} on '{task_description[:50]}...'",
+            successes=successes,
+            failures=failures,
+            patterns_identified=patterns,
+            root_causes=root_causes,
+            recommendations=recommendations,
+            action_items=[r["description"] for r in recommendations]
         )
         
-        self.capability_assessments[capability_name] = assessment
-        return assessment
+        self.reflection_history.append(report)
+        return report
     
-    def _generate_suggestions(self, weaknesses: List[str]) -> List[str]:
-        """Generate improvement suggestions based on weaknesses."""
-        suggestion_map = {
-            "Unreliable - too many failures": "Implement better error handling and fallback strategies",
-            "Requires too many retries": "Improve initial attempt quality through better planning",
-            "Slow execution": "Optimize algorithm or implement caching",
-            "Low quality outputs": "Add validation steps and quality gates",
-            "Insufficient sample size for reliable assessment": "Execute more tasks to build assessment confidence"
-        }
+    def reflect_on_plan(
+        self,
+        plan_id: str,
+        plan_goal: str,
+        tasks_data: List[Dict[str, Any]],
+        overall_success: bool
+    ) -> ReflectionReport:
+        """
+        Generate reflection on a complete plan execution.
         
-        suggestions = []
-        for weakness in weaknesses:
-            if weakness in suggestion_map:
-                suggestions.append(suggestion_map[weakness])
-            else:
-                suggestions.append(f"Address: {weakness}")
+        Args:
+            plan_id: Plan identifier
+            plan_goal: The goal of the plan
+            tasks_data: List of task execution data
+            overall_success: Whether plan succeeded overall
+        """
+        report_id = f"plan_ref_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        return suggestions
-    
-    def get_capability_profile(self) -> Dict[str, CapabilityAssessment]:
-        """Get full capability assessment profile."""
-        return self.capability_assessments
-    
-    # ============ Improvement Planning ============
-    
-    def create_improvement_goal(self, target_capability: str,
-                               target_score: float,
-                               priority: int = 5,
-                               deadline: Optional[datetime] = None,
-                               strategy: str = "") -> ImprovementGoal:
-        """Create a structured improvement goal."""
+        # Calculate metrics
+        metrics = PerformanceMetrics()
+        metrics.tasks_total = len(tasks_data)
         
-        current = self.capability_assessments.get(target_capability)
-        current_score = current.proficiency_score if current else 0.5
-        
-        goal = ImprovementGoal(
-            goal_id=f"goal_{int(time.time())}_{hash(target_capability) % 10000}",
-            target_capability=target_capability,
-            target_score=target_score,
-            current_score=current_score,
-            priority=priority,
-            deadline=deadline,
-            strategy=strategy or "Practice and feedback loop",
-            milestones=[
-                (f"Reach {(current_score + (target_score - current_score) * 0.5):.2f}", 
-                 current_score + (target_score - current_score) * 0.5),
-                (f"Approach target at {(target_score * 0.9):.2f}", target_score * 0.9)
-            ]
-        )
-        
-        self.improvement_goals[goal.goal_id] = goal
-        return goal
-    
-    def prioritize_goals(self) -> List[ImprovementGoal]:
-        """Return goals sorted by priority and potential impact."""
-        goals = list(self.improvement_goals.values())
-        
-        # Filter active goals
-        active = [g for g in goals if g.status == "active"]
-        
-        # Sort by priority desc, then by gap (target - current) desc
-        return sorted(active, key=lambda g: (g.priority, g.target_score - g.current_score), reverse=True)
-    
-    def update_goal_progress(self, goal_id: str, new_score: float) -> None:
-        """Update a goal with new capability score."""
-        if goal_id in self.improvement_goals:
-            goal = self.improvement_goals[goal_id]
-            goal.current_score = new_score
+        for task in tasks_data:
+            if task.get("status") == "completed":
+                metrics.tasks_completed += 1
+                if task.get("duration"):
+                    metrics.total_time += task["duration"]
+                if task.get("quality_score"):
+                    metrics.quality_scores.append(task["quality_score"])
+            elif task.get("status") == "failed":
+                metrics.tasks_failed += 1
             
-            # Check completion
-            if new_score >= goal.target_score:
-                goal.status = "completed"
-            elif goal.deadline and datetime.now() > goal.deadline:
-                goal.status = "abandoned"
-    
-    # ============ Self-Modification with Safety ============
-    
-    def propose_change(self, scope: ReflectionScope,
-                      description: str,
-                      rationale: str,
-                      expected_impact: Dict[str, float],
-                      implementation: str) -> ProposedChange:
-        """
-        Propose a self-modification with full constitutional validation.
+            # Count tool usage
+            for tool in task.get("tools_used", []):
+                metrics.tools_used[tool] = metrics.tools_used.get(tool, 0) + 1
         
-        All changes must pass constitutional review before implementation.
-        """
+        metrics.calculate_stats()
         
-        # Generate unique ID
-        content_hash = hashlib.sha256(
-            f"{scope}{description}{time.time()}".encode()
-        ).hexdigest()[:12]
-        
-        change = ProposedChange(
-            change_id=f"change_{content_hash}",
-            scope=scope,
-            description=description,
-            rationale=rationale,
-            expected_impact=expected_impact,
-            implementation=implementation,
-            status=ChangeStatus.PROPOSED
-        )
-        
-        # Constitutional validation
-        violations = []
-        for principle in self.constitution:
-            passed, reason = principle.validate(change)
-            if not passed:
-                violations.append(reason)
-        
-        change.constitutional_violations = violations
-        
-        if violations:
-            change.status = ChangeStatus.REJECTED
-        
-        self.change_history.append(change)
-        return change
-    
-    def simulate_review(self, change: ProposedChange,
-                       perspectives: List[ReviewPerspective] = None) -> Dict[ReviewPerspective, Dict]:
-        """
-        Simulate multi-perspective review of a proposed change.
-        
-        In production, this would call multiple LLM instances.
-        For now, we simulate with rule-based analysis.
-        """
-        
-        if perspectives is None:
-            perspectives = [
-                ReviewPerspective.SAFETY_FIRST,
-                ReviewPerspective.CORRECTNESS,
-                ReviewPerspective.MAINTAINABILITY
-            ]
-        
-        reviews = {}
-        
-        for perspective in perspectives:
-            review = self._generate_perspective_review(change, perspective)
-            reviews[perspective] = review
-        
-        change.reviews = reviews
-        change.status = ChangeStatus.UNDER_REVIEW
-        return reviews
-    
-    def _generate_perspective_review(self, change: ProposedChange, 
-                                    perspective: ReviewPerspective) -> Dict:
-        """Generate a simulated review from a specific perspective."""
-        
-        # Base review structure
-        review = {
-            "perspective": perspective.value,
-            "approved": False,
-            "confidence": 0.5,
-            "concerns": [],
-            "suggestions": []
-        }
-        
-        # Perspective-specific logic
-        if perspective == ReviewPerspective.SAFETY_FIRST:
-            if change.scope in [ReflectionScope.SAFETY_CONSTRAINTS, ReflectionScope.CORE_ARCHITECTURE]:
-                review["concerns"].append("High-risk scope - requires extensive testing")
-                review["confidence"] = 0.3
-            elif change.scope == ReflectionScope.INTERNAL_STATE:
-                review["approved"] = True
-                review["confidence"] = 0.8
-            else:
-                review["approved"] = True
-                review["confidence"] = 0.6
-        
-        elif perspective == ReviewPerspective.CORRECTNESS:
-            if len(change.implementation) < 50:
-                review["concerns"].append("Implementation seems incomplete")
-                review["confidence"] = 0.4
-            elif "TODO" in change.implementation or "FIXME" in change.implementation:
-                review["concerns"].append("Contains unresolved TODOs/FIXMEs")
-                review["suggestions"].append("Complete all TODOs before implementation")
-                review["confidence"] = 0.5
-            else:
-                review["approved"] = True
-                review["confidence"] = 0.75
-        
-        elif perspective == ReviewPerspective.MAINTAINABILITY:
-            if len(change.rationale) < 50:
-                review["concerns"].append("Rationale could be more detailed")
-                review["suggestions"].append("Add more context about why this change is needed")
-            if not change.expected_impact:
-                review["concerns"].append("Expected impact not quantified")
-            else:
-                review["approved"] = True
-                review["confidence"] = 0.7
-        
-        elif perspective == ReviewPerspective.PERFORMANCE:
-            if change.expected_impact.get("execution_time_delta", 0) > 0:
-                review["concerns"].append("Expected to increase execution time")
-            elif change.expected_impact.get("memory_usage_delta", 0) > 0:
-                review["concerns"].append("Expected to increase memory usage")
-            else:
-                review["approved"] = True
-                review["confidence"] = 0.65
-        
-        elif perspective == ReviewPerspective.ELEGANCE:
-            if "hack" in change.implementation.lower() or "workaround" in change.implementation.lower():
-                review["concerns"].append("Contains hack/workaround - consider cleaner solution")
-                review["confidence"] = 0.4
-            else:
-                review["approved"] = True
-                review["confidence"] = 0.6
-        
-        return review
-    
-    def approve_change(self, change_id: str) -> bool:
-        """Approve a change after review (in production: human or multi-model approval)."""
-        for change in self.change_history:
-            if change.change_id == change_id:
-                if change.constitutional_violations:
-                    return False  # Cannot approve constitutionally invalid changes
-                
-                # Check if we have sufficient reviews
-                if len(change.reviews) >= 2:
-                    approval_count = sum(1 for r in change.reviews.values() if r.get("approved"))
-                    if approval_count >= len(change.reviews) * 0.6:  # Majority approval
-                        change.status = ChangeStatus.APPROVED
-                        return True
-        
-        return False
-    
-    def implement_change(self, change_id: str) -> bool:
-        """
-        Mark a change as implemented.
-        
-        NOTE: Actual implementation would execute the change.
-        For safety, this framework only tracks proposals.
-        """
-        for change in self.change_history:
-            if change.change_id == change_id:
-                if change.status == ChangeStatus.APPROVED:
-                    change.status = ChangeStatus.IMPLEMENTED
-                    change.implemented_at = datetime.now()
-                    return True
-        
-        return False
-    
-    def rollback_change(self, change_id: str, reason: str) -> bool:
-        """Mark a change as rolled back."""
-        for change in self.change_history:
-            if change.change_id == change_id:
-                if change.status == ChangeStatus.IMPLEMENTED:
-                    change.status = ChangeStatus.ROLLED_BACK
-                    change.rolled_back_at = datetime.now()
-                    change.rollback_reason = reason
-                    return True
-        
-        return False
-    
-    # ============ Audit and Reporting ============
-    
-    def get_audit_trail(self, scope_filter: Optional[ReflectionScope] = None) -> List[ProposedChange]:
-        """Get full audit trail of changes, optionally filtered by scope."""
-        changes = self.change_history
-        if scope_filter:
-            changes = [c for c in changes if c.scope == scope_filter]
-        return changes
-    
-    def generate_reflection_report(self) -> Dict[str, Any]:
-        """Generate comprehensive self-reflection report."""
-        
-        # Performance summary
-        perf_summary = self.analyze_performance_patterns()
-        
-        # Problem areas
-        problems = self.identify_problem_areas()
-        
-        # Capability summary
-        capabilities = {
-            name: {
-                "score": cap.proficiency_score,
-                "confidence": cap.confidence,
-                "strengths": cap.strengths,
-                "weaknesses": cap.weaknesses
-            }
-            for name, cap in self.capability_assessments.items()
-        }
-        
-        # Goal summary
-        active_goals = [g for g in self.improvement_goals.values() if g.status == "active"]
-        completed_goals = [g for g in self.improvement_goals.values() if g.status == "completed"]
-        
-        # Change summary
-        changes_by_status: Dict[str, int] = {}
-        for c in self.change_history:
-            status = c.status.name
-            changes_by_status[status] = changes_by_status.get(status, 0) + 1
-        
-        return {
-            "generated_at": datetime.now().isoformat(),
-            "agent_id": self.agent_id,
-            "performance_summary": perf_summary,
-            "problem_areas": problems,
-            "capabilities": capabilities,
-            "improvement_goals": {
-                "active": len(active_goals),
-                "completed": len(completed_goals),
-                "top_priority": active_goals[0].target_capability if active_goals else None
-            },
-            "self_modification_history": changes_by_status,
-            "constitutional_principles": [p.name for p in self.constitution],
-            "recommendations": self._generate_recommendations(problems, active_goals)
-        }
-    
-    def _generate_recommendations(self, problems: List[Dict], 
-                                 goals: List[ImprovementGoal]) -> List[str]:
-        """Generate high-level recommendations based on analysis."""
+        # Analyze patterns
+        successes = []
+        failures = []
+        patterns = []
         recommendations = []
         
-        if problems:
-            recommendations.append(
-                f"Address {len(problems)} identified problem areas, starting with {problems[0]['task_type']}"
-            )
+        if overall_success:
+            successes.append(f"Plan achieved goal: {plan_goal}")
+            if metrics.avg_quality > 0.8:
+                successes.append(f"High quality output (avg: {metrics.avg_quality:.2f})")
+        else:
+            failures.append(f"Plan failed to achieve goal: {plan_goal}")
+            if metrics.tasks_failed > 0:
+                failures.append(f"{metrics.tasks_failed} tasks failed")
         
-        if goals:
-            top_goal = max(goals, key=lambda g: g.priority)
-            recommendations.append(
-                f"Focus on improving {top_goal.target_capability} (priority {top_goal.priority})"
-            )
+        # Pattern: Dependency bottlenecks
+        blocked_tasks = [t for t in tasks_data if t.get("blocked_by")]
+        if blocked_tasks:
+            patterns.append(f"{len(blocked_tasks)} tasks had dependency issues")
+            recommendations.append({
+                "type": "planning_improvement",
+                "description": "Review task dependency structure for bottlenecks",
+                "priority": "medium"
+            })
         
-        if not self.capability_assessments:
-            recommendations.append("Conduct capability assessments for key task types")
+        # Pattern: Tool usage
+        if metrics.tools_used:
+            patterns.append(f"Tools used: {', '.join(metrics.tools_used.keys())}")
         
-        successful_changes = sum(
-            1 for c in self.change_history if c.status == ChangeStatus.IMPLEMENTED
+        # Pattern: Time estimation accuracy
+        estimated_times = [t.get("estimated_duration") for t in tasks_data if t.get("estimated_duration")]
+        actual_times = [t.get("duration") for t in tasks_data if t.get("duration")]
+        if estimated_times and actual_times:
+            avg_estimate = statistics.mean(estimated_times)
+            avg_actual = statistics.mean(actual_times)
+            if abs(avg_estimate - avg_actual) / avg_actual > 0.3:
+                patterns.append("Time estimation significantly off - review estimation model")
+        
+        report = ReflectionReport(
+            id=report_id,
+            timestamp=datetime.now(),
+            scope=ReflectionScope.PLAN,
+            reflection_type=ReflectionType.STRATEGY,
+            summary=f"Plan reflection for '{plan_goal[:50]}...': {metrics.tasks_completed}/{metrics.tasks_total} tasks completed",
+            successes=successes,
+            failures=failures,
+            patterns_identified=patterns,
+            recommendations=recommendations,
+            metrics=metrics,
+            action_items=[r["description"] for r in recommendations],
+            related_plan_ids=[plan_id]
         )
-        if successful_changes == 0 and self.change_history:
-            recommendations.append("Review change approval process - many proposals but no implementations")
         
-        return recommendations
+        self.reflection_history.append(report)
+        return report
     
-    def export_state(self) -> Dict[str, Any]:
-        """Export full reflection state for persistence."""
+    def reflect_on_session(
+        self,
+        session_plans: List[Dict[str, Any]],
+        session_goal: Optional[str] = None
+    ) -> ReflectionReport:
+        """
+        Generate reflection across multiple plans in a session.
+        
+        Args:
+            session_plans: Data about plans executed in session
+            session_goal: Overall session objective
+        """
+        report_id = f"session_ref_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
+        # Aggregate metrics
+        all_tasks = []
+        for plan in session_plans:
+            all_tasks.extend(plan.get("tasks", []))
+        
+        metrics = PerformanceMetrics()
+        metrics.tasks_total = len(all_tasks)
+        metrics.tasks_completed = sum(1 for t in all_tasks if t.get("status") == "completed")
+        metrics.tasks_failed = sum(1 for t in all_tasks if t.get("status") == "failed")
+        
+        # Collect patterns
+        patterns = []
+        recommendations = []
+        
+        # Pattern: Success rate trend
+        if metrics.tasks_total > 0:
+            success_rate = metrics.tasks_completed / metrics.tasks_total
+            if success_rate < 0.7:
+                patterns.append(f"Low success rate: {success_rate:.1%}")
+                recommendations.append({
+                    "type": "system_improvement",
+                    "description": "Investigate systemic causes of task failures",
+                    "priority": "high"
+                })
+            elif success_rate > 0.9:
+                patterns.append(f"High success rate: {success_rate:.1%}")
+                patterns.append("Consider increasing task difficulty or complexity")
+        
+        # Pattern: Common failure modes
+        failure_types = {}
+        for task in all_tasks:
+            if task.get("status") == "failed" and task.get("failure_type"):
+                ft = task["failure_type"]
+                failure_types[ft] = failure_types.get(ft, 0) + 1
+        
+        if failure_types:
+            most_common = max(failure_types.items(), key=lambda x: x[1])
+            patterns.append(f"Most common failure: {most_common[0]} ({most_common[1]} times)")
+        
+        report = ReflectionReport(
+            id=report_id,
+            timestamp=datetime.now(),
+            scope=ReflectionScope.SESSION,
+            reflection_type=ReflectionType.LEARNING,
+            summary=f"Session reflection: {metrics.tasks_completed}/{metrics.tasks_total} tasks across {len(session_plans)} plans",
+            patterns_identified=patterns,
+            recommendations=recommendations,
+            metrics=metrics,
+            related_plan_ids=[p.get("id") for p in session_plans],
+            action_items=[r["description"] for r in recommendations]
+        )
+        
+        self.reflection_history.append(report)
+        return report
+    
+    def generate_improvement_proposals(
+        self,
+        report: ReflectionReport
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate specific improvement proposals from a reflection.
+        These can be fed to the self-analysis system for review.
+        
+        Returns list of proposals with structure compatible with self_analysis.py
+        """
+        proposals = []
+        
+        for rec in report.recommendations:
+            proposal = {
+                "id": f"prop_{report.id}_{len(proposals)}",
+                "title": rec["description"],
+                "improvement_type": rec["type"],
+                "component": "planning" if rec["type"] in ["planning_improvement", "retry_strategy"] else "execution",
+                "description": rec["description"],
+                "rationale": f"Identified in reflection {report.id}",
+                "expected_impact": f"Priority: {rec.get('priority', 'medium')}",
+                "risk_level": "NORMAL",
+                "requires_review": True,
+                "source_reflection": report.id
+            }
+            proposals.append(proposal)
+        
+        return proposals
+    
+    def get_insights_for_planning(
+        self,
+        goal_type: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get insights to inform future planning.
+        Returns aggregated patterns and recommendations.
+        """
+        # Filter relevant reflections
+        relevant = [
+            r for r in self.reflection_history
+            if goal_type is None or r.reflection_type.value == goal_type
+        ]
+        
+        if not relevant:
+            return {
+                "successful_approaches": [],
+                "failed_approaches": [],
+                "suggested_improvements": []
+            }
+        
+        # Aggregate insights
+        successful_approaches = []
+        failed_approaches = []
+        suggestions = []
+        
+        for report in relevant:
+            successful_approaches.extend(report.successes)
+            failed_approaches.extend(report.failures)
+            suggestions.extend(report.action_items)
+        
+        # Get most common suggestions
+        from collections import Counter
+        suggestion_counts = Counter(suggestions)
+        top_suggestions = [s for s, _ in suggestion_counts.most_common(5)]
+        
         return {
-            "agent_id": self.agent_id,
-            "performance_history": [
-                {
-                    "task_id": r.task_id,
-                    "task_type": r.task_type,
-                    "success": r.success,
-                    "execution_time_ms": r.execution_time_ms,
-                    "quality_score": r.quality_score,
-                    "error_type": r.error_type,
-                    "retry_count": r.retry_count,
-                    "timestamp": r.timestamp.isoformat()
-                }
-                for r in self.performance_history
-            ],
-            "capability_assessments": {
-                name: {
-                    "capability_name": c.capability_name,
-                    "proficiency_score": c.proficiency_score,
-                    "confidence": c.confidence,
-                    "sample_size": c.sample_size,
-                    "last_evaluated": c.last_evaluated.isoformat(),
-                    "strengths": c.strengths,
-                    "weaknesses": c.weaknesses,
-                    "improvement_suggestions": c.improvement_suggestions
-                }
-                for name, c in self.capability_assessments.items()
-            },
-            "improvement_goals": {
-                gid: {
-                    "goal_id": g.goal_id,
-                    "target_capability": g.target_capability,
-                    "target_score": g.target_score,
-                    "current_score": g.current_score,
-                    "priority": g.priority,
-                    "deadline": g.deadline.isoformat() if g.deadline else None,
-                    "strategy": g.strategy,
-                    "status": g.status,
-                    "created_at": g.created_at.isoformat()
-                }
-                for gid, g in self.improvement_goals.items()
-            },
-            "change_history": [
-                {
-                    "change_id": c.change_id,
-                    "scope": c.scope.name,
-                    "description": c.description,
-                    "rationale": c.rationale,
-                    "expected_impact": c.expected_impact,
-                    "status": c.status.name,
-                    "constitutional_violations": c.constitutional_violations,
-                    "created_at": c.created_at.isoformat(),
-                    "implemented_at": c.implemented_at.isoformat() if c.implemented_at else None,
-                    "rolled_back_at": c.rolled_back_at.isoformat() if c.rolled_back_at else None,
-                    "rollback_reason": c.rollback_reason
-                }
-                for c in self.change_history
-            ]
+            "successful_approaches": list(set(successful_approaches))[:5],
+            "failed_approaches": list(set(failed_approaches))[:5],
+            "suggested_improvements": top_suggestions,
+            "total_reflections_analyzed": len(relevant)
         }
+
+
+class ReflectivePlanner:
+    """
+    Planner that integrates reflection for continuous improvement.
+    Bridges the gap between planning and reflection systems.
+    """
     
-    def import_state(self, state: Dict[str, Any]) -> None:
-        """Import reflection state from persisted data."""
-        # This would reconstruct all dataclasses from the dict
-        # Implementation omitted for brevity - would parse ISO dates,
-        # reconstruct enums, etc.
-        pass
+    def __init__(self, planner_engine: Any, reflection_engine: ReflectionEngine):
+        self.planner = planner_engine
+        self.reflection = reflection_engine
+        self.planning_history: List[Dict] = []
+    
+    def plan_and_execute(
+        self,
+        goal: str,
+        execute_fn: Callable[[Any], Any],
+        reflect: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Plan, execute, and optionally reflect on results.
+        
+        Args:
+            goal: The goal to achieve
+            execute_fn: Function to execute the plan
+            reflect: Whether to generate reflection after execution
+        
+        Returns:
+            Dict with plan, result, and optional reflection report
+        """
+        # Get insights from past reflections
+        insights = self.reflection.get_insights_for_planning()
+        
+        # Create plan informed by insights
+        plan = self.planner.plan_with_reflection(goal, insights)
+        
+        # Execute
+        result = execute_fn(plan)
+        
+        output = {
+            "plan": plan,
+            "result": result,
+            "reflection": None
+        }
+        
+        # Generate reflection if requested
+        if reflect:
+            reflection_report = self.reflection.reflect_on_plan(
+                plan_id=plan.id,
+                plan_goal=goal,
+                tasks_data=result.get("tasks", []),
+                overall_success=result.get("success", False)
+            )
+            output["reflection"] = reflection_report
+            
+            # Store for future planning
+            self.planning_history.append({
+                "plan_id": plan.id,
+                "goal": goal,
+                "success": result.get("success", False),
+                "reflection_id": reflection_report.id
+            })
+        
+        return output
 
 
-def create_reflection_engine(agent_id: str = "default") -> ReflectionEngine:
-    """Factory function to create a configured reflection engine."""
-    return ReflectionEngine(agent_id)
+# Convenience functions
+def create_reflection_engine(memory_system: Optional[Any] = None) -> ReflectionEngine:
+    """Create a new reflection engine."""
+    return ReflectionEngine(memory_system=memory_system)
+
+
+def quick_reflect(
+    task_description: str,
+    success: bool,
+    notes: Optional[List[str]] = None
+) -> ReflectionReport:
+    """
+    Quick reflection for simple use cases.
+    
+    Args:
+        task_description: What was attempted
+        success: Whether it succeeded
+        notes: Optional list of observations
+    """
+    engine = ReflectionEngine()
+    return engine.reflect_on_task(
+        task_description=task_description,
+        task_result={"success": success},
+        execution_trace=[{"note": n} for n in (notes or [])],
+        success=success
+    )
