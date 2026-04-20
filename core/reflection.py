@@ -559,3 +559,7 @@ def quick_reflect(
         execution_trace=[{"note": n} for n in (notes or [])],
         success=success
     )
+
+
+# Backward compatibility alias
+PerformanceRecord = PerformanceMetrics

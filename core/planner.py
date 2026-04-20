@@ -583,3 +583,29 @@ def create_simple_plan(goal: str, steps: List[str]) -> Plan:
     
     planner.executor.decompose_goal(plan, subtasks)
     return plan
+
+
+# Backward compatibility aliases
+def PlanStatus(status: TaskStatus) -> TaskStatus:
+    """Alias for TaskStatus for backward compatibility."""
+    return status
+
+class ResourceBudget:
+    """Resource budget for planning - placeholder for compatibility."""
+    def __init__(self, max_tokens: int = 100000, max_api_calls: int = 100, max_time_minutes: float = 60.0):
+        self.max_tokens = max_tokens
+        self.max_api_calls = max_api_calls
+        self.max_time_minutes = max_time_minutes
+
+class TaskType(Enum):
+    """Task type for backward compatibility."""
+    RESEARCH = auto()
+    CODE = auto()
+    ANALYSIS = auto()
+    PLANNING = auto()
+    EXECUTION = auto()
+    REVIEW = auto()
+    OTHER = auto()
+
+# SubTask is an alias for Task
+SubTask = Task
