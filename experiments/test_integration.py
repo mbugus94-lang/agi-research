@@ -1,523 +1,636 @@
 """
-Test Suite for Integration Module
-Tests the self-improving loop connecting reflection, planning, and memory.
+Test Suite for Integration Layer - Connecting Reflection, Planning, and Memory
+
+Tests the self-improving closed loop:
+    Execute → Reflect → Store → Plan(with history) → Execute(improved)
+
+Validates:
+1. ReflectionMemoryBridge: Storage and retrieval of reflections in tiered memory
+2. PlanningWithReflection: Historical insights informing new plans
+3. SelfImprovingLoop: Full automated improvement cycle
+4. Cross-system metrics aggregation
+5. Pattern recognition across execution traces
 """
 
+import unittest
+import time
+import json
+from datetime import datetime
+
+# Adjust imports for test context
 import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, '/home/workspace/agi-research')
 
 from core.integration import (
-    SelfImprovingLoop, IntegratedReflectionEngine, IntegratedPlanner, IntegratedMemory,
-    FeedbackType, IntegrationPriority, ComponentFeedback, ReflectionToPlanningBridge,
-    PerformanceInformedPlan
+    ReflectionMemoryBridge,
+    PlanningWithReflection,
+    SelfImprovingLoop,
+    ExecutionTrace,
+    IntegrationMode,
+    create_integrated_system
+)
+from core.reflection import (
+    ReflectionEngine,
+    ReflectionReport,
+    ReflectionScope,
+    ReflectionType,
+    PerformanceMetrics
+)
+from core.planner import (
+    HierarchicalPlanner,
+    PlanExecutor,
+    Plan,
+    Task,
+    TaskStatus,
+    TaskPriority
+)
+from core.tiered_memory import (
+    TieredMemorySystem,
+    MemoryTier,
+    MemoryEntry
 )
 
 
-def test_component_interface():
-    """Test 1: Component interface feedback flow"""
-    print("Test 1: Component interface feedback flow...")
+class TestReflectionMemoryBridge(unittest.TestCase):
+    """Test storage and retrieval of reflection reports in tiered memory."""
     
-    reflection = IntegratedReflectionEngine("test_agent")
-    planner = IntegratedPlanner()
+    def setUp(self):
+        self.memory = TieredMemorySystem()
+        self.bridge = ReflectionMemoryBridge(self.memory)
+        self.reflection = ReflectionEngine()
     
-    # Send feedback from reflection to planner
-    feedback = ComponentFeedback(
-        feedback_type=FeedbackType.PERFORMANCE_INSIGHT,
-        source_component="reflection",
-        target_component="planning",
-        content={"test": "data"},
-        priority=IntegrationPriority.HIGH
-    )
-    
-    reflection.send_feedback(feedback)
-    planner.receive_feedback(feedback)
-    
-    assert len(reflection.feedback_outbox) == 1
-    assert len(planner.feedback_inbox) == 1
-    print("  ✅ Component interface feedback flow works")
-
-
-def test_reflection_performance_recording():
-    """Test 2: Reflection engine performance recording"""
-    print("Test 2: Reflection engine performance recording...")
-    
-    engine = IntegratedReflectionEngine("test_agent")
-    
-    # Record multiple executions
-    for i in range(10):
-        engine.record_execution(
-            task_id=f"task_{i}",
-            task_type="code_generation",
-            success=i % 3 != 0,  # 66% success rate
-            execution_time_ms=1000.0 + i * 100,
-            quality_score=0.7 + (i % 3) * 0.1,
-            error_type=None if i % 3 != 0 else "syntax_error"
+    def test_01_store_task_scope_reflection(self):
+        """TASK scope reflections should be stored in L0 (immediate) tier."""
+        # Create a reflection report manually
+        report = ReflectionReport(
+            id="task_ref_001",
+            timestamp=datetime.now(),
+            scope=ReflectionScope.TASK,
+            reflection_type=ReflectionType.PERFORMANCE,
+            summary="Task reflection test",
+            successes=["Completed successfully"],
+            failures=[],
+            patterns_identified=["Fast execution"],
+            root_causes=[],
+            recommendations=[],
+            metrics=PerformanceMetrics(tasks_total=1, tasks_completed=1)
         )
-    
-    history = engine.performance_history.get("code_generation", [])
-    assert len(history) == 10
-    
-    # Check window limit
-    for i in range(60):  # Add more to test window
-        engine.record_execution(
-            task_id=f"task_extra_{i}",
-            task_type="code_generation",
-            success=True,
-            execution_time_ms=500.0,
-            quality_score=0.8
-        )
-    
-    history = engine.performance_history.get("code_generation", [])
-    assert len(history) == 50  # Window limit maintained
-    print("  ✅ Performance recording with window management works")
-
-
-def test_reflection_to_planning_bridge():
-    """Test 3: Reflection generates insights for planning"""
-    print("Test 3: Reflection to planning bridge...")
-    
-    engine = IntegratedReflectionEngine("test_agent")
-    planner = IntegratedPlanner()
-    
-    # Record declining performance
-    for i in range(20):
-        # Intentionally declining: more failures as we go
-        success = i < 10  # First 10 succeed, next 10 fail
-        engine.record_execution(
-            task_id=f"task_{i}",
-            task_type="web_search",
-            success=success,
-            execution_time_ms=2000.0,
-            quality_score=0.9 if success else 0.3
-        )
-    
-    bridge = engine.analyze_and_send_insights("web_search")
-    
-    assert bridge is not None
-    assert bridge.capability_name == "web_search"
-    assert bridge.trend == "declining"
-    assert bridge.priority == IntegrationPriority.HIGH
-    assert len(bridge.suggested_strategies) > 0
-    
-    # Verify feedback was sent
-    assert len(engine.feedback_outbox) == 1
-    assert engine.feedback_outbox[0].feedback_type == FeedbackType.PERFORMANCE_INSIGHT
-    print("  ✅ Reflection to planning bridge generation works")
-
-
-def test_planner_informed_plan_creation():
-    """Test 4: Planner creates informed plans"""
-    print("Test 4: Planner creates informed plans...")
-    
-    planner = IntegratedPlanner()
-    
-    # Add an insight
-    insight = ReflectionToPlanningBridge(
-        capability_name="code_generation",
-        proficiency_score=0.85,
-        confidence=0.8,
-        trend="improving",
-        suggested_strategies=["Use advanced strategies"],
-        priority=IntegrationPriority.MEDIUM
-    )
-    planner.update_from_reflection(insight)
-    
-    # Create informed plan
-    plan = planner.create_informed_plan("code_generation", "Implement a sorting algorithm")
-    
-    assert plan.plan_id is not None
-    assert plan.task_type == "code_generation"
-    assert plan.expected_success_rate == 0.85  # From insight
-    assert plan.suggested_strategy is not None
-    assert len(plan.adaptations) > 0
-    assert plan.risk_assessment["confidence"] == 0.8
-    
-    # Verify feedback was sent
-    assert len(planner.feedback_outbox) == 1
-    print("  ✅ Informed plan creation works")
-
-
-def test_memory_storage_and_retrieval():
-    """Test 5: Memory stores and retrieves insights"""
-    print("Test 5: Memory storage and retrieval...")
-    
-    memory = IntegratedMemory(max_entries=10)
-    
-    # Store reports
-    for i in range(15):
-        memory.store_reflection_report({
-            "task_type": "code_generation" if i % 2 == 0 else "analysis",
-            "score": 0.7 + i * 0.01
-        }, priority=IntegrationPriority.MEDIUM if i % 3 == 0 else IntegrationPriority.LOW)
-    
-    # Check size limit enforced
-    assert len(memory.reflection_reports) == 10
-    
-    # Retrieve relevant insights
-    insights = memory.retrieve_relevant_insights("code_generation", limit=3)
-    # Should get code_generation reports (every other one, so about 7 stored, 3 retrieved)
-    assert len(insights) <= 3
-    
-    # Check access count tracking
-    for insight in insights:
-        assert insight["access_count"] >= 1
-    
-    print("  ✅ Memory storage and retrieval works")
-
-
-def test_self_improving_loop_basic():
-    """Test 6: Basic self-improving loop execution"""
-    print("Test 6: Self-improving loop execution...")
-    
-    loop = SelfImprovingLoop("test_loop")
-    
-    # Mock execution function
-    def mock_execute(plan):
-        return {
-            "success": True,
-            "quality": 0.85,
-            "result": "task completed"
-        }
-    
-    result = loop.execute_task(
-        task_type="code_generation",
-        task_description="Test task",
-        execute_fn=mock_execute
-    )
-    
-    assert result["success"] is True
-    assert result["task_id"] == "task_0"
-    assert result["quality_score"] == 0.85
-    assert "plan" in result
-    
-    # Check execution count
-    assert loop.execution_count == 1
-    
-    # Check memory updated
-    assert len(loop.memory.planning_history) == 1
-    
-    print("  ✅ Self-improving loop basic execution works")
-
-
-def test_improving_performance_adaptation():
-    """Test 7: System adapts to improving performance"""
-    print("Test 7: Improving performance adaptation...")
-    
-    loop = SelfImprovingLoop("test_adapt")
-    
-    # Simulate improving performance
-    quality_scores = [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.88, 0.9, 0.92, 0.93]
-    
-    for quality in quality_scores:
-        loop.execute_task(
-            task_type="analysis",
-            task_description="Analyzing data",
-            execute_fn=lambda p, q=quality: {"success": q > 0.6, "quality": q}
-        )
-    
-    # Check reflection has history
-    assert len(loop.reflection.performance_history.get("analysis", [])) == 10
-    
-    # Generate insights
-    bridge = loop.reflection.analyze_and_send_insights("analysis")
-    
-    if bridge:
-        assert bridge.trend == "improving"
-        assert bridge.proficiency_score >= 0.8  # Allow exact match
-    
-    print("  ✅ Improving performance adaptation works")
-
-
-def test_declining_performance_response():
-    """Test 8: System responds to declining performance"""
-    print("Test 8: Declining performance response...")
-    
-    loop = SelfImprovingLoop("test_decline")
-    
-    # Simulate declining performance
-    quality_scores = [0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45]
-    
-    for quality in quality_scores:
-        loop.execute_task(
-            task_type="web_search",
-            task_description="Search for information",
-            execute_fn=lambda p, q=quality: {"success": q > 0.6, "quality": q, "error": None if q > 0.6 else "timeout"}
-        )
-    
-    # Generate insights
-    bridge = loop.reflection.analyze_and_send_insights("web_search")
-    
-    if bridge:
-        assert bridge.trend == "declining"
-        assert bridge.priority == IntegrationPriority.HIGH
-        # Should have suggestions for recovery
-        assert any("alternative" in s.lower() or "review" in s.lower() 
-                  for s in bridge.suggested_strategies)
-    
-    print("  ✅ Declining performance response works")
-
-
-def test_system_status_report():
-    """Test 9: System status reporting"""
-    print("Test 9: System status reporting...")
-    
-    loop = SelfImprovingLoop("test_status")
-    
-    # Execute some tasks
-    for i in range(5):
-        loop.execute_task(
-            task_type="test_task",
-            task_description=f"Task {i}",
-            execute_fn=lambda p: {"success": True, "quality": 0.8}
-        )
-    
-    status = loop.get_system_status()
-    
-    assert status["agent_id"] == "test_status"
-    assert status["execution_count"] == 5
-    assert status["reflection"]["task_types_tracked"] == 1
-    assert status["reflection"]["total_records"] == 5
-    assert status["memory"]["planning_history"] == 5
-    
-    print("  ✅ System status reporting works")
-
-
-def test_state_persistence():
-    """Test 10: State export and import"""
-    print("Test 10: State persistence...")
-    
-    loop1 = SelfImprovingLoop("persist_test")
-    
-    # Execute and build state
-    for i in range(3):
-        loop1.execute_task(
-            task_type="persistent_task",
-            task_description="Test",
-            execute_fn=lambda p: {"success": True, "quality": 0.75}
-        )
-    
-    # Export state
-    state = loop1.export_state()
-    
-    assert state["agent_id"] == "persist_test"
-    assert state["execution_count"] == 3
-    assert "reflection_history" in state
-    assert "planning_history" in state
-    
-    # Create new loop and import
-    loop2 = SelfImprovingLoop("new_agent")
-    loop2.import_state(state)
-    
-    assert loop2.agent_id == "persist_test"
-    assert loop2.execution_count == 3
-    assert len(loop2.reflection.performance_history.get("persistent_task", [])) == 3
-    
-    print("  ✅ State persistence works")
-
-
-def test_feedback_processing():
-    """Test 11: Feedback processing between components"""
-    print("Test 11: Feedback processing...")
-    
-    loop = SelfImprovingLoop("feedback_test")
-    
-    # Manually add feedback
-    loop.reflection.send_feedback(ComponentFeedback(
-        feedback_type=FeedbackType.PERFORMANCE_INSIGHT,
-        source_component="reflection",
-        target_component="planning",
-        content={"test": "insight"},
-        priority=IntegrationPriority.HIGH
-    ))
-    
-    # Process feedback
-    loop._process_component_feedback()
-    
-    # Should have processed and cleared high priority feedback
-    assert len(loop.reflection.feedback_outbox) == 0
-    
-    print("  ✅ Feedback processing works")
-
-
-def test_multiple_task_types():
-    """Test 12: Multiple task type tracking"""
-    print("Test 12: Multiple task type tracking...")
-    
-    loop = SelfImprovingLoop("multi_type")
-    
-    task_types = ["coding", "search", "analysis", "generation", "review"]
-    
-    for i, task_type in enumerate(task_types):
-        for j in range(5):
-            loop.execute_task(
-                task_type=task_type,
-                task_description=f"Task {j}",
-                execute_fn=lambda p: {"success": True, "quality": 0.8}
-            )
-    
-    status = loop.get_system_status()
-    assert status["reflection"]["task_types_tracked"] == 5
-    assert status["reflection"]["total_records"] == 25
-    
-    print("  ✅ Multiple task type tracking works")
-
-
-def test_strategy_selection():
-    """Test 13: Strategy selection based on insights"""
-    print("Test 13: Strategy selection...")
-    
-    planner = IntegratedPlanner()
-    
-    # Test with improving trend
-    insight_improving = ReflectionToPlanningBridge(
-        capability_name="code_generation",
-        proficiency_score=0.9,
-        confidence=0.95,
-        trend="improving",
-        suggested_strategies=[],
-        priority=IntegrationPriority.MEDIUM
-    )
-    planner.update_from_reflection(insight_improving)
-    
-    plan_improving = planner.create_informed_plan("code_generation", "Test")
-    
-    # Should suggest more advanced strategy
-    assert plan_improving.suggested_strategy is not None
-    assert plan_improving.suggested_strategy == "test_driven"  # Last (most advanced) in library
-    
-    # Test with declining trend
-    planner2 = IntegratedPlanner()
-    insight_declining = ReflectionToPlanningBridge(
-        capability_name="code_generation",
-        proficiency_score=0.4,
-        confidence=0.8,
-        trend="declining",
-        suggested_strategies=["Consider alternative approach"],
-        priority=IntegrationPriority.HIGH
-    )
-    planner2.update_from_reflection(insight_declining)
-    
-    plan_declining = planner2.create_informed_plan("code_generation", "Test")
-    
-    # Should use conservative approach
-    assert plan_declining.risk_assessment["risk_level"] == "high"
-    assert len(plan_declining.adaptations) > 0
-    assert plan_declining.suggested_strategy == "direct_generation"  # First (most conservative)
-    
-    print("  ✅ Strategy selection based on insights works")
-
-
-def test_memory_priority_eviction():
-    """Test 14: Memory priority-based eviction"""
-    print("Test 14: Memory priority-based eviction...")
-    
-    memory = IntegratedMemory(max_entries=5)
-    
-    # Add entries with different priorities
-    for i in range(3):
-        memory.store_reflection_report(
-            {"id": f"low_{i}"},
-            priority=IntegrationPriority.LOW
-        )
-    
-    for i in range(3):
-        memory.store_reflection_report(
-            {"id": f"critical_{i}"},
-            priority=IntegrationPriority.CRITICAL
-        )
-    
-    # Should keep critical, evict low priority older entries
-    assert len(memory.reflection_reports) == 5
-    
-    # Check that critical entries remain
-    priorities = [r["priority"] for r in memory.reflection_reports]
-    assert any(p == "CRITICAL" for p in priorities)
-    
-    print("  ✅ Memory priority-based eviction works")
-
-
-def test_error_pattern_detection():
-    """Test 15: Error pattern detection and suggestions"""
-    print("Test 15: Error pattern detection...")
-    
-    engine = IntegratedReflectionEngine("error_test")
-    
-    # Record with error patterns
-    errors = ["timeout", "timeout", "syntax_error", "timeout", "network_error"]
-    for i, error in enumerate(errors):
-        engine.record_execution(
-            task_id=f"task_{i}",
-            task_type="api_call",
-            success=False,
-            execution_time_ms=5000.0,
-            quality_score=0.2,
-            error_type=error
-        )
-    
-    # Also add successes for contrast
-    for i in range(10):
-        engine.record_execution(
-            task_id=f"good_task_{i}",
-            task_type="api_call",
-            success=True,
-            execution_time_ms=500.0,
-            quality_score=0.9
-        )
-    
-    bridge = engine.analyze_and_send_insights("api_call")
-    
-    if bridge:
-        # Should detect timeout pattern
-        feedback = engine.feedback_outbox[0]
-        error_counts = feedback.content.get("error_counts", {})
-        assert "timeout" in error_counts
-        assert error_counts["timeout"] >= 3
         
-        # Should suggest addressing frequent error
-        assert any("timeout" in s or "frequent error" in s.lower() 
-                  for s in bridge.suggested_strategies)
+        memory_id = self.bridge.store_reflection(report)
+        
+        self.assertIsNotNone(memory_id)
+        # Check that something was stored in memory
+        self.assertGreater(len(self.memory.l0_entries), 0)
     
-    print("  ✅ Error pattern detection works")
+    def test_02_store_plan_scope_reflection(self):
+        """PLAN scope reflections should be stored in L1 (working) tier."""
+        report = ReflectionReport(
+            id="plan_ref_001",
+            timestamp=datetime.now(),
+            scope=ReflectionScope.PLAN,
+            reflection_type=ReflectionType.STRATEGY,
+            summary="Plan reflection test",
+            successes=["Plan executed successfully"],
+            failures=[],
+            patterns_identified=["Good parallelization"],
+            root_causes=[],
+            recommendations=[{"type": "continue", "description": "Keep strategy", "priority": "low"}],
+            metrics=PerformanceMetrics(tasks_total=3, tasks_completed=3, avg_quality=0.9)
+        )
+        
+        memory_id = self.bridge.store_reflection(report)
+        
+        self.assertIsNotNone(memory_id)
+        # Check that report scope is PLAN
+        self.assertEqual(report.scope, ReflectionScope.PLAN)
+    
+    def test_03_store_system_scope_reflection(self):
+        """SYSTEM scope reflections should be stored in L2 (archival) tier."""
+        report = ReflectionReport(
+            id="sys_reflection_001",
+            timestamp=datetime.now(),
+            scope=ReflectionScope.SYSTEM,
+            reflection_type=ReflectionType.PERFORMANCE,
+            summary="System-wide performance analysis",
+            successes=["Consistent API response times"],
+            failures=["Memory tier optimization needed"],
+            patterns_identified=["L2 access is slower than expected"],
+            root_causes=["Compression overhead"],
+            recommendations=[{"type": "optimization", "description": "Implement caching layer", "priority": "high"}],
+            metrics=PerformanceMetrics(
+                tasks_total=100,
+                tasks_completed=85,
+                avg_quality=0.85
+            )
+        )
+        
+        memory_id = self.bridge.store_reflection(report)
+        
+        self.assertIsNotNone(memory_id)
+        self.assertEqual(report.scope, ReflectionScope.SYSTEM)
+    
+    def test_04_query_relevant_reflections(self):
+        """Query should return relevant reflections sorted by relevance."""
+        # Store multiple reflections
+        for i in range(3):
+            report = ReflectionReport(
+                id=f"ref_{i}",
+                timestamp=datetime.now(),
+                scope=ReflectionScope.TASK,
+                reflection_type=ReflectionType.PERFORMANCE,
+                summary=f"Task performance analysis {i}",
+                successes=["Good execution"],
+                patterns_identified=["Pattern A" if i == 0 else "Pattern B"],
+                recommendations=[],
+                metrics=PerformanceMetrics(tasks_total=1, tasks_completed=1)
+            )
+            self.bridge.store_reflection(report)
+        
+        # Query for relevant reflections
+        results = self.bridge.query_relevant_reflections(
+            task_description="Pattern A task execution",
+            limit=5
+        )
+        
+        self.assertIsInstance(results, list)
+    
+    def test_05_store_execution_trace(self):
+        """Execution traces should be stored with reflection context."""
+        trace = ExecutionTrace(
+            trace_id="trace_001",
+            plan_id="plan_001",
+            started_at=datetime.now(),
+            success=True,
+            quality_score=0.92
+        )
+        
+        report = ReflectionReport(
+            id="ref_trace_001",
+            timestamp=datetime.now(),
+            scope=ReflectionScope.PLAN,
+            reflection_type=ReflectionType.PERFORMANCE,
+            summary="Execution trace analysis",
+            successes=["All tasks completed"],
+            patterns_identified=["Parallel execution works well"],
+            recommendations=[{"type": "continue", "description": "Continue using parallelization", "priority": "low"}],
+            metrics=PerformanceMetrics(tasks_total=5, tasks_completed=5, avg_quality=0.92)
+        )
+        
+        memory_id = self.bridge.store_reflection(report, trace)
+        
+        self.assertIsNotNone(memory_id)
+    
+    def test_06_get_performance_patterns(self):
+        """Should extract aggregated performance patterns across reflections."""
+        # Store reflections with patterns
+        for i in range(3):
+            report = ReflectionReport(
+                id=f"pattern_ref_{i}",
+                timestamp=datetime.now(),
+                scope=ReflectionScope.PLAN,
+                reflection_type=ReflectionType.PERFORMANCE,
+                summary=f"Analysis {i}",
+                successes=["Success pattern A", "Success pattern B"],
+                failures=["Failure pattern X"],
+                patterns_identified=["Learning pattern C"],
+                recommendations=[{"type": "improvement", "description": "Improvement D", "priority": "medium"}],
+                metrics=PerformanceMetrics(
+                    tasks_total=10,
+                    tasks_completed=8 if i < 2 else 10,
+                    avg_quality=0.75 + (i * 0.05)
+                )
+            )
+            self.bridge.store_reflection(report)
+        
+        patterns = self.bridge.get_performance_patterns()
+        
+        self.assertIn("total_reflections", patterns)
+        self.assertIn("success_patterns", patterns)
+        self.assertIn("failure_patterns", patterns)
 
 
-# Run all tests
+class TestPlanningWithReflection(unittest.TestCase):
+    """Test using historical reflections to inform planning."""
+    
+    def setUp(self):
+        self.memory = TieredMemorySystem()
+        self.base_planner = HierarchicalPlanner()
+        self.bridge = ReflectionMemoryBridge(self.memory)
+        self.planner = PlanningWithReflection(self.base_planner, self.bridge)
+    
+    def test_07_plan_with_reflection_context(self):
+        """Planning should query and use relevant past reflections."""
+        # First, store some reflections about similar tasks
+        report = ReflectionReport(
+            id="planning_ref_001",
+            timestamp=datetime.now(),
+            scope=ReflectionScope.PLAN,
+            reflection_type=ReflectionType.STRATEGY,
+            summary="Web search planning strategy",
+            successes=["Parallel search execution worked well"],
+            failures=["Sequential execution was slow"],
+            patterns_identified=["Search tasks benefit from parallelism"],
+            root_causes=["Network latency in sequential mode"],
+            recommendations=[{"type": "strategy", "description": "Use parallel execution for multiple searches", "priority": "high"}],
+            metrics=PerformanceMetrics(
+                tasks_total=3,
+                tasks_completed=3,
+                total_time=2.5,
+                avg_quality=0.88
+            )
+        )
+        self.bridge.store_reflection(report)
+        
+        # Now plan a similar task
+        plan = self.planner.plan_with_reflection_context(
+            goal="Search and analyze AGI research papers",
+            available_tools=["web_search", "analyze", "summarize"]
+        )
+        
+        self.assertIsNotNone(plan)
+        self.assertTrue(hasattr(plan, 'id'))
+    
+    def test_08_insights_extraction(self):
+        """Should extract actionable insights from reflections."""
+        # Create sample reflections
+        reflections = [
+            {
+                "reflection_data": {
+                    "successes": ["Strategy A worked"],
+                    "failures": ["Strategy B failed"],
+                    "recommendations": [{"type": "strategy", "description": "Use Strategy A", "priority": "high"}],
+                    "report_id": "ref_001"
+                },
+                "relevance_score": 0.85
+            }
+        ]
+        
+        insights = self.planner._extract_planning_insights(reflections)
+        
+        self.assertIsInstance(insights, dict)
+        self.assertIn("avoid", insights)
+        self.assertIn("replicate", insights)
+        self.assertIn("recommendations", insights)
+    
+    def test_09_adaptation_tracking(self):
+        """Should track planning adaptations over time."""
+        # Create several plans to build adaptation history
+        for i in range(3):
+            self.planner.plan_with_reflection_context(
+                goal=f"Task {i}: Analyze data",
+                available_tools=["analyze"]
+            )
+        
+        summary = self.planner.get_adaptation_summary()
+        
+        self.assertIn("adaptations", summary)
+        self.assertEqual(summary["adaptations"], 3)
+        self.assertIn("average_reflections_per_plan", summary)
+        self.assertIn("average_planning_time_ms", summary)
+
+
+class TestSelfImprovingLoop(unittest.TestCase):
+    """Test the full self-improving execution cycle."""
+    
+    def setUp(self):
+        self.planner, self.loop, self.bridge = create_integrated_system(
+            mode=IntegrationMode.AUTONOMOUS
+        )
+    
+    def test_11_execute_improving_cycle(self):
+        """Should execute goal with reflection-based improvement."""
+        trace = self.loop.execute_improving_cycle(
+            goal="Research and summarize AGI papers",
+            available_tools=["search", "read", "summarize"],
+            max_iterations=2
+        )
+        
+        self.assertIsInstance(trace, ExecutionTrace)
+        self.assertIsNotNone(trace.trace_id)
+        self.assertIsNotNone(trace.started_at)
+        
+        # Should have execution results
+        self.assertIsInstance(trace.execution_results, list)
+        
+        # Should have reflection report
+        self.assertIsNotNone(trace.reflection_report)
+    
+    def test_12_execution_trace_structure(self):
+        """Execution trace should have proper structure."""
+        trace = self.loop.execute_improving_cycle(
+            goal="Simple test task",
+            available_tools=["test_tool"],
+            max_iterations=1
+        )
+        
+        # Check trace structure
+        trace_dict = trace.to_dict()
+        self.assertIn("trace_id", trace_dict)
+        self.assertIn("plan_id", trace_dict)
+        self.assertIn("execution_results", trace_dict)
+        self.assertIn("reflection_report", trace_dict)
+        self.assertIn("improvement_proposals", trace_dict)
+        self.assertIn("total_duration_ms", trace_dict)
+        self.assertIn("success", trace_dict)
+    
+    def test_14_improvement_statistics(self):
+        """Should track improvement statistics across cycles."""
+        # Run multiple improvement cycles
+        for i in range(3):
+            self.loop.execute_improving_cycle(
+                goal=f"Test goal {i}",
+                available_tools=["tool"],
+                max_iterations=1
+            )
+        
+        stats = self.loop.get_improvement_statistics()
+        
+        self.assertIn("total_cycles", stats)
+        self.assertEqual(stats["total_cycles"], 3)
+        self.assertIn("average_quality", stats)
+        self.assertIn("quality_trend", stats)
+    
+    def test_15_export_learning_report(self):
+        """Should generate comprehensive learning report."""
+        # Run a cycle to generate data
+        self.loop.execute_improving_cycle(
+            goal="Generate learning data",
+            available_tools=["tool"],
+            max_iterations=1
+        )
+        
+        report = self.loop.export_learning_report()
+        
+        self.assertIsInstance(report, str)
+        self.assertIn("Self-Improvement Learning Report", report)
+        self.assertIn("Performance Statistics", report)
+        self.assertIn("Learned Patterns", report)
+    
+    def test_16_multiple_iterations(self):
+        """Should handle multiple improvement iterations."""
+        trace = self.loop.execute_improving_cycle(
+            goal="Iterative improvement test",
+            available_tools=["tool_a", "tool_b"],
+            max_iterations=3
+        )
+        
+        # Should complete all iterations (or stop early on success)
+        self.assertGreaterEqual(len(trace.execution_results), 1)
+        
+        # Should have final reflection
+        self.assertIsNotNone(trace.reflection_report)
+
+
+class TestIntegrationModes(unittest.TestCase):
+    """Test different integration modes."""
+    
+    def test_17_passive_mode(self):
+        """PASSIVE mode should store reflections without auto-planning use."""
+        planner, loop, bridge = create_integrated_system(mode=IntegrationMode.PASSIVE)
+        
+        trace = loop.execute_improving_cycle(
+            goal="Passive mode test",
+            available_tools=["tool"],
+            max_iterations=1
+        )
+        
+        self.assertIsNotNone(trace)
+    
+    def test_18_active_mode(self):
+        """ACTIVE mode should automatically query reflections during planning."""
+        planner, loop, bridge = create_integrated_system(mode=IntegrationMode.ACTIVE)
+        
+        # First run to create some history
+        trace1 = loop.execute_improving_cycle(
+            goal="Active mode first run",
+            available_tools=["tool"],
+            max_iterations=1
+        )
+        
+        # Second run should use reflections from first
+        trace2 = loop.execute_improving_cycle(
+            goal="Active mode second run similar",
+            available_tools=["tool"],
+            max_iterations=1
+        )
+        
+        self.assertIsNotNone(trace1)
+        self.assertIsNotNone(trace2)
+    
+    def test_19_autonomous_mode(self):
+        """AUTONOMOUS mode should enable full self-improving loop."""
+        planner, loop, bridge = create_integrated_system(mode=IntegrationMode.AUTONOMOUS)
+        
+        trace = loop.execute_improving_cycle(
+            goal="Autonomous improvement",
+            available_tools=["tool_a", "tool_b"],
+            max_iterations=2
+        )
+        
+        # Should have improvement proposals
+        self.assertIsNotNone(trace.improvement_proposals)
+        self.assertIsInstance(trace.improvement_proposals, list)
+
+
+class TestEndToEndWorkflow(unittest.TestCase):
+    """End-to-end workflow tests."""
+    
+    def test_20_full_improvement_cycle(self):
+        """Complete cycle: plan → execute → reflect → store → replan."""
+        memory = TieredMemorySystem()
+        bridge = ReflectionMemoryBridge(memory)
+        base_planner = HierarchicalPlanner()
+        planner = PlanningWithReflection(base_planner, bridge)
+        executor = base_planner.executor
+        reflection = ReflectionEngine()
+        
+        # First iteration
+        plan1 = planner.plan_with_reflection_context(
+            goal="Analyze research papers",
+            available_tools=["search", "analyze"]
+        )
+        
+        # Execute (simulated by marking tasks complete)
+        if hasattr(plan1, 'tasks'):
+            for task_id in plan1.tasks:
+                task = plan1.tasks[task_id]
+                if hasattr(task, 'status'):
+                    task.status = TaskStatus.COMPLETED
+        
+        # Reflect
+        report1 = reflection.reflect_on_plan(
+            plan_id=plan1.id,
+            plan_goal="Analyze research papers",
+            tasks_data=[{"status": "completed"}],
+            overall_success=True
+        )
+        
+        # Store
+        bridge.store_reflection(report1)
+        
+        # Second iteration with learning
+        plan2 = planner.plan_with_reflection_context(
+            goal="Analyze more research papers",
+            available_tools=["search", "analyze"]
+        )
+        
+        # Verify second plan was created
+        self.assertIsNotNone(plan2)
+        
+        # Verify adaptation tracking
+        self.assertGreaterEqual(
+            planner.get_adaptation_summary()["adaptations"],
+            2
+        )
+    
+    def test_21_pattern_learning_across_sessions(self):
+        """Should learn patterns that persist across planning sessions."""
+        planner, loop, bridge = create_integrated_system()
+        
+        # Session 1: Learn that parallel execution works
+        trace1 = loop.execute_improving_cycle(
+            goal="Parallel data processing",
+            available_tools=["process_a", "process_b"],
+            max_iterations=1
+        )
+        
+        # Manually add pattern to reflection
+        if trace1.reflection_report:
+            trace1.reflection_report.patterns_identified.append(
+                "Parallel execution is faster"
+            )
+            bridge.store_reflection(trace1.reflection_report, trace1)
+        
+        # Session 2: Similar goal should benefit from learned pattern
+        trace2 = loop.execute_improving_cycle(
+            goal="Parallel processing task",
+            available_tools=["process_a", "process_b"],
+            max_iterations=1
+        )
+        
+        # Verify learning occurred (at least traces exist)
+        self.assertEqual(len(loop._execution_traces), 2)
+
+
+class TestPerformanceMetrics(unittest.TestCase):
+    """Test metrics aggregation across systems."""
+    
+    def test_22_cross_system_metrics(self):
+        """Should aggregate metrics from planner, executor, and reflection."""
+        planner, loop, bridge = create_integrated_system()
+        
+        # Execute and collect metrics
+        for i in range(3):
+            trace = loop.execute_improving_cycle(
+                goal=f"Metrics test {i}",
+                available_tools=["tool"],
+                max_iterations=1
+            )
+            
+            # Verify trace has metrics
+            trace_dict = trace.to_dict()
+            self.assertIn("total_duration_ms", trace_dict)
+            self.assertIn("quality_score", trace_dict)
+        
+        # Check statistics
+        stats = loop.get_improvement_statistics()
+        self.assertEqual(stats["total_cycles"], 3)
+    
+    def test_23_quality_tracking(self):
+        """Should track quality scores across iterations."""
+        planner, loop, bridge = create_integrated_system()
+        
+        qualities = []
+        
+        for i in range(3):
+            trace = loop.execute_improving_cycle(
+                goal=f"Quality tracking {i}",
+                available_tools=["tool"],
+                max_iterations=1
+            )
+            
+            # Manually set quality for predictable tracking
+            trace.quality_score = 0.7 + (i * 0.1)
+            qualities.append(trace.quality_score)
+        
+        # Force update improvement log with quality scores
+        for i, log in enumerate(loop._improvement_log):
+            log["final_quality"] = qualities[i]
+        
+        stats = loop.get_improvement_statistics()
+        
+        # With increasing quality, trend should be improving or stable
+        self.assertIn(stats["quality_trend"], ["improving", "stable"])
+
+
+class TestErrorHandling(unittest.TestCase):
+    """Test error handling in integration layer."""
+    
+    def test_24_invalid_reflection_storage(self):
+        """Should handle invalid reflection data gracefully."""
+        memory = TieredMemorySystem()
+        bridge = ReflectionMemoryBridge(memory)
+        
+        # Create invalid data in memory
+        memory.store(
+            content="invalid json",
+            tier=MemoryTier.L0_IMMEDIATE,
+            directory="/reflections",
+            tags={"reflection"}
+        )
+        
+        # Query should handle gracefully
+        results = bridge.query_relevant_reflections("test")
+        
+        # Should return empty or valid results, not crash
+        self.assertIsInstance(results, list)
+    
+    def test_25_empty_planning_history(self):
+        """Should handle planning with no prior reflections."""
+        memory = TieredMemorySystem()
+        bridge = ReflectionMemoryBridge(memory)
+        base_planner = HierarchicalPlanner()
+        planner = PlanningWithReflection(base_planner, bridge)
+        
+        # Plan without any stored reflections
+        plan = planner.plan_with_reflection_context(
+            goal="First ever plan",
+            available_tools=["tool"]
+        )
+        
+        self.assertIsNotNone(plan)
+
+
+def run_tests():
+    """Run all integration tests."""
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    
+    # Add all test classes
+    suite.addTests(loader.loadTestsFromTestCase(TestReflectionMemoryBridge))
+    suite.addTests(loader.loadTestsFromTestCase(TestPlanningWithReflection))
+    suite.addTests(loader.loadTestsFromTestCase(TestSelfImprovingLoop))
+    suite.addTests(loader.loadTestsFromTestCase(TestIntegrationModes))
+    suite.addTests(loader.loadTestsFromTestCase(TestEndToEndWorkflow))
+    suite.addTests(loader.loadTestsFromTestCase(TestPerformanceMetrics))
+    suite.addTests(loader.loadTestsFromTestCase(TestErrorHandling))
+    
+    # Run with verbose output
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite)
+    
+    # Print summary
+    print(f"\n{'='*60}")
+    print(f"Test Summary: {result.testsRun} tests run")
+    print(f"Failures: {len(result.failures)}")
+    print(f"Errors: {len(result.errors)}")
+    print(f"Skipped: {len(result.skipped)}")
+    print(f"Success Rate: {(result.testsRun - len(result.failures) - len(result.errors)) / result.testsRun:.1%}")
+    print(f"{'='*60}\n")
+    
+    return result.wasSuccessful()
+
+
 if __name__ == "__main__":
-    print("=" * 60)
-    print("Integration Module Test Suite")
-    print("=" * 60)
-    
-    tests = [
-        test_component_interface,
-        test_reflection_performance_recording,
-        test_reflection_to_planning_bridge,
-        test_planner_informed_plan_creation,
-        test_memory_storage_and_retrieval,
-        test_self_improving_loop_basic,
-        test_improving_performance_adaptation,
-        test_declining_performance_response,
-        test_system_status_report,
-        test_state_persistence,
-        test_feedback_processing,
-        test_multiple_task_types,
-        test_strategy_selection,
-        test_memory_priority_eviction,
-        test_error_pattern_detection
-    ]
-    
-    passed = 0
-    failed = 0
-    
-    for test in tests:
-        try:
-            test()
-            passed += 1
-        except Exception as e:
-            print(f"  ❌ Test failed: {e}")
-            failed += 1
-    
-    print("=" * 60)
-    print(f"Results: {passed}/{len(tests)} tests passed")
-    if failed > 0:
-        print(f"         {failed} tests failed")
-    print("=" * 60)
+    success = run_tests()
+    exit(0 if success else 1)

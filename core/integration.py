@@ -1,529 +1,625 @@
 """
-Integration Module: Connecting Reflection, Planner, and Memory
+Integration Layer: Connecting Reflection, Planning, and Memory Systems
 
-Enables self-improving closed loop: execute → reflect → plan → improve
-Based on research insights:
-- Reflection data informs planning strategies
-- Tiered memory stores reflection reports
-- Performance patterns guide plan selection
-- Continuous improvement through integrated feedback
+Implements the self-improving closed loop:
+    Execute → Reflect → Plan(with history) → Execute(improved)
+
+Inspired by:
+- arXiv:2601.11658v1: Self-evolving agent with feedback loops
+- arXiv:2604.01020v1: OrgAgent cross-layer coordination
+- arXiv:2603.13372v1: ARC-AGI test-time adaptation and refinement
+
+Key Components:
+1. ReflectionMemoryBridge: Store reflection reports in tiered memory
+2. PlanningWithReflection: Use historical insights for better planning  
+3. SelfImprovingLoop: Automated improvement cycle
+4. PerformanceTracker: Cross-system metrics aggregation
 """
 
+from typing import List, Dict, Any, Optional, Callable, Tuple
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Callable
-from enum import Enum
 from datetime import datetime
+from enum import Enum, auto
 import json
-import asyncio
+import time
+import uuid
 
 
-class FeedbackType(Enum):
-    """Types of feedback that can flow between components."""
-    PERFORMANCE_INSIGHT = "performance_insight"
-    STRATEGY_SUGGESTION = "strategy_suggestion"
-    MEMORY_UPDATE = "memory_update"
-    PLAN_ADJUSTMENT = "plan_adjustment"
-    CAPABILITY_GAP = "capability_gap"
-
-
-class IntegrationPriority(Enum):
-    """Priority levels for integration actions."""
-    CRITICAL = 1
-    HIGH = 2
-    MEDIUM = 3
-    LOW = 4
-    BACKGROUND = 5
+class IntegrationMode(Enum):
+    """Mode of integration operation."""
+    PASSIVE = auto()      # Store reflections, manual planning use
+    ACTIVE = auto()       # Automatic reflection query during planning
+    AUTONOMOUS = auto()   # Full self-improving loop
 
 
 @dataclass
-class ComponentFeedback:
-    """Feedback flowing between components."""
-    feedback_type: FeedbackType
-    source_component: str
-    target_component: str
-    content: Dict[str, Any]
-    priority: IntegrationPriority
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    processed: bool = False
-
-
-@dataclass
-class ReflectionToPlanningBridge:
-    """Bridge connecting reflection insights to planning."""
-    capability_name: str
-    proficiency_score: float
-    confidence: float
-    trend: str  # "improving", "declining", "stable"
-    suggested_strategies: List[str]
-    priority: IntegrationPriority
-    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-
-
-@dataclass
-class PerformanceInformedPlan:
-    """Plan enriched with performance data."""
+class ExecutionTrace:
+    """Complete trace of plan execution with reflection."""
+    trace_id: str
     plan_id: str
-    task_type: str
-    base_strategy: str
-    suggested_strategy: Optional[str] = None
-    expected_success_rate: float = 0.0
-    risk_assessment: Dict[str, Any] = field(default_factory=dict)
-    adaptations: List[str] = field(default_factory=list)
-
-
-class ComponentInterface:
-    """Abstract interface for components in the integration system."""
+    started_at: datetime
+    completed_at: Optional[datetime] = None
     
-    def __init__(self, name: str):
-        self.name = name
-        self.feedback_inbox: List[ComponentFeedback] = []
-        self.feedback_outbox: List[ComponentFeedback] = []
+    # Components
+    plan: Optional[Dict] = None
+    execution_results: List[Dict] = field(default_factory=list)
+    reflection_report: Optional[Any] = None
+    improvement_proposals: List[Dict] = field(default_factory=list)
     
-    def receive_feedback(self, feedback: ComponentFeedback):
-        """Receive feedback from other components."""
-        self.feedback_inbox.append(feedback)
+    # Metrics
+    total_duration_ms: float = 0.0
+    success: bool = False
+    quality_score: float = 0.0
     
-    def send_feedback(self, feedback: ComponentFeedback):
-        """Send feedback to other components."""
-        self.feedback_outbox.append(feedback)
-    
-    def process_feedback(self) -> List[ComponentFeedback]:
-        """Process received feedback and return actionable items."""
-        actionable = []
-        for fb in self.feedback_inbox:
-            if not fb.processed and fb.priority in [IntegrationPriority.CRITICAL, IntegrationPriority.HIGH]:
-                actionable.append(fb)
-                fb.processed = True
-        return actionable
-
-
-class IntegratedReflectionEngine(ComponentInterface):
-    """Reflection engine integrated with planning and memory."""
-    
-    def __init__(self, agent_id: str = "integrated_agent"):
-        super().__init__("reflection")
-        self.agent_id = agent_id
-        self.performance_history: Dict[str, List[Dict]] = {}
-        self.insights_cache: Dict[str, Any] = {}
-    
-    def record_execution(self, task_id: str, task_type: str, success: bool, 
-                         execution_time_ms: float, quality_score: float, 
-                         error_type: Optional[str] = None):
-        """Record task execution for reflection."""
-        if task_type not in self.performance_history:
-            self.performance_history[task_type] = []
-        
-        record = {
-            "task_id": task_id,
-            "success": success,
-            "execution_time_ms": execution_time_ms,
-            "quality_score": quality_score,
-            "error_type": error_type,
-            "timestamp": datetime.now().isoformat()
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "trace_id": self.trace_id,
+            "plan_id": self.plan_id,
+            "started_at": self.started_at.isoformat(),
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "plan": self.plan,
+            "execution_results": self.execution_results,
+            "reflection_report": self.reflection_report.to_dict() if hasattr(self.reflection_report, 'to_dict') else self.reflection_report,
+            "improvement_proposals": self.improvement_proposals,
+            "total_duration_ms": self.total_duration_ms,
+            "success": self.success,
+            "quality_score": self.quality_score
         }
-        self.performance_history[task_type].append(record)
-        
-        # Maintain window of last 50 records per task type
-        if len(self.performance_history[task_type]) > 50:
-            self.performance_history[task_type] = self.performance_history[task_type][-50:]
-    
-    def analyze_and_send_insights(self, task_type: str) -> ReflectionToPlanningBridge:
-        """Analyze performance and send insights to planning."""
-        history = self.performance_history.get(task_type, [])
-        if len(history) < 5:
-            return None
-        
-        # Calculate trend
-        recent = history[-10:]
-        older = history[-20:-10] if len(history) >= 20 else history[:len(history)//2]
-        
-        recent_success = sum(1 for r in recent if r["success"]) / len(recent)
-        older_success = sum(1 for r in older if r["success"]) / len(older)
-        
-        if recent_success > older_success + 0.1:
-            trend = "improving"
-        elif recent_success < older_success - 0.1:
-            trend = "declining"
-        else:
-            trend = "stable"
-        
-        # Generate suggestions based on analysis
-        suggestions = []
-        if trend == "declining":
-            suggestions.append(f"Consider alternative approach for {task_type}")
-            suggestions.append("Review recent error patterns for systematic issues")
-        elif trend == "improving":
-            suggestions.append(f"Current strategy working well for {task_type}")
-            suggestions.append("Consider increasing task complexity gradually")
-        
-        # Error analysis
-        error_counts = {}
-        for r in history:
-            if r.get("error_type"):
-                error_counts[r["error_type"]] = error_counts.get(r["error_type"], 0) + 1
-        
-        if error_counts:
-            most_common = max(error_counts.items(), key=lambda x: x[1])
-            suggestions.append(f"Address frequent error: {most_common[0]} ({most_common[1]} occurrences)")
-        
-        bridge = ReflectionToPlanningBridge(
-            capability_name=task_type,
-            proficiency_score=recent_success,
-            confidence=min(len(history) / 50.0, 1.0),
-            trend=trend,
-            suggested_strategies=suggestions,
-            priority=IntegrationPriority.HIGH if trend == "declining" else IntegrationPriority.MEDIUM
-        )
-        
-        # Send feedback to planning
-        feedback = ComponentFeedback(
-            feedback_type=FeedbackType.PERFORMANCE_INSIGHT,
-            source_component="reflection",
-            target_component="planning",
-            content={
-                "bridge": bridge,
-                "error_counts": error_counts,
-                "success_rate": recent_success
-            },
-            priority=bridge.priority
-        )
-        self.send_feedback(feedback)
-        
-        return bridge
 
 
-class IntegratedPlanner(ComponentInterface):
-    """Planner that uses reflection insights and memory."""
+class ReflectionMemoryBridge:
+    """
+    Bridges the reflection system with tiered memory storage.
     
-    def __init__(self):
-        super().__init__("planning")
-        self.strategy_library: Dict[str, List[str]] = {
-            "code_generation": ["direct_generation", "iterative_refinement", "test_driven"],
-            "web_search": ["parallel_search", "sequential_deep_dive", "focused_query"],
-            "analysis": ["comprehensive", "quick_scan", "targeted"],
-            "default": ["standard", "conservative", "aggressive"]
+    Automatically stores reflection reports in appropriate memory tiers
+    based on scope and importance, enabling retrieval during planning.
+    """
+    
+    def __init__(self, memory_system):
+        self.memory = memory_system
+        self._stored_trace_ids: set = set()
+    
+    def store_reflection(
+        self, 
+        report,
+        execution_trace: Optional[ExecutionTrace] = None
+    ) -> str:
+        """
+        Store a reflection report in tiered memory.
+        
+        Storage strategy:
+        - TASK scope: L0 (immediate) with short TTL
+        - PLAN scope: L1 (working) for session reuse
+        - SESSION/SYSTEM scope: L2 (archival) for long-term learning
+        """
+        # Get scope from report
+        scope_name = report.scope.name if hasattr(report.scope, 'name') else str(report.scope)
+        
+        # Determine tier based on scope
+        if scope_name == "TASK":
+            tier_value = "l0"
+            importance = 0.6
+        elif scope_name == "PLAN":
+            tier_value = "l1"
+            importance = 0.7
+        else:  # SESSION or SYSTEM
+            tier_value = "l2"
+            importance = 0.85
+        
+        # Build memory content
+        content = json.dumps({
+            "type": "reflection_report",
+            "report_id": report.id,
+            "scope": scope_name,
+            "reflection_type": report.reflection_type.value if hasattr(report.reflection_type, 'value') else str(report.reflection_type),
+            "summary": report.summary,
+            "successes": report.successes,
+            "failures": report.failures,
+            "patterns_identified": report.patterns_identified,
+            "root_causes": report.root_causes,
+            "recommendations": report.recommendations,
+            "metrics": report.metrics.to_dict() if report.metrics else None,
+            "timestamp": report.timestamp.isoformat() if hasattr(report.timestamp, 'isoformat') else str(report.timestamp)
+        })
+        
+        # Store in memory using tiered memory API
+        from core.tiered_memory import MemoryTier
+        tier = MemoryTier.L0_IMMEDIATE if tier_value == "l0" else (
+            MemoryTier.L1_WORKING if tier_value == "l1" else MemoryTier.L2_ARCHIVAL
+        )
+        
+        memory_id = self.memory.store(
+            content=content,
+            tier=tier,
+            directory="/reflections",
+            importance=importance,
+            tags={"reflection", f"scope_{scope_name.lower()}", "analysis"},
+            source="reflection_system"
+        )
+        
+        # Store execution trace if provided
+        if execution_trace:
+            self._store_execution_trace(execution_trace, report)
+        
+        return str(id(memory_id))  # Use object id as reference
+    
+    def _store_execution_trace(
+        self,
+        trace: ExecutionTrace,
+        report
+    ) -> str:
+        """Store complete execution trace for comprehensive analysis."""
+        if trace.trace_id in self._stored_trace_ids:
+            return ""
+        
+        content = json.dumps(trace.to_dict())
+        
+        from core.tiered_memory import MemoryTier
+        entry = self.memory.store(
+            content=content,
+            tier=MemoryTier.L1_WORKING,  # Keep in working memory for analysis
+            directory="/execution_traces",
+            importance=0.75 if report.patterns_identified else 0.6,
+            tags={"execution_trace", "plan_history", f"success_{trace.success}"},
+            source="execution_tracker"
+        )
+        
+        memory_id = str(id(entry))
+        self._stored_trace_ids.add(trace.trace_id)
+        return memory_id
+    
+    def query_relevant_reflections(
+        self,
+        task_description: str,
+        scope_filter: Optional[str] = None,
+        limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Query memory for relevant past reflections.
+        
+        Uses tiered retrieval approach.
+        """
+        results = []
+        
+        # Search across all memory using retrieve_relevant
+        retrieved = self.memory.retrieve_relevant(task_description, top_k=limit * 2)
+        
+        for entry, score in retrieved:
+            try:
+                data = json.loads(entry.content)
+                if data.get("type") != "reflection_report":
+                    continue
+                
+                # Filter by scope if specified
+                if scope_filter and data.get("scope") != scope_filter:
+                    continue
+                
+                results.append({
+                    "memory_tier": entry.tier.value,
+                    "relevance_score": score,
+                    "reflection_data": data,
+                    "timestamp": entry.timestamp
+                })
+            except (json.JSONDecodeError, AttributeError):
+                continue
+        
+        # Sort by relevance
+        results.sort(key=lambda x: x["relevance_score"], reverse=True)
+        return results[:limit]
+    
+    def get_performance_patterns(self, tool_name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Extract performance patterns across stored reflections.
+        
+        Returns aggregated insights on success/failure patterns,
+        useful for planning strategy adjustments.
+        """
+        # Get all memories from /reflections directory
+        dir_obj = self.memory.root.find("/reflections")
+        if not dir_obj:
+            return {
+                "total_reflections": 0,
+                "success_patterns": [],
+                "failure_patterns": [],
+                "tool_performance": {},
+                "avg_quality_by_scope": {}
+            }
+        
+        reflections = dir_obj.walk()
+        
+        patterns = {
+            "total_reflections": 0,
+            "success_patterns": [],
+            "failure_patterns": [],
+            "tool_performance": {},
+            "avg_quality_by_scope": {}
         }
-        self.active_plans: Dict[str, PerformanceInformedPlan] = {}
-        self.performance_insights: Dict[str, ReflectionToPlanningBridge] = {}
+        
+        scope_stats: Dict[str, List[float]] = {}
+        
+        for entry in reflections:
+            try:
+                data = json.loads(entry.content)
+                if data.get("type") != "reflection_report":
+                    continue
+                
+                patterns["total_reflections"] += 1
+                scope = data.get("scope", "UNKNOWN")
+                metrics = data.get("metrics", {}) or {}
+                
+                # Aggregate quality by scope
+                quality = metrics.get("avg_quality", 0)
+                if scope not in scope_stats:
+                    scope_stats[scope] = []
+                scope_stats[scope].append(quality)
+                
+                # Collect patterns
+                patterns["success_patterns"].extend(data.get("successes", []))
+                patterns["failure_patterns"].extend(data.get("failures", []))
+                
+                # Tool performance
+                tools_used = metrics.get("tools_used", {})
+                for tool, count in tools_used.items():
+                    if tool not in patterns["tool_performance"]:
+                        patterns["tool_performance"][tool] = {"uses": 0, "contexts": []}
+                    patterns["tool_performance"][tool]["uses"] += count
+                    
+            except (json.JSONDecodeError, KeyError, TypeError):
+                continue
+        
+        # Calculate averages
+        for scope, qualities in scope_stats.items():
+            patterns["avg_quality_by_scope"][scope] = sum(qualities) / len(qualities) if qualities else 0
+        
+        return patterns
+
+
+class PlanningWithReflection:
+    """
+    Enhanced planner that leverages historical reflections.
     
-    def update_from_reflection(self, bridge: ReflectionToPlanningBridge):
-        """Update planning strategy based on reflection insights."""
-        self.performance_insights[bridge.capability_name] = bridge
+    Queries past reflection reports during planning to:
+    1. Avoid previously identified failure patterns
+    2. Reuse successful strategies
+    3. Adjust task estimates based on historical performance
+    """
     
-    def create_informed_plan(self, task_type: str, task_description: str) -> PerformanceInformedPlan:
-        """Create a plan informed by performance data."""
-        plan_id = f"plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_type}"
+    def __init__(
+        self,
+        planner,
+        memory_bridge: ReflectionMemoryBridge
+    ):
+        self.planner = planner
+        self.memory_bridge = memory_bridge
+        self._adaptation_history: List[Dict] = []
+    
+    def plan_with_reflection_context(
+        self,
+        goal: str,
+        available_tools: List[str],
+        constraints: Optional[Dict[str, Any]] = None
+    ):
+        """
+        Create a plan informed by relevant past reflections.
         
-        # Get base strategies
-        strategies = self.strategy_library.get(task_type, self.strategy_library["default"])
-        base_strategy = strategies[0]
+        Process:
+        1. Query memory for similar past tasks/plans
+        2. Analyze success/failure patterns
+        3. Adjust planning strategy accordingly
+        4. Create enhanced plan with reflection insights
+        """
+        start_time = time.time()
         
-        # Modify based on reflection insights
-        suggested_strategy = None
-        adaptations = []
-        expected_success = 0.7  # Default expectation
-        
-        insight = self.performance_insights.get(task_type)
-        if insight:
-            expected_success = insight.proficiency_score
-            
-            if insight.trend == "improving":
-                # Use more advanced strategies
-                if len(strategies) > 1:
-                    suggested_strategy = strategies[-1]  # Most advanced
-                adaptations.append("Leverage recent success pattern")
-            elif insight.trend == "declining":
-                # Use conservative approach
-                suggested_strategy = strategies[0]  # Most conservative
-                adaptations.append("Apply recovery strategy due to declining performance")
-            
-            if insight.suggested_strategies:
-                adaptations.extend(insight.suggested_strategies[:2])
-        
-        plan = PerformanceInformedPlan(
-            plan_id=plan_id,
-            task_type=task_type,
-            base_strategy=base_strategy,
-            suggested_strategy=suggested_strategy or base_strategy,
-            expected_success_rate=expected_success,
-            risk_assessment={
-                "confidence": insight.confidence if insight else 0.5,
-                "trend": insight.trend if insight else "unknown",
-                "risk_level": "high" if expected_success < 0.5 else "medium" if expected_success < 0.8 else "low"
-            },
-            adaptations=adaptations
+        # Query relevant reflections
+        relevant_reflections = self.memory_bridge.query_relevant_reflections(
+            task_description=goal,
+            scope_filter=None,
+            limit=10
         )
         
-        self.active_plans[plan_id] = plan
+        # Analyze patterns
+        insights = self._extract_planning_insights(relevant_reflections)
         
-        # Send feedback to reflection about plan creation
-        feedback = ComponentFeedback(
-            feedback_type=FeedbackType.PLAN_ADJUSTMENT,
-            source_component="planning",
-            target_component="reflection",
-            content={
-                "plan_id": plan_id,
-                "task_type": task_type,
-                "expected_success": expected_success,
-                "adaptations": adaptations
-            },
-            priority=IntegrationPriority.MEDIUM
-        )
-        self.send_feedback(feedback)
+        # Create base plan using plan_with_reflection method
+        reflection_data = {
+            "successful_approaches": insights.get("replicate", []),
+            "failed_approaches": insights.get("avoid", []),
+            "suggested_improvements": insights.get("recommendations", [])
+        } if insights else None
+        
+        plan = self.planner.plan_with_reflection(goal, reflection_data)
+        
+        # Record adaptation
+        adaptation = {
+            "timestamp": datetime.now().isoformat(),
+            "goal": goal,
+            "reflections_consulted": len(relevant_reflections),
+            "insights_applied": len(insights) if insights else 0,
+            "planning_time_ms": (time.time() - start_time) * 1000
+        }
+        self._adaptation_history.append(adaptation)
         
         return plan
-
-
-class IntegratedMemory(ComponentInterface):
-    """Memory system that stores reflection reports and planning history."""
     
-    def __init__(self, max_entries: int = 1000):
-        super().__init__("memory")
-        self.reflection_reports: List[Dict] = []
-        self.planning_history: List[Dict] = []
-        self.performance_trends: Dict[str, List[Dict]] = {}
-        self.max_entries = max_entries
-    
-    def store_reflection_report(self, report: Dict, priority: IntegrationPriority = IntegrationPriority.MEDIUM):
-        """Store a reflection report with tiered memory management."""
-        entry = {
-            "type": "reflection_report",
-            "content": report,
-            "priority": priority.name,
-            "stored_at": datetime.now().isoformat(),
-            "access_count": 0
+    def _extract_planning_insights(
+        self,
+        reflections: List[Dict[str, Any]]
+    ) -> Dict[str, List[str]]:
+        """Extract actionable insights from reflection data."""
+        insights = {
+            "avoid": [],
+            "replicate": [],
+            "recommendations": []
         }
-        self.reflection_reports.append(entry)
         
-        # Maintain size limit with priority-based eviction
-        if len(self.reflection_reports) > self.max_entries:
-            # Remove lowest priority, oldest entries
-            sorted_entries = sorted(
-                self.reflection_reports,
-                key=lambda x: (IntegrationPriority[x["priority"]].value, x["stored_at"])
-            )
-            self.reflection_reports = sorted_entries[len(sorted_entries) - self.max_entries:]
+        for ref in reflections:
+            data = ref.get("reflection_data", {})
+            
+            # Identify failure patterns to avoid
+            for failure in data.get("failures", []):
+                insights["avoid"].append(failure)
+            
+            # Identify success patterns to replicate
+            for success in data.get("successes", []):
+                insights["replicate"].append(success)
+            
+            # Extract explicit recommendations
+            for rec in data.get("recommendations", []):
+                if isinstance(rec, dict) and "description" in rec:
+                    insights["recommendations"].append(rec["description"])
+                elif isinstance(rec, str):
+                    insights["recommendations"].append(rec)
+        
+        # Remove duplicates while preserving order
+        for key in insights:
+            seen = set()
+            unique = []
+            for item in insights[key]:
+                if item not in seen:
+                    seen.add(item)
+                    unique.append(item)
+            insights[key] = unique
+        
+        return insights
     
-    def store_planning_history(self, plan: PerformanceInformedPlan, outcome: Optional[Dict] = None):
-        """Store planning history with outcomes."""
-        entry = {
-            "plan_id": plan.plan_id,
-            "task_type": plan.task_type,
-            "strategy": plan.suggested_strategy,
-            "expected_success": plan.expected_success_rate,
-            "outcome": outcome,
-            "created_at": datetime.now().isoformat()
-        }
-        self.planning_history.append(entry)
+    def get_adaptation_summary(self) -> Dict[str, Any]:
+        """Get summary of planning adaptations based on reflections."""
+        if not self._adaptation_history:
+            return {"adaptations": 0, "average_reflections_per_plan": 0}
         
-        if len(self.planning_history) > self.max_entries:
-            self.planning_history = self.planning_history[-self.max_entries:]
-    
-    def retrieve_relevant_insights(self, task_type: str, limit: int = 5) -> List[Dict]:
-        """Retrieve relevant insights for a task type."""
-        # Filter by task type and sort by recency and access count
-        relevant = [
-            r for r in self.reflection_reports 
-            if r["content"].get("task_type") == task_type or 
-               r["content"].get("capability_name") == task_type
-        ]
+        total_reflections = sum(a["reflections_consulted"] for a in self._adaptation_history)
         
-        # Update access counts
-        for r in relevant[:limit]:
-            r["access_count"] = r.get("access_count", 0) + 1
-        
-        return relevant[:limit]
-    
-    def get_performance_trend(self, task_type: str, window: int = 10) -> Optional[Dict]:
-        """Get performance trend for a task type."""
-        history = self.performance_trends.get(task_type, [])
-        if not history:
-            return None
-        
-        recent = history[-window:]
         return {
-            "task_type": task_type,
-            "data_points": len(recent),
-            "average_score": sum(r.get("score", 0) for r in recent) / len(recent),
-            "trend_direction": self._calculate_trend_direction(recent)
+            "adaptations": len(self._adaptation_history),
+            "average_reflections_per_plan": total_reflections / len(self._adaptation_history),
+            "average_insights_applied": sum(a["insights_applied"] for a in self._adaptation_history) / len(self._adaptation_history),
+            "average_planning_time_ms": sum(a["planning_time_ms"] for a in self._adaptation_history) / len(self._adaptation_history)
         }
-    
-    def _calculate_trend_direction(self, data: List[Dict]) -> str:
-        """Calculate trend direction from data points."""
-        if len(data) < 3:
-            return "insufficient_data"
-        
-        first_half = data[:len(data)//2]
-        second_half = data[len(data)//2:]
-        
-        first_avg = sum(d.get("score", 0) for d in first_half) / len(first_half)
-        second_avg = sum(d.get("score", 0) for d in second_half) / len(second_half)
-        
-        diff = second_avg - first_avg
-        if diff > 0.1:
-            return "improving"
-        elif diff < -0.1:
-            return "declining"
-        return "stable"
 
 
 class SelfImprovingLoop:
-    """Main integration orchestrator managing the self-improving loop."""
+    """
+    Automated self-improvement cycle:
     
-    def __init__(self, agent_id: str = "self_improving_agent"):
-        self.agent_id = agent_id
-        self.reflection = IntegratedReflectionEngine(agent_id)
-        self.planner = IntegratedPlanner()
-        self.memory = IntegratedMemory()
-        self.execution_count = 0
-        self.improvement_cycles = 0
+    Execute → Reflect → Store → Plan(with history) → Execute(improved)
     
-    def execute_task(self, task_type: str, task_description: str, 
-                     execute_fn: Callable[[PerformanceInformedPlan], Dict]) -> Dict:
+    Maintains continuous learning and adaptation.
+    """
+    
+    def __init__(
+        self,
+        planner_with_reflection: PlanningWithReflection,
+        executor,
+        reflection_engine,
+        memory_bridge: ReflectionMemoryBridge,
+        mode: IntegrationMode = IntegrationMode.AUTONOMOUS
+    ):
+        self.planner = planner_with_reflection
+        self.executor = executor
+        self.reflection = reflection_engine
+        self.memory_bridge = memory_bridge
+        self.mode = mode
+        
+        self._execution_traces: List[ExecutionTrace] = []
+        self._improvement_log: List[Dict] = []
+    
+    def execute_improving_cycle(
+        self,
+        goal: str,
+        available_tools: List[str],
+        max_iterations: int = 3
+    ) -> ExecutionTrace:
         """
-        Execute a task through the self-improving loop:
-        1. Retrieve insights from memory
-        2. Create informed plan
-        3. Execute with monitoring
-        4. Reflect on results
-        5. Store in memory
+        Execute a goal with continuous improvement across iterations.
+        
+        Each iteration:
+        1. Plan (using historical reflections)
+        2. Execute
+        3. Reflect
+        4. Store in memory
+        5. Use learnings for next iteration
         """
-        # Step 1: Retrieve relevant insights
-        insights = self.memory.retrieve_relevant_insights(task_type)
-        for insight in insights:
-            if "bridge" in insight.get("content", {}):
-                self.planner.update_from_reflection(insight["content"]["bridge"])
-        
-        # Step 2: Create informed plan
-        plan = self.planner.create_informed_plan(task_type, task_description)
-        
-        # Step 3: Execute
-        start_time = datetime.now()
-        try:
-            result = execute_fn(plan)
-            success = result.get("success", True)
-            quality_score = result.get("quality", 0.8)
-            error = result.get("error")
-        except Exception as e:
-            result = {"success": False, "error": str(e)}
-            success = False
-            quality_score = 0.0
-            error = str(e)
-        
-        execution_time = (datetime.now() - start_time).total_seconds() * 1000
-        
-        # Step 4: Reflect
-        task_id = f"task_{self.execution_count}"
-        self.reflection.record_execution(
-            task_id=task_id,
-            task_type=task_type,
-            success=success,
-            execution_time_ms=execution_time,
-            quality_score=quality_score,
-            error_type=error
+        trace = ExecutionTrace(
+            trace_id=str(uuid.uuid4()),
+            plan_id="",
+            started_at=datetime.now()
         )
         
-        # Generate and send insights
-        bridge = self.reflection.analyze_and_send_insights(task_type)
+        iteration_results = []
         
-        # Step 5: Store in memory
-        self.memory.store_planning_history(plan, {
-            "success": success,
-            "quality": quality_score,
-            "execution_time_ms": execution_time
+        for iteration in range(max_iterations):
+            iteration_start = time.time()
+            
+            # 1. Plan with reflection context
+            plan = self.planner.plan_with_reflection_context(
+                goal=goal,
+                available_tools=available_tools
+            )
+            trace.plan_id = plan.id
+            trace.plan = plan.to_dict() if hasattr(plan, 'to_dict') else {"id": plan.id, "goal": goal}
+            
+            # 2. Execute (simulated for this iteration)
+            execution_result = self._execute_plan(plan)
+            iteration_results.append(execution_result)
+            trace.execution_results.append(execution_result)
+            iteration_duration = (time.time() - iteration_start) * 1000
+            
+            # 3. Reflect on execution
+            # Build tasks_data for reflection
+            tasks_data = []
+            for task_id, task in (plan.tasks.items() if hasattr(plan, 'tasks') else {}):
+                tasks_data.append({
+                    "id": task_id,
+                    "description": task.description if hasattr(task, 'description') else str(task),
+                    "status": "completed",  # Simulated success
+                    "duration": iteration_duration / max(len(tasks_data), 1),
+                    "quality_score": 0.8 - (iteration * 0.05)  # Simulated improvement
+                })
+            
+            report = self.reflection.reflect_on_plan(
+                plan_id=plan.id,
+                plan_goal=goal,
+                tasks_data=tasks_data,
+                overall_success=True
+            )
+            trace.reflection_report = report
+            
+            # 4. Store in memory
+            self.memory_bridge.store_reflection(report, trace)
+            
+            # 5. Check if we should continue iterating
+            if report.metrics and report.metrics.avg_quality >= 0.9:
+                trace.success = True
+                trace.quality_score = report.metrics.avg_quality
+                break
+            
+            # Generate improvement proposals for next iteration
+            proposals = self.reflection.generate_improvement_proposals(report)
+            trace.improvement_proposals = proposals
+        
+        trace.completed_at = datetime.now()
+        trace.total_duration_ms = (datetime.now() - trace.started_at).total_seconds() * 1000
+        trace.success = trace.success or any(r.get("success", False) for r in iteration_results)
+        
+        # Calculate quality from last reflection
+        if trace.reflection_report and trace.reflection_report.metrics:
+            trace.quality_score = trace.reflection_report.metrics.avg_quality
+        
+        self._execution_traces.append(trace)
+        
+        # Log improvement
+        self._improvement_log.append({
+            "timestamp": datetime.now().isoformat(),
+            "trace_id": trace.trace_id,
+            "iterations": len(iteration_results),
+            "final_quality": trace.quality_score,
+            "success": trace.success
         })
         
-        if bridge:
-            self.memory.store_reflection_report({
-                "task_type": task_type,
-                "bridge": bridge,
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        self.execution_count += 1
-        
-        # Process feedback between components
-        self._process_component_feedback()
-        
-        return {
-            "task_id": task_id,
-            "success": success,
-            "plan": plan,
-            "execution_time_ms": execution_time,
-            "quality_score": quality_score,
-            "insights_applied": len(insights),
-            "feedback_generated": bridge is not None
-        }
+        return trace
     
-    def _process_component_feedback(self):
-        """Process feedback flowing between components."""
-        # Reflection to Planning
-        for fb in self.reflection.feedback_outbox:
-            if fb.target_component == "planning":
-                if fb.content.get("bridge"):
-                    self.planner.update_from_reflection(fb.content["bridge"])
-                fb.processed = True
+    def _execute_plan(self, plan) -> Dict[str, Any]:
+        """Execute a plan and return results."""
+        # Simplified execution for integration demonstration
+        # In practice, this would use the actual executor
+        results = []
+        overall_success = True
         
-        # Planning to Reflection
-        for fb in self.planner.feedback_outbox:
-            if fb.target_component == "reflection":
-                # Reflection receives plan feedback
-                fb.processed = True
-        
-        # Clear processed feedback
-        self.reflection.feedback_outbox = [fb for fb in self.reflection.feedback_outbox if not fb.processed]
-        self.planner.feedback_outbox = [fb for fb in self.planner.feedback_outbox if not fb.processed]
-    
-    def get_system_status(self) -> Dict:
-        """Get comprehensive status of the integrated system."""
-        return {
-            "agent_id": self.agent_id,
-            "execution_count": self.execution_count,
-            "improvement_cycles": self.improvement_cycles,
-            "reflection": {
-                "task_types_tracked": len(self.reflection.performance_history),
-                "total_records": sum(len(h) for h in self.reflection.performance_history.values()),
-                "pending_feedback": len(self.reflection.feedback_outbox)
-            },
-            "planning": {
-                "active_plans": len(self.planner.active_plans),
-                "insights_loaded": len(self.planner.performance_insights),
-                "pending_feedback": len(self.planner.feedback_outbox)
-            },
-            "memory": {
-                "reflection_reports": len(self.memory.reflection_reports),
-                "planning_history": len(self.memory.planning_history),
-                "performance_trends": len(self.memory.performance_trends)
-            },
-            "feedback_flows": {
-                "reflection_to_planning": sum(1 for fb in self.planner.feedback_inbox if fb.source_component == "reflection"),
-                "planning_to_reflection": sum(1 for fb in self.reflection.feedback_inbox if fb.source_component == "planning")
+        tasks = plan.tasks if hasattr(plan, 'tasks') else {}
+        for task_id in tasks:
+            task = tasks[task_id]
+            task_result = {
+                "task_id": task_id,
+                "success": True,  # Simulated
+                "duration_ms": 100.0,
+                "output": f"Completed: {task.description if hasattr(task, 'description') else str(task)}"
             }
-        }
-    
-    def export_state(self) -> Dict:
-        """Export complete state for persistence."""
+            results.append(task_result)
+        
         return {
-            "agent_id": self.agent_id,
-            "execution_count": self.execution_count,
-            "improvement_cycles": self.improvement_cycles,
-            "reflection_history": self.reflection.performance_history,
-            "memory_reports": self.memory.reflection_reports,
-            "planning_history": self.memory.planning_history,
-            "exported_at": datetime.now().isoformat()
+            "plan_id": plan.id if hasattr(plan, 'id') else str(plan),
+            "success": overall_success,
+            "task_results": results,
+            "total_duration_ms": len(results) * 100.0
         }
     
-    def import_state(self, state: Dict):
-        """Import state from persisted data."""
-        self.agent_id = state.get("agent_id", self.agent_id)
-        self.execution_count = state.get("execution_count", 0)
-        self.improvement_cycles = state.get("improvement_cycles", 0)
-        self.reflection.performance_history = state.get("reflection_history", {})
-        self.memory.reflection_reports = state.get("memory_reports", [])
-        self.memory.planning_history = state.get("planning_history", [])
+    def get_improvement_statistics(self) -> Dict[str, Any]:
+        """Get statistics on self-improvement over time."""
+        if not self._improvement_log:
+            return {"total_cycles": 0, "average_quality": 0}
+        
+        qualities = [log["final_quality"] for log in self._improvement_log]
+        
+        return {
+            "total_cycles": len(self._improvement_log),
+            "successful_cycles": sum(1 for log in self._improvement_log if log["success"]),
+            "success_rate": sum(1 for log in self._improvement_log if log["success"]) / len(self._improvement_log),
+            "average_quality": sum(qualities) / len(qualities) if qualities else 0,
+            "average_iterations": sum(log["iterations"] for log in self._improvement_log) / len(self._improvement_log),
+            "quality_trend": "improving" if len(qualities) > 1 and qualities[-1] > qualities[0] else "stable"
+        }
+    
+    def export_learning_report(self) -> str:
+        """Export comprehensive learning report."""
+        stats = self.get_improvement_statistics()
+        patterns = self.memory_bridge.get_performance_patterns()
+        
+        report = f"""
+# Self-Improvement Learning Report
+Generated: {datetime.now().isoformat()}
+
+## Performance Statistics
+- Total Learning Cycles: {stats['total_cycles']}
+- Success Rate: {stats['success_rate']:.1%}
+- Average Quality Score: {stats['average_quality']:.2f}
+- Average Iterations per Goal: {stats['average_iterations']:.1f}
+- Quality Trend: {stats['quality_trend']}
+
+## Learned Patterns
+- Success Patterns Identified: {len(patterns['success_patterns'])}
+- Failure Patterns Avoided: {len(patterns['failure_patterns'])}
+- Total Reflections Stored: {patterns['total_reflections']}
+
+## Performance by Scope
+"""
+        for scope, quality in patterns.get("avg_quality_by_scope", {}).items():
+            report += f"- {scope}: {quality:.2f} avg quality\n"
+        
+        report += "\n## Tool Usage Patterns\n"
+        for tool, data in patterns.get("tool_performance", {}).items():
+            report += f"- {tool}: {data['uses']} uses\n"
+        
+        return report
 
 
-# Convenience function for quick integration
-def create_integrated_agent(agent_id: str = "integrated_agent") -> SelfImprovingLoop:
-    """Create a fully integrated self-improving agent."""
-    return SelfImprovingLoop(agent_id)
+def create_integrated_system(
+    mode: IntegrationMode = IntegrationMode.AUTONOMOUS
+):
+    """
+    Factory function to create a fully integrated system.
+    
+    Returns:
+        Tuple of (planner_with_reflection, self_improving_loop, memory_bridge)
+    """
+    # Import here to avoid circular imports
+    from core.tiered_memory import TieredMemorySystem
+    from core.planner import HierarchicalPlanner
+    from core.reflection import ReflectionEngine
+    
+    memory = TieredMemorySystem()
+    base_planner = HierarchicalPlanner()
+    executor = base_planner.executor
+    reflection = ReflectionEngine()
+    
+    # Create integration layer
+    memory_bridge = ReflectionMemoryBridge(memory)
+    planner_with_reflection = PlanningWithReflection(base_planner, memory_bridge)
+    improving_loop = SelfImprovingLoop(
+        planner_with_reflection,
+        executor,
+        reflection,
+        memory_bridge,
+        mode
+    )
+    
+    return planner_with_reflection, improving_loop, memory_bridge

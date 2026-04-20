@@ -205,3 +205,95 @@ See detailed build log in AGENTS.md
 ---
 
 [Previous build logs truncated - see git history for full archive]
+
+## April 20, 2026 - Research Findings
+
+### Web Research - AGI Latest Breakthroughs
+
+**OpenAI's AGI Research Timeline (April 2026):**
+- OpenAI Chief Scientist Jakub Pachocki stated AI is getting close to working as well as human research interns
+- OpenAI's internal goal: "AI research intern" by September 2026, fully autonomous AI researcher by March 2028
+- Recent breakthroughs in coding (Codex handling much of OpenAI's programming work), math research, and physics progress
+- GPT-Rosalind launched for life sciences - designed for biochemistry and genomics with fundamental reasoning capabilities
+- GPT-5.4-Cyber released for defensive cybersecurity use cases
+
+**Forbes AI 50 2026 - Key Trends:**
+- Clear shift from "AI dominance" to "AI independence" - success measured by control, usage, and cost to run
+- Four female-led companies on list: EliseAI, Fireworks AI, Thinking Machine Labs, World Labs
+- AI 50 Brink List: 20 promising Seed/Series A startups building in AI (over $3.5B raised collectively)
+- New job categories emerging: "Agent Orchestrators", "AI Workflow Designers"
+
+**Physical Intelligence π0.7 (April 2026):**
+- New robotics model can direct robots to perform tasks never explicitly trained on
+- Early step toward general-purpose robot brain that can be coached through unfamiliar tasks in plain language
+- Capabilities scale "more than linearly" with data once threshold crossed
+
+**Cloudflare & OpenAI Agent Cloud (April 2026):**
+- Agent Cloud launched for enterprises with compute/storage/security primitives for autonomous AI agents
+- Agents cost nothing when inactive - critical for millions of dormant agents
+- 40% of AI agent projects predicted to fail by 2027 due to architecture/engineering gaps
+
+**2026 - Year of AI Agents Going to Production:**
+- David Soria Parra (MCP creator) predicts "2026 is the year agents go to production"
+- Agents will apply wide range of skills, compose complex calls using MCP and CLI
+- Microsoft testing OpenClaw-like always-on agents for Copilot integration
+
+### arXiv Papers (Past 2 Weeks)
+
+**arXiv:2603.13372v1 - "The ARC of Progress towards AGI"**
+- Living survey of Abstraction and Reasoning Corpus (ARC-AGI) evaluating 82 approaches
+- Key finding: Performance degrades 2-3x across ARC-AGI versions while humans stay near-perfect
+- Cost trends: Test-time cost fell 390x in one year ($4,500/task → $12/task for GPT-5.2)
+- Kaggle-sized models (0.66B-8B params) can be competitive - data-efficiency matters
+- Critical factors: Test-time adaptation and refinement loops remain unsolved
+
+**arXiv:2603.06590v1 - "ARC-AGI-2 Technical Report"**
+- Transformer-based system with structure-aware priors and test-time LoRA adaptation
+- Task framing: 125-token encoding enabling efficient long-context processing
+- Symmetry-aware decoding with multi-view scoring across augmented task views
+- Test-time training (TTT) with lightweight LoRA adapters for per-task specialization
+
+**arXiv:2501.03151v1 - "Large language models for AGI: A Survey"**
+- Examines how LLMs can contribute to AGI through embodiment, symbol grounding, causality, memory
+- Multimodal LLMs and vision-language-action (VLA) models for richer representations
+- Current PFMs remain superficial and brittle in generalist capabilities
+
+**arXiv:2601.17335 - "The Relativity of AGI"**
+- Investigates whether universal AGI definition can exist
+- Four main results: Relativity of generality, Fragility/cliff sets, Bounded transfer, Undecidability
+- AGI cannot be soundly/completely certified by any computable procedure
+- Recursive self-improvement schemes relying on internal self-certification are ill-posed
+
+**arXiv:2510.18212 - "A Definition of AGI"**
+- Proposes quantitative AGI definition using Cattell-Horn-Carroll (CHC) theory of human cognition
+- Decomposes intelligence into ten core cognitive domains (reasoning, memory, perception)
+- AGI scores: GPT-4 ≈ 27%, GPT-5 ≈ 57% - substantial progress but large gap remains
+- Long-term memory storage is key bottleneck
+
+**arXiv:2603.28906 - "Towards a Category-theoretic Comparative Framework for AGI"**
+- Proposes category-theoretic framework to describe/compare AGI architectures
+- Unifies RL, Universal AI, Active Inference, CRL, Schema-based Learning under single formalism
+- "Machines in a Category" concept for rigorous architecture comparison
+
+### Trending Open-Source AI Agent Repos (April 2026)
+
+1. **OpenBMB/XAgent** - Python autonomous agent with Dispatcher→Planner→Actor architecture, Docker sandboxing
+2. **razzant/ouroboros** - Self-modifying AI that writes its own code, 30+ self-guided evolution cycles, multi-model review (o3, Gemini, Claude)
+3. **openagents-org/openagents** - AI agent networks for open collaboration, persistent workspace for multi-agent chat
+4. **agentgram/agentgram** - AI agent social network with Ed25519 auth, reputation/AXP-based permissions
+5. **openai/openai-agents-python** - Lightweight provider-agnostic multi-agent framework with 100+ LLM support
+6. **superagentxai/superagentx** - Modular agentic AI with human approval governance, 10,000+ MCP tools
+7. **google/adk-docs** - Agent Development Kit by Google, code-first toolkit for sophisticated agents
+8. **volcengine/OpenViking** - Context database for agents with L0/L1/L2 tiered retrieval, filesystem-like paradigm
+9. **henryalps/OpenManus** - Multi-agent system autonomously executing complex tasks, Docker-friendly
+10. **VoltAgent/voltagent** - TypeScript agent engineering platform with VoltOps Console for observability
+
+### Key Insights for AGI Framework Development
+
+1. **MCP (Model Context Protocol)** is becoming the dominant standard for agent-tool connections
+2. **Test-time adaptation** is critical for ARC-AGI performance - static models insufficient
+3. **Hierarchical organization** (governance/execution/compliance) outperforms flat multi-agent
+4. **Tiered memory systems** (L0/L1/L2) enable 60-80% token reduction
+5. **Self-evolution** through curriculum learning, RL, and genetic algorithms showing promise
+6. **Agent authentication & security** now critical - machine identity, mTLS, scoped tokens
+7. **Cost efficiency** driving architecture decisions - idle agents should cost nothing
