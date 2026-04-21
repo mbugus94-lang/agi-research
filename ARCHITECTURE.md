@@ -1,184 +1,87 @@
-# AGI Agent Architecture
+# AGI Architecture
 
-## Overview
+## Core Philosophy
 
-The agi-research project implements a modular, extensible architecture for autonomous AI agents with the following key principles:
+Based on 2026 research insights, this architecture emphasizes:
 
-1. **Separation of Concerns**: Memory, planning, reflection, and tool execution are independent modules
-2. **Unified Tool Interface**: All capabilities expose consistent schemas via the Tool Registry
-3. **Observability**: Full execution history, metrics, and state inspection
-4. **Safety**: Risk-level classification, human-in-the-loop for self-modifications
+1. **Cartesian Agency**: Clear separation between learned core and explicit runtime interface
+2. **Test-Time Adaptation**: Refinement loops for continuous improvement
+3. **Compositional Reasoning**: Building complex behaviors from simple primitives
+4. **Constitutional Governance**: Safety constraints before self-modification
 
-## High-Level Architecture
+## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Integrated Agent                           │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │  Memory  │  │ Planner  │  │Reflection│  │  Tools   │        │
-│  │  System  │  │          │  │          │  │ Registry │        │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘        │
-│       │             │             │             │               │
-│       └─────────────┴──────┬──────┴─────────────┘               │
-│                            ▼                                   │
-│                    ┌───────────────┐                           │
-│                    │  ReAct Loop   │                           │
-│                    │  (Reason+Act) │                           │
-│                    └───────────────┘                           │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     AGENT RUNTIME                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐   │
+│  │   Agent     │  │   Memory    │  │      Planner        │   │
+│  │   Core      │◄─┤   System    │◄─┤  (with Refinement)  │   │
+│  │             │  │             │  │                     │   │
+│  │ - Identity  │  │ - Working   │  │ - Decomposition     │   │
+│  │ - Reasoning │  │ - Episodic  │  │ - Reflection        │   │
+│  │ - Values    │  │ - Semantic  │  │ - Test-Time Adapt   │   │
+│  └──────┬──────┘  └─────────────┘  └─────────────────────┘   │
+│         │                                                    │
+│         ▼                                                    │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │              SYMBOLIC INTERFACE LAYER                   │  │
+│  │    (Governed by Constitution - BIBLE.md equivalent)    │  │
+│  └────────────────────────────────────────────────────────┘  │
+│         │                                                    │
+│         ▼                                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐   │
+│  │   Skills    │  │   Tools     │  │    Multi-Agent      │   │
+│  │   Registry  │  │   (MCP)     │  │      Review         │   │
+│  │             │  │             │  │                     │   │
+│  │ - WebSearch │  │ - File Ops  │  │ - Code Review       │   │
+│  │ - CodeGen   │  │ - Shell     │  │ - Safety Check      │   │
+│  │ - Analysis  │  │ - Browser   │  │ - Consensus         │   │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Component Details
 
-### 1. Tool Registry (skills/tool_registry.py)
+### Agent Core (`core/agent.py`)
+- **Identity**: Persistent self-model across sessions
+- **Reasoning**: Chain-of-thought with reflection integration
+- **Values**: Constitutional constraints from governance layer
 
-Central registry for all agent capabilities:
+### Memory System (`core/memory.py`)
+- **Working Memory**: Current context and active goals
+- **Episodic Memory**: Past experiences with outcomes
+- **Semantic Memory**: Learned facts and patterns
+- **Procedural Memory**: Skill execution traces
 
-- **Schema Definition**: Tools declare parameters, types, descriptions (OpenAI/Anthropic compatible)
-- **Risk Classification**: SAFE, NORMAL, ELEVATED, CRITICAL levels for governance
-- **Auto-discovery**: Register functions via introspection or class-based tools
-- **Execution History**: Full audit trail of tool calls
+### Planner (`core/planner.py`)
+- **Task Decomposition**: Break complex goals into subtasks
+- **Reflection Integration**: Learn from past planning failures
+- **Test-Time Refinement**: Adapt plan during execution based on feedback
+- **Compositional Assembly**: Build plans from reusable components
 
-```python
-# Built-in tools:
-- web_search: Search the web with time-range filtering
-- file_read: Read files with offset/limit
-- file_write: Write files with backup option
-- calculator: Safe mathematical evaluation
-- file_list: Directory listing with patterns
-- file_search: Content search within files
-```
+### Reflection System (`core/reflection.py`)
+- **Self-Evaluation**: Assess own performance
+- **Error Analysis**: Identify failure modes
+- **Improvement Proposals**: Suggest architectural changes
+- **Safety Review**: Flag risky modifications
 
-### 2. Integrated Agent (core/integrated_agent.py)
+### Governance Layer
+- **Constitution**: BIBLE.md equivalent with core principles
+- **Multi-Model Review**: Multiple LLMs review changes before commit
+- **Human-in-the-Loop**: Critical changes require approval
 
-Combines all subsystems into a unified execution environment:
+## Research-Driven Design Decisions
 
-```python
-agent = IntegratedAgent(AgentConfig(
-    name="MyAgent",
-    max_steps=10,
-    enable_planning=True,
-    enable_reflection=True
-))
+1. **From ARC-AGI**: Test-time adaptation loops are critical
+2. **From Cartesian Agency**: Explicit symbolic interface for safety
+3. **From Self-Evolving Agents**: Curriculum learning for skill acquisition
+4. **From Multi-Agent Research**: Internal deliberation improves outcomes
 
-result = agent.run("Research AI trends and write a summary")
-```
+## Evolution Roadmap
 
-Features:
-- Automatic task decomposition via Planner
-- Context-aware tool selection
-- Memory-enhanced reasoning
-- Performance tracking and reflection
-- Full state introspection via `get_state()`
-
-### 3. Memory System (core/memory.py)
-
-Three-tier memory architecture:
-
-- **Working Memory**: Short-term context (FIFO, limited capacity)
-- **Episodic Memory**: Task history with outcomes (persistent)
-- **Semantic Memory**: Key-value facts and knowledge
-
-```python
-memory.add_to_context("User asked about Python")  # Working
-memory.record_episode(task, outcome, lessons)      # Episodic
-memory.learn_fact("python_created", "1991")        # Semantic
-```
-
-### 4. Task Planner (core/planner.py)
-
-Hierarchical task decomposition:
-
-- Rule-based goal decomposition (expandable to LLM-based)
-- Dependency tracking between subtasks
-- Execution order resolution
-- Progress tracking with status updates
-
-### 5. Reflection System (core/reflection.py)
-
-Self-improvement through metacognition:
-
-- Performance metrics tracking (steps, time, errors)
-- Pattern analysis over multiple runs
-- Improvement suggestions based on trends
-- Self-modification proposals (human-reviewed)
-
-```python
-# Proposes changes, never auto-applies
-improver.propose_change(
-    component="agent",
-    change_description="Add retry logic",
-    rationale="API timeouts observed",
-    expected_impact="Reduce failure rate"
-)
-```
-
-### 6. Base Agent (core/agent.py)
-
-ReAct pattern implementation:
-
-```
-THOUGHT → ACTION → OBSERVATION → (repeat)
-```
-
-- Pure reasoning loop without external dependencies
-- Extensible for LLM-based reasoning
-- Tool execution via registry
-
-## Skill System
-
-Skills extend `BaseTool` and define:
-
-```python
-class MySkill(BaseTool):
-    def _define_schema(self) -> ToolSchema:
-        return ToolSchema(
-            name="my_skill",
-            description="What this skill does",
-            parameters=[
-                ToolParameter(name="input", type="string", description="...", required=True)
-            ],
-            category=ToolCategory.WEB,
-            risk_level=ToolRiskLevel.SAFE
-        )
-    
-    def _execute(self, input: str) -> Any:
-        # Implementation
-        return result
-```
-
-## Tool Categories
-
-| Category | Risk Level | Examples |
-|----------|-----------|----------|
-| WEB | SAFE | Search, fetch |
-| FILE | ELEVATED | Read, write, delete |
-| CODE | ELEVATED | Execute, generate |
-| DATA | SAFE | Query, analyze |
-| SYSTEM | CRITICAL | Shell, network |
-| EXTERNAL_API | NORMAL | Third-party APIs |
-
-## Testing
-
-All components have integration tests:
-
-```bash
-python experiments/test_agent.py
-```
-
-Tests cover:
-- Tool Registry (schema, execution, stats)
-- Memory System (all three tiers)
-- Task Planner (decomposition, execution)
-- Reflection (metrics, suggestions)
-- Integrated Agent (full stack)
-- Skills (web search, file ops)
-
-## Future Extensions
-
-- **LLM Integration**: Replace rule-based reasoning with actual LLM calls
-- **Vector Memory**: Semantic search with embeddings
-- **Multi-Agent Orchestration**: Agent-to-agent communication
-- **Durable Execution**: Persist state for long-running tasks
-- **Streaming**: Real-time output for interactive use
-- **Human-in-the-Loop**: Approval gates for critical operations
+1. **Phase 1**: Basic agent with memory and planning
+2. **Phase 2**: Add test-time refinement loops
+3. **Phase 3**: Implement compositional reasoning
+4. **Phase 4**: Add self-reflection and improvement proposals
+5. **Phase 5**: Enable governed self-modification with review

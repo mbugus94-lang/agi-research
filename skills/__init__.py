@@ -1,75 +1,55 @@
 """
 Skills module for AGI agents.
-Provides tools for web search, file operations, and more.
+Provides modular capabilities that can be registered with the agent.
 """
-
-from .tool_registry import (
-    ToolRegistry,
-    BaseTool,
-    ToolSchema,
-    ToolParameter,
-    ToolResult,
-    ToolCategory,
-    ToolRiskLevel,
-    get_registry,
-    reset_registry,
-    WebSearchTool,
-    FileReadTool,
-    FileWriteTool,
-    CalculatorTool
-)
 
 from .web_search import (
     WebSearchSkill,
-    WebFetchSkill,
-    search_web,
-    fetch_webpage
+    SearchResult,
+    web_search,
+    deep_research,
+    summarize_search
 )
 
-from .file_operations import (
-    FileReadSkill,
-    FileWriteSkill,
-    FileListSkill,
-    FileSearchSkill,
-    FileInfoSkill,
-    read_file,
-    write_file,
-    list_files,
-    search_files
+from .code_gen import (
+    CodeGenSkill,
+    CodeResult,
+    CodeAction,
+    generate_code,
+    propose_modification,
+    review_code
+)
+
+from .analysis import (
+    AnalysisSkill,
+    AnalysisResult,
+    analyze_patterns,
+    analyze_trends,
+    synthesize,
+    generate_hypothesis
 )
 
 __all__ = [
-    # Registry
-    "ToolRegistry",
-    "BaseTool",
-    "ToolSchema",
-    "ToolParameter",
-    "ToolResult",
-    "ToolCategory",
-    "ToolRiskLevel",
-    "get_registry",
-    "reset_registry",
-    
-    # Built-in tools
-    "WebSearchTool",
-    "FileReadTool",
-    "FileWriteTool",
-    "CalculatorTool",
-    
-    # Web search
+    # Web Search
     "WebSearchSkill",
-    "WebFetchSkill",
-    "search_web",
-    "fetch_webpage",
+    "SearchResult",
+    "web_search",
+    "deep_research",
+    "summarize_search",
     
-    # File operations
-    "FileReadSkill",
-    "FileWriteSkill",
-    "FileListSkill",
-    "FileSearchSkill",
-    "FileInfoSkill",
-    "read_file",
-    "write_file",
-    "list_files",
-    "search_files"
+    # Code Generation
+    "CodeGenSkill",
+    "CodeResult",
+    "CodeAction",
+    "generate_code",
+    "propose_modification",
+    "review_code",
+    
+    # Analysis
+    "AnalysisSkill",
+    "AnalysisResult",
+    "analyze_patterns",
+    "analyze_trends",
+    "synthesize",
+    "generate_hypothesis"
 ]

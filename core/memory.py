@@ -1,599 +1,354 @@
 """
-Memory system for AGI agents.
-Implements working, episodic, and semantic memory.
+Memory System for AGI Agent
+
+Based on research findings:
+- Working memory for current context
+- Episodic memory for experiences
+- Semantic memory for facts/patterns
+- Procedural memory for skill traces
+
+Inspired by Ouroboros' persistent identity and Clawith's memory architecture.
 """
 
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, field
-from datetime import datetime
 import json
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+from collections import deque
 import hashlib
-import math
-from collections import Counter
-import re
 
 
 @dataclass
 class MemoryEntry:
-    """A single memory entry."""
-    content: str
-    memory_type: str  # "working", "episodic", "semantic"
-    timestamp: datetime = field(default_factory=datetime.now)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    embedding: Optional[List[float]] = None
+    """A single memory entry"""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    content: Any = None
+    memory_type: str = "episodic"  # working, episodic, semantic, procedural
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    tags: List[str] = field(default_factory=list)
+    importance: float = 0.5  # 0-1 scale
+    access_count: int = 0
+    last_accessed: Optional[str] = None
+    embeddings: Optional[List[float]] = None  # For semantic search
     
     def to_dict(self) -> Dict:
         return {
+            "id": self.id,
             "content": self.content,
             "memory_type": self.memory_type,
-            "timestamp": self.timestamp.isoformat(),
-            "metadata": self.metadata,
-            "embedding": self.embedding
+            "timestamp": self.timestamp,
+            "tags": self.tags,
+            "importance": self.importance,
+            "access_count": self.access_count,
+            "last_accessed": self.last_accessed,
+            "embeddings": self.embeddings
         }
     
     @classmethod
-    def from_dict(cls, data: Dict) -> 'MemoryEntry':
-        """Create MemoryEntry from dictionary."""
-        entry = cls(
-            content=data["content"],
-            memory_type=data["memory_type"],
-            timestamp=datetime.fromisoformat(data["timestamp"]),
-            metadata=data.get("metadata", {}),
-            embedding=data.get("embedding")
-        )
-        return entry
-
-
-class WorkingMemory:
-    """
-    Short-term memory holding current context.
-    Limited capacity, FIFO eviction.
-    """
-    
-    def __init__(self, capacity: int = 10):
-        self.capacity = capacity
-        self.entries: List[MemoryEntry] = []
-    
-    def add(self, content: str, metadata: Dict = None) -> MemoryEntry:
-        """Add entry to working memory."""
-        entry = MemoryEntry(
-            content=content,
-            memory_type="working",
-            metadata=metadata or {}
-        )
-        self.entries.append(entry)
-        
-        # Evict oldest if over capacity
-        if len(self.entries) > self.capacity:
-            self.entries.pop(0)
-        
-        return entry
-    
-    def size(self) -> int:
-        """Return current number of entries."""
-        return len(self.entries)
-    
-    def get(self, key: str) -> Optional[Dict]:
-        """Get entry by metadata key."""
-        for entry in self.entries:
-            if entry.metadata.get("id") == key:
-                return entry.metadata
-        return None
-    
-    def get_context(self, n: int = None) -> str:
-        """Get recent context as formatted string."""
-        entries = self.entries[-n:] if n else self.entries
-        return "\n".join([e.content for e in entries])
-    
-    def clear(self):
-        """Clear working memory."""
-        self.entries = []
-
-
-class EpisodicMemory:
-    """
-    Memory of past experiences/episodes.
-    Stores agent interactions and their outcomes.
-    """
-    
-    def __init__(self, storage_path: str = None):
-        self.storage_path = storage_path
-        self.episodes: List[MemoryEntry] = []
-        
-        if storage_path:
-            self._load()
-    
-    def add_episode(
-        self,
-        task: str,
-        outcome: str,
-        lessons: str,
-        metadata: Dict = None
-    ) -> MemoryEntry:
-        """Record a completed episode."""
-        content = f"Task: {task}\nOutcome: {outcome}\nLessons: {lessons}"
-        entry = MemoryEntry(
-            content=content,
-            memory_type="episodic",
-            metadata=metadata or {}
-        )
-        self.episodes.append(entry)
-        self._save()
-        return entry
-    
-    def store(self, data: Dict[str, Any]) -> MemoryEntry:
-        """Store an episode from a dict."""
-        return self.add_episode(
-            task=data.get("task", "Unknown task"),
-            outcome=data.get("output", data.get("outcome", "")),
-            lessons=data.get("lessons", ""),
-            metadata=data
-        )
-    
-    def get_recent(self, limit: int = 10) -> List[Dict]:
-        """Get recent episodes."""
-        episodes = self.episodes[-limit:] if limit else self.episodes
-        return [e.to_dict() for e in episodes]
-    
-    def search_by_task(self, task_type: str) -> List[Dict]:
-        """Search episodes by task type."""
-        results = []
-        for episode in self.episodes:
-            if task_type.lower() in episode.metadata.get("task", "").lower():
-                results.append(episode.to_dict())
-        return results
-    
-    def search(self, query: str, limit: int = 5) -> List[MemoryEntry]:
-        """Simple keyword search through episodes."""
-        # In production, use embeddings for semantic search
-        results = []
-        for episode in self.episodes:
-            if query.lower() in episode.content.lower():
-                results.append(episode)
-                if len(results) >= limit:
-                    break
-        return results
-    
-    def get_similar_experiences(self, task: str) -> List[MemoryEntry]:
-        """Find episodes similar to current task."""
-        return self.search(task, limit=3)
-    
-    def _load(self):
-        """Load episodes from storage."""
-        try:
-            with open(self.storage_path, 'r') as f:
-                data = json.load(f)
-                for item in data:
-                    entry = MemoryEntry.from_dict(item)
-                    self.episodes.append(entry)
-        except FileNotFoundError:
-            pass
-    
-    def _save(self):
-        """Save episodes to storage."""
-        if self.storage_path:
-            with open(self.storage_path, 'w') as f:
-                json.dump([e.to_dict() for e in self.episodes], f, indent=2)
-
-
-class SemanticMemory:
-    """
-    Long-term factual knowledge.
-    Key-value store for facts and concepts.
-    """
-    
-    def __init__(self, storage_path: str = None):
-        self.storage_path = storage_path
-        self.facts: Dict[str, Any] = {}
-        
-        if storage_path:
-            self._load()
-    
-    def store(self, key: str, value: Any, category: str = "general"):
-        """Store a fact."""
-        self.facts[key] = {
-            "value": value,
-            "category": category,
-            "timestamp": datetime.now().isoformat()
-        }
-        self._save()
-    
-    def store_fact(
-        self,
-        subject: str,
-        predicate: str,
-        object_: str,
-        confidence: float = 1.0
-    ):
-        """Store a semantic fact as subject-predicate-object."""
-        key = f"{subject}_{predicate}"
-        self.facts[key] = {
-            "subject": subject,
-            "predicate": predicate,
-            "object": object_,
-            "confidence": confidence,
-            "timestamp": datetime.now().isoformat()
-        }
-        self._save()
-    
-    def query(
-        self,
-        subject: Optional[str] = None,
-        predicate: Optional[str] = None
-    ) -> List[Dict]:
-        """Query facts by subject and/or predicate."""
-        results = []
-        for key, fact in self.facts.items():
-            match = True
-            if subject and fact.get("subject") != subject:
-                match = False
-            if predicate and fact.get("predicate") != predicate:
-                match = False
-            if match:
-                results.append(fact)
-        return results
-    
-    def retrieve(self, key: str) -> Optional[Any]:
-        """Retrieve a fact."""
-        fact = self.facts.get(key)
-        return fact["value"] if fact else None
-    
-    def search_by_category(self, category: str) -> Dict[str, Any]:
-        """Get all facts in a category."""
-        return {
-            k: v["value"] for k, v in self.facts.items()
-            if v.get("category") == category
-        }
-    
-    def _load(self):
-        """Load facts from storage."""
-        try:
-            with open(self.storage_path, 'r') as f:
-                self.facts = json.load(f)
-        except FileNotFoundError:
-            pass
-    
-    def _save(self):
-        """Save facts to storage."""
-        if self.storage_path:
-            with open(self.storage_path, 'w') as f:
-                json.dump(self.facts, f, indent=2)
-
-
-class VectorMemory:
-    """
-    Semantic memory with vector-based search.
-    Implements simplified TF-IDF style embeddings for semantic retrieval.
-    
-    Based on OpenViking pattern: context database with unified memory management.
-    """
-    
-    def __init__(self, storage_path: str = None, embedding_dim: int = 100):
-        self.storage_path = storage_path
-        self.embedding_dim = embedding_dim
-        self.entries: List[MemoryEntry] = []
-        self.vocabulary: Dict[str, int] = {}  # word -> index mapping
-        self.idf_scores: Dict[str, float] = {}  # word -> IDF score
-        
-        if storage_path:
-            self._load()
-    
-    def _tokenize(self, text: str) -> List[str]:
-        """Simple tokenization."""
-        # Lowercase, remove punctuation, split
-        text = re.sub(r'[^\w\s]', ' ', text.lower())
-        tokens = [w for w in text.split() if len(w) > 2]
-        return tokens
-    
-    def _compute_embedding(self, text: str) -> List[float]:
-        """Compute TF-IDF style embedding vector."""
-        tokens = self._tokenize(text)
-        if not tokens:
-            return [0.0] * self.embedding_dim
-        
-        # Update vocabulary
-        for token in set(tokens):
-            if token not in self.vocabulary:
-                idx = len(self.vocabulary)
-                if idx < self.embedding_dim:
-                    self.vocabulary[token] = idx
-        
-        # Compute TF-IDF
-        vector = [0.0] * self.embedding_dim
-        token_counts = Counter(tokens)
-        
-        for token, count in token_counts.items():
-            if token in self.vocabulary:
-                idx = self.vocabulary[token]
-                tf = count / len(tokens)
-                idf = self.idf_scores.get(token, 1.0)
-                vector[idx] = tf * idf
-        
-        # Normalize
-        norm = math.sqrt(sum(x*x for x in vector))
-        if norm > 0:
-            vector = [x / norm for x in vector]
-        
-        return vector
-    
-    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
-        """Compute cosine similarity between two vectors."""
-        if len(vec1) != len(vec2):
-            return 0.0
-        
-        dot_product = sum(a * b for a, b in zip(vec1, vec2))
-        norm1 = math.sqrt(sum(a * a for a in vec1))
-        norm2 = math.sqrt(sum(b * b for b in vec2))
-        
-        if norm1 == 0 or norm2 == 0:
-            return 0.0
-        
-        return dot_product / (norm1 * norm2)
-    
-    def add(self, content: str, metadata: Dict = None) -> MemoryEntry:
-        """Add entry with auto-generated embedding."""
-        embedding = self._compute_embedding(content)
-        entry = MemoryEntry(
-            content=content,
-            memory_type="semantic",
-            metadata=metadata or {},
-            embedding=embedding
-        )
-        self.entries.append(entry)
-        self._update_idf()
-        
-        if self.storage_path:
-            self._save()
-        
-        return entry
-    
-    def _update_idf(self):
-        """Update IDF scores based on current corpus."""
-        if not self.entries:
-            return
-        
-        # Count document frequency for each token
-        doc_freq = Counter()
-        for entry in self.entries:
-            tokens = set(self._tokenize(entry.content))
-            for token in tokens:
-                doc_freq[token] += 1
-        
-        # Compute IDF
-        N = len(self.entries)
-        self.idf_scores = {
-            token: math.log(N / (freq + 1)) + 1
-            for token, freq in doc_freq.items()
-        }
-    
-    def semantic_search(
-        self,
-        query: str,
-        top_k: int = 5,
-        min_similarity: float = 0.1
-    ) -> List[Tuple[MemoryEntry, float]]:
-        """
-        Search entries by semantic similarity.
-        
-        Returns list of (entry, similarity_score) tuples ranked by similarity.
-        """
-        query_embedding = self._compute_embedding(query)
-        
-        results = []
-        for entry in self.entries:
-            if entry.embedding:
-                similarity = self._cosine_similarity(query_embedding, entry.embedding)
-                if similarity >= min_similarity:
-                    results.append((entry, similarity))
-        
-        # Sort by similarity (descending)
-        results.sort(key=lambda x: x[1], reverse=True)
-        return results[:top_k]
-    
-    def hybrid_search(
-        self,
-        query: str,
-        top_k: int = 5,
-        keyword_weight: float = 0.3,
-        semantic_weight: float = 0.7
-    ) -> List[Tuple[MemoryEntry, float]]:
-        """
-        Combined keyword and semantic search.
-        
-        Balances exact matching with semantic understanding.
-        """
-        query_lower = query.lower()
-        
-        # Keyword scores
-        keyword_scores = {}
-        for i, entry in enumerate(self.entries):
-            content_lower = entry.content.lower()
-            # Simple keyword matching score
-            matches = sum(1 for word in query_lower.split() if word in content_lower)
-            keyword_scores[i] = matches / max(len(query_lower.split()), 1)
-        
-        # Semantic scores
-        semantic_results = self.semantic_search(query, top_k=len(self.entries))
-        semantic_scores = {self.entries.index(entry): score for entry, score in semantic_results}
-        
-        # Combine scores
-        combined_scores = {}
-        for i in range(len(self.entries)):
-            kw_score = keyword_scores.get(i, 0)
-            sem_score = semantic_scores.get(i, 0)
-            combined = keyword_weight * kw_score + semantic_weight * sem_score
-            if combined > 0:
-                combined_scores[i] = combined
-        
-        # Get top results
-        top_indices = sorted(combined_scores.keys(), key=lambda i: combined_scores[i], reverse=True)[:top_k]
-        results = [(self.entries[i], combined_scores[i]) for i in top_indices]
-        
-        return results
-    
-    def get_by_metadata(self, key: str, value: Any) -> List[MemoryEntry]:
-        """Find entries by metadata field."""
-        return [e for e in self.entries if e.metadata.get(key) == value]
-    
-    def get_context_for_task(self, task: str, n: int = 3) -> str:
-        """Get relevant context for a task."""
-        results = self.hybrid_search(task, top_k=n)
-        if not results:
-            return ""
-        
-        parts = ["=== Relevant Context ==="]
-        for entry, score in results:
-            parts.append(f"[Similarity: {score:.2f}] {entry.content[:200]}...")
-        
-        return "\n".join(parts)
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get memory statistics."""
-        return {
-            "total_entries": len(self.entries),
-            "vocabulary_size": len(self.vocabulary),
-            "embedding_dimension": self.embedding_dim,
-            "storage_path": self.storage_path
-        }
-    
-    def _save(self):
-        """Save to disk."""
-        data = {
-            "entries": [e.to_dict() for e in self.entries],
-            "vocabulary": self.vocabulary,
-            "idf_scores": self.idf_scores,
-            "embedding_dim": self.embedding_dim
-        }
-        with open(self.storage_path, 'w') as f:
-            json.dump(data, f, indent=2)
-    
-    def _load(self):
-        """Load from disk."""
-        try:
-            with open(self.storage_path, 'r') as f:
-                data = json.load(f)
-                self.entries = [MemoryEntry.from_dict(e) for e in data.get("entries", [])]
-                self.vocabulary = data.get("vocabulary", {})
-                self.idf_scores = data.get("idf_scores", {})
-                self.embedding_dim = data.get("embedding_dim", self.embedding_dim)
-        except FileNotFoundError:
-            pass
+    def from_dict(cls, data: Dict) -> "MemoryEntry":
+        return cls(**data)
 
 
 class MemorySystem:
     """
-    Unified memory system combining all memory types.
+    Multi-tier memory system:
+    
+    1. Working Memory: Small, fast, recent context
+    2. Episodic Memory: Experiences with outcomes
+    3. Semantic Memory: Facts and learned patterns
+    4. Procedural Memory: Skill execution traces
     """
     
-    def __init__(self, storage_dir: str = None):
-        self.working = WorkingMemory(capacity=10)
-        self.episodic = EpisodicMemory(
-            storage_path=f"{storage_dir}/episodes.json" if storage_dir else None
+    def __init__(self, 
+                 working_capacity: int = 10,
+                 episodic_capacity: int = 1000,
+                 semantic_capacity: int = 500):
+        
+        # Working memory: limited size, fast access
+        self.working_memory: deque = deque(maxlen=working_capacity)
+        
+        # Episodic memory: experiences with timestamps
+        self.episodic_memory: Dict[str, MemoryEntry] = {}
+        
+        # Semantic memory: facts and patterns
+        self.semantic_memory: Dict[str, MemoryEntry] = {}
+        
+        # Procedural memory: how to do things
+        self.procedural_memory: Dict[str, MemoryEntry] = {}
+        
+        # Index for search
+        self.tag_index: Dict[str, List[str]] = {}
+        
+    def store(self, content: Any, 
+              memory_type: str = "episodic",
+              tags: Optional[List[str]] = None,
+              importance: float = 0.5) -> str:
+        """Store a new memory entry"""
+        
+        entry = MemoryEntry(
+            content=content,
+            memory_type=memory_type,
+            tags=tags or [],
+            importance=importance
         )
-        self.semantic = SemanticMemory(
-            storage_path=f"{storage_dir}/facts.json" if storage_dir else None
+        
+        # Store in appropriate memory tier
+        if memory_type == "working":
+            self.working_memory.append(entry)
+        elif memory_type == "episodic":
+            self.episodic_memory[entry.id] = entry
+        elif memory_type == "semantic":
+            self.semantic_memory[entry.id] = entry
+        elif memory_type == "procedural":
+            self.procedural_memory[entry.id] = entry
+        
+        # Update tag index
+        for tag in entry.tags:
+            if tag not in self.tag_index:
+                self.tag_index[tag] = []
+            self.tag_index[tag].append(entry.id)
+        
+        return entry.id
+    
+    def retrieve(self, memory_id: str, 
+                 memory_type: Optional[str] = None) -> Optional[MemoryEntry]:
+        """Retrieve a specific memory by ID"""
+        
+        entry = None
+        
+        if memory_type == "working":
+            for e in self.working_memory:
+                if e.id == memory_id:
+                    entry = e
+                    break
+        elif memory_type == "episodic":
+            entry = self.episodic_memory.get(memory_id)
+        elif memory_type == "semantic":
+            entry = self.semantic_memory.get(memory_id)
+        elif memory_type == "procedural":
+            entry = self.procedural_memory.get(memory_id)
+        else:
+            # Search all tiers
+            for e in self.working_memory:
+                if e.id == memory_id:
+                    entry = e
+                    break
+            entry = entry or self.episodic_memory.get(memory_id)
+            entry = entry or self.semantic_memory.get(memory_id)
+            entry = entry or self.procedural_memory.get(memory_id)
+        
+        if entry:
+            entry.access_count += 1
+            entry.last_accessed = datetime.now().isoformat()
+        
+        return entry
+    
+    def search_by_tags(self, tags: List[str], 
+                       memory_type: Optional[str] = None) -> List[MemoryEntry]:
+        """Search memories by tags"""
+        results = []
+        
+        for tag in tags:
+            if tag in self.tag_index:
+                for memory_id in self.tag_index[tag]:
+                    entry = self.retrieve(memory_id, memory_type)
+                    if entry and entry not in results:
+                        results.append(entry)
+        
+        # Sort by importance and recency
+        results.sort(key=lambda e: (e.importance, e.timestamp), reverse=True)
+        return results
+    
+    def get_working_memory(self) -> List[MemoryEntry]:
+        """Get all entries in working memory"""
+        return list(self.working_memory)
+    
+    def get_recent_episodes(self, n: int = 10) -> List[MemoryEntry]:
+        """Get most recent episodic memories"""
+        episodes = sorted(
+            self.episodic_memory.values(),
+            key=lambda e: e.timestamp,
+            reverse=True
         )
-        self.vector = VectorMemory(
-            storage_path=f"{storage_dir}/vector_memory.json" if storage_dir else None
+        return episodes[:n]
+    
+    def get_important_memories(self, 
+                               memory_type: Optional[str] = None,
+                               threshold: float = 0.7,
+                               n: int = 10) -> List[MemoryEntry]:
+        """Get most important memories above threshold"""
+        
+        all_memories = []
+        
+        if memory_type is None or memory_type == "working":
+            all_memories.extend(self.working_memory)
+        if memory_type is None or memory_type == "episodic":
+            all_memories.extend(self.episodic_memory.values())
+        if memory_type is None or memory_type == "semantic":
+            all_memories.extend(self.semantic_memory.values())
+        if memory_type is None or memory_type == "procedural":
+            all_memories.extend(self.procedural_memory.values())
+        
+        important = [m for m in all_memories if m.importance >= threshold]
+        important.sort(key=lambda e: e.importance, reverse=True)
+        
+        return important[:n]
+    
+    def consolidate_working_to_episodic(self) -> None:
+        """
+        Move working memory entries to episodic memory.
+        Called periodically to free up working memory.
+        """
+        while self.working_memory:
+            entry = self.working_memory.popleft()
+            entry.memory_type = "episodic"
+            self.episodic_memory[entry.id] = entry
+    
+    def store_skill_trace(self, skill_name: str, 
+                          inputs: Dict, 
+                          outputs: Any,
+                          success: bool,
+                          duration_ms: float) -> str:
+        """
+        Store a procedural memory (skill execution trace).
+        Used for learning from experience.
+        """
+        trace = {
+            "skill": skill_name,
+            "inputs": inputs,
+            "outputs": outputs,
+            "success": success,
+            "duration_ms": duration_ms
+        }
+        
+        importance = 0.8 if not success else 0.5  # Failed attempts more important
+        
+        return self.store(
+            content=trace,
+            memory_type="procedural",
+            tags=["skill", skill_name, "success" if success else "failure"],
+            importance=importance
         )
     
-    def add_to_context(self, content: str, metadata: Dict = None):
-        """Add to working memory."""
-        return self.working.add(content, metadata)
-    
-    def get_context(self, n: int = 5) -> str:
-        """Get current context."""
-        return self.working.get_context(n)
-    
-    def record_episode(self, task: str, outcome: str, lessons: str = ""):
-        """Record a completed task."""
-        return self.episodic.add_episode(task, outcome, lessons)
-    
-    def recall_similar(self, task: str) -> List[str]:
-        """Recall similar past experiences."""
-        episodes = self.episodic.get_similar_experiences(task)
-        return [e.content for e in episodes]
-    
-    def learn_fact(self, key: str, value: Any, category: str = "general"):
-        """Learn a new fact."""
-        self.semantic.store(key, value, category)
-    
-    def recall_fact(self, key: str) -> Optional[Any]:
-        """Recall a learned fact."""
-        return self.semantic.retrieve(key)
-    
-    def semantic_search(self, query: str, top_k: int = 5) -> List[Tuple[MemoryEntry, float]]:
-        """Perform semantic search across vector memory."""
-        return self.vector.hybrid_search(query, top_k=top_k)
-    
-    def get_full_context(self, task: str) -> str:
-        """Build comprehensive context for a task."""
-        parts = []
+    def get_skill_traces(self, skill_name: str, 
+                         success_only: bool = False) -> List[MemoryEntry]:
+        """Get execution traces for a specific skill"""
+        traces = self.search_by_tags(["skill", skill_name], "procedural")
         
-        # Working memory
-        parts.append("=== Current Context ===")
-        parts.append(self.working.get_context())
+        if success_only:
+            traces = [t for t in traces if t.content.get("success", False)]
         
-        # Similar experiences
-        similar = self.episodic.get_similar_experiences(task)
-        if similar:
-            parts.append("\n=== Relevant Past Experiences ===")
-            for ep in similar[:2]:
-                parts.append(ep.content)
-        
-        # Semantic search results (new!)
-        sem_results = self.vector.hybrid_search(task, top_k=3)
-        if sem_results:
-            parts.append("\n=== Semantically Relevant Knowledge ===")
-            for entry, score in sem_results:
-                parts.append(f"[{score:.2f}] {entry.content[:150]}...")
-        
-        # Relevant facts (heuristic: check if task keywords match)
-        parts.append("\n=== Known Facts ===")
-        for key, data in self.semantic.facts.items():
-            if any(word in task.lower() for word in key.lower().split()):
-                parts.append(f"{key}: {data['value']}")
-        
-        return "\n".join(parts)
+        return traces
     
-    def clear_working_memory(self):
-        """Clear short-term context."""
-        self.working.clear()
+    def get_context_for_task(self, task_description: str,
+                            relevant_tags: Optional[List[str]] = None) -> Dict:
+        """
+        Gather relevant context for a new task.
+        Combines working memory with relevant episodic/semantic memories.
+        """
+        context = {
+            "working_memory": [e.to_dict() for e in self.get_working_memory()],
+            "relevant_episodes": [],
+            "relevant_semantic": [],
+            "skill_traces": []
+        }
+        
+        if relevant_tags:
+            episodes = self.search_by_tags(relevant_tags, "episodic")
+            context["relevant_episodes"] = [e.to_dict() for e in episodes[:5]]
+            
+            semantic = self.search_by_tags(relevant_tags, "semantic")
+            context["relevant_semantic"] = [e.to_dict() for e in semantic[:5]]
+        
+        # Add recent important memories
+        important = self.get_important_memories(threshold=0.8, n=5)
+        context["important_memories"] = [e.to_dict() for e in important]
+        
+        return context
+    
+    def save(self, path: str) -> None:
+        """Save memory system to file"""
+        state = {
+            "working_memory": [e.to_dict() for e in self.working_memory],
+            "episodic_memory": {k: v.to_dict() for k, v in self.episodic_memory.items()},
+            "semantic_memory": {k: v.to_dict() for k, v in self.semantic_memory.items()},
+            "procedural_memory": {k: v.to_dict() for k, v in self.procedural_memory.items()},
+            "tag_index": self.tag_index
+        }
+        
+        with open(path, 'w') as f:
+            json.dump(state, f, indent=2)
+    
+    def load(self, path: str) -> None:
+        """Load memory system from file"""
+        with open(path, 'r') as f:
+            state = json.load(f)
+        
+        self.working_memory = deque(
+            [MemoryEntry.from_dict(e) for e in state.get("working_memory", [])],
+            maxlen=self.working_memory.maxlen
+        )
+        
+        self.episodic_memory = {
+            k: MemoryEntry.from_dict(v) 
+            for k, v in state.get("episodic_memory", {}).items()
+        }
+        
+        self.semantic_memory = {
+            k: MemoryEntry.from_dict(v) 
+            for k, v in state.get("semantic_memory", {}).items()
+        }
+        
+        self.procedural_memory = {
+            k: MemoryEntry.from_dict(v) 
+            for k, v in state.get("procedural_memory", {}).items()
+        }
+        
+        self.tag_index = state.get("tag_index", {})
+    
+    def get_stats(self) -> Dict:
+        """Get memory system statistics"""
+        return {
+            "working_memory_size": len(self.working_memory),
+            "episodic_memory_size": len(self.episodic_memory),
+            "semantic_memory_size": len(self.semantic_memory),
+            "procedural_memory_size": len(self.procedural_memory),
+            "total_tags": len(self.tag_index),
+            "working_capacity": self.working_memory.maxlen
+        }
 
 
 if __name__ == "__main__":
-    # Demo
-    import tempfile
-    import os
+    # Basic test
+    memory = MemorySystem(working_capacity=5)
     
-    with tempfile.TemporaryDirectory() as tmpdir:
-        memory = MemorySystem(storage_dir=tmpdir)
-        
-        # Add working memory
-        memory.add_to_context("User asked: What is the capital of France?")
-        memory.add_to_context("I should search for this information.")
-        
-        # Learn a fact
-        memory.learn_fact("capital_france", "Paris", category="geography")
-        memory.learn_fact("capital_germany", "Berlin", category="geography")
-        
-        # Record an episode
-        memory.record_episode(
-            task="Find capital of Spain",
-            outcome="Successfully found Madrid",
-            lessons="Always verify with multiple sources"
-        )
-        
-        # Add to vector memory (semantic search)
-        memory.vector.add("Paris is the capital and most populous city of France.", {"topic": "geography"})
-        memory.vector.add("Berlin is the capital of Germany with a rich history.", {"topic": "geography"})
-        memory.vector.add("Tokyo is Japan's capital and largest metropolis.", {"topic": "geography"})
-        
-        # Test semantic search
-        print("=== Testing Semantic Search ===")
-        results = memory.semantic_search("What is the capital city of France?", top_k=3)
-        for entry, score in results:
-            print(f"[Score: {score:.3f}] {entry.content}")
-        
-        print("\n" + "="*50)
-        print(memory.get_full_context("What is the capital of France?"))
+    # Store some memories
+    memory.store("Current goal: Build AGI", "working", ["goal", "agi"], 0.9)
+    memory.store("Research: ARC-AGI shows test-time adaptation is key", 
+                 "semantic", ["research", "arc-agi"], 0.8)
+    memory.store("Experience: Failed to implement planner", 
+                 "episodic", ["failure", "planner"], 0.9)
+    
+    # Store skill trace
+    memory.store_skill_trace(
+        skill_name="web_search",
+        inputs={"query": "agi research"},
+        outputs={"results": 10},
+        success=True,
+        duration_ms=1500
+    )
+    
+    print("Memory Stats:", memory.get_stats())
+    print("\nWorking Memory:")
+    for m in memory.get_working_memory():
+        print(f"  - {m.content}")
+    
+    print("\nSearch by tags ['research']:")
+    results = memory.search_by_tags(["research"])
+    for r in results:
+        print(f"  - {r.content}")
+    
+    print("\nImportant memories:")
+    for m in memory.get_important_memories(threshold=0.8):
+        print(f"  - [{m.memory_type}] {m.content[:50]}...")

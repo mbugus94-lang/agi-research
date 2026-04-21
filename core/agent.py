@@ -1,270 +1,260 @@
 """
-Base Agent implementing the ReAct (Reason + Act) pattern.
-Based on: Yao et al. "ReAct: Synergizing Reasoning and Acting in Language Models"
+Base Agent Implementation
+
+A minimal but extensible agent architecture based on 2026 research:
+- Cartesian agency: clear separation between core and interface
+- Test-time adaptation: refinement during execution
+- Constitutional governance: safety-first self-modification
 """
 
-from typing import Dict, List, Any, Optional, Callable
-from dataclasses import dataclass, field
-from enum import Enum
 import json
-import time
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Callable
+from enum import Enum
 
 
-class ActionType(Enum):
-    THINK = "think"
-    TOOL_CALL = "tool_call"
-    ANSWER = "answer"
-
-
-@dataclass
-class Thought:
-    content: str
-    reasoning: str
-    timestamp: float = field(default_factory=time.time)
-
-
-@dataclass
-class Action:
-    action_type: ActionType
-    tool_name: Optional[str] = None
-    tool_input: Optional[Dict] = None
-    thought: Optional[str] = None
-    timestamp: float = field(default_factory=time.time)
+class AgentState(Enum):
+    IDLE = "idle"
+    PLANNING = "planning"
+    EXECUTING = "executing"
+    REFLECTING = "reflecting"
+    WAITING = "waiting"
 
 
 @dataclass
-class Observation:
-    content: str
-    success: bool = True
-    timestamp: float = field(default_factory=time.time)
-
-
-@dataclass
-class Step:
-    thought: Thought
-    action: Action
-    observation: Observation
-
-
-class Tool:
-    """A tool that the agent can use."""
+class AgentIdentity:
+    """Persistent identity across sessions - inspired by Ouroboros"""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = "AGI-Agent"
+    version: str = "0.1.0"
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    core_values: List[str] = field(default_factory=lambda: [
+        "safety_first",
+        "incremental_progress",
+        "test_everything",
+        "document_findings"
+    ])
     
-    def __init__(self, name: str, description: str, func: Callable, schema: Dict):
-        self.name = name
-        self.description = description
-        self.func = func
-        self.schema = schema
+    def to_dict(self) -> Dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "version": self.version,
+            "created_at": self.created_at,
+            "core_values": self.core_values
+        }
+
+
+@dataclass
+class Task:
+    """A task for the agent to execute"""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    description: str = ""
+    goal: str = ""
+    context: Dict[str, Any] = field(default_factory=dict)
+    parent_id: Optional[str] = None
+    subtasks: List[str] = field(default_factory=list)
+    status: str = "pending"  # pending, in_progress, completed, failed
+    result: Any = None
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    completed_at: Optional[str] = None
     
-    def execute(self, **kwargs) -> Observation:
-        try:
-            result = self.func(**kwargs)
-            return Observation(content=str(result), success=True)
-        except Exception as e:
-            return Observation(content=f"Error: {str(e)}", success=False)
+    def to_dict(self) -> Dict:
+        return {
+            "id": self.id,
+            "description": self.description,
+            "goal": self.goal,
+            "context": self.context,
+            "parent_id": self.parent_id,
+            "subtasks": self.subtasks,
+            "status": self.status,
+            "result": self.result,
+            "created_at": self.created_at,
+            "completed_at": self.completed_at
+        }
 
 
 class BaseAgent:
     """
-    ReAct-based agent that reasons and acts in a loop.
-    
-    The ReAct pattern:
-    1. REASON: Think about what to do
-    2. ACT: Take an action (tool call or answer)
-    3. OBSERVE: Get result from action
-    4. REFLECT: Update understanding
-    5. Repeat until complete
+    Base agent with:
+    - Identity persistence
+    - State management
+    - Skill registry
+    - Basic task execution loop
     """
     
-    def __init__(
-        self,
-        name: str = "Agent",
-        max_steps: int = 10,
-        tools: Optional[List[Tool]] = None
-    ):
-        self.name = name
-        self.max_steps = max_steps
-        self.tools: Dict[str, Tool] = {t.name: t for t in (tools or [])}
-        self.history: List[Step] = []
-        self.system_prompt = self._build_system_prompt()
+    def __init__(self, identity: Optional[AgentIdentity] = None):
+        self.identity = identity or AgentIdentity()
+        self.state = AgentState.IDLE
+        self.memory = {}  # Will integrate with core/memory.py
+        self.skills: Dict[str, Callable] = {}
+        self.current_task: Optional[Task] = None
+        self.task_history: List[Task] = []
+        self.reflection_enabled = True
+        
+    def register_skill(self, name: str, skill: Callable) -> None:
+        """Register a skill function"""
+        self.skills[name] = skill
+        
+    def get_identity(self) -> Dict:
+        """Return agent identity as dict"""
+        return self.identity.to_dict()
     
-    def _build_system_prompt(self) -> str:
-        tool_descriptions = "\n".join([
-            f"- {name}: {tool.description}"
-            for name, tool in self.tools.items()
-        ])
-        
-        return f"""You are {self.name}, an AI agent that solves problems using the ReAct pattern.
-
-Available tools:
-{tool_descriptions}
-
-Follow this format for each step:
-THOUGHT: Your reasoning about what to do next
-ACTION: Either "tool_call" with tool name and input, or "answer" with final response
-
-Be concise and strategic in your reasoning."""
+    def create_task(self, description: str, goal: str, 
+                    context: Optional[Dict] = None,
+                    parent_id: Optional[str] = None) -> Task:
+        """Create a new task"""
+        task = Task(
+            description=description,
+            goal=goal,
+            context=context or {},
+            parent_id=parent_id
+        )
+        return task
     
-    def think(self, context: str) -> Thought:
-        """Generate a thought based on current context."""
-        # For now, simple rule-based thinking
-        # In production, this would call an LLM
+    def execute_skill(self, skill_name: str, **kwargs) -> Any:
+        """Execute a registered skill"""
+        if skill_name not in self.skills:
+            raise ValueError(f"Skill '{skill_name}' not found. Available: {list(self.skills.keys())}")
         
-        lines = context.split("\n")
-        last_observation = lines[-1] if lines else ""
+        self.state = AgentState.EXECUTING
+        try:
+            result = self.skills[skill_name](**kwargs)
+            return result
+        except Exception as e:
+            return {"error": str(e), "skill": skill_name}
+        finally:
+            self.state = AgentState.IDLE
+    
+    def execute_task(self, task: Task, max_iterations: int = 10) -> Task:
+        """
+        Execute a task with test-time refinement loop.
         
-        # Simple heuristics for demo
-        if "error" in last_observation.lower():
-            reasoning = "The previous action failed. I need to try a different approach."
-        elif len(self.history) >= self.max_steps - 1:
-            reasoning = "I'm near the step limit. I should provide a final answer."
-        elif not self.tools:
-            reasoning = "No tools available. I'll answer directly based on context."
+        Based on ARC-AGI research: test-time adaptation is critical.
+        This implements a basic refinement loop.
+        """
+        self.current_task = task
+        task.status = "in_progress"
+        
+        for iteration in range(max_iterations):
+            # Planning phase
+            self.state = AgentState.PLANNING
+            plan = self._generate_plan(task, iteration)
+            
+            # Execution phase
+            self.state = AgentState.EXECUTING
+            step_result = self._execute_plan_step(plan, iteration)
+            
+            # Reflection/adaptation phase (test-time refinement)
+            if self.reflection_enabled:
+                self.state = AgentState.REFLECTING
+                should_adapt = self._reflect_on_step(step_result, iteration)
+                if should_adapt:
+                    self._adapt_plan(task, step_result)
+            
+            # Check completion
+            if self._is_task_complete(task, step_result):
+                task.status = "completed"
+                task.result = step_result
+                task.completed_at = datetime.now().isoformat()
+                break
         else:
-            reasoning = "I should analyze the task and use appropriate tools."
+            task.status = "failed"
+            task.result = {"error": "Max iterations reached"}
         
-        return Thought(
-            content=f"Analyzing: {context[:100]}...",
-            reasoning=reasoning
-        )
+        self.task_history.append(task)
+        self.current_task = None
+        self.state = AgentState.IDLE
+        return task
     
-    def decide_action(self, thought: Thought) -> Action:
-        """Decide what action to take based on thought."""
-        # Simple rule-based decision
-        if len(self.history) >= self.max_steps - 1:
-            return Action(
-                action_type=ActionType.ANSWER,
-                thought=thought.reasoning
-            )
-        
-        # For demo: if we have a tool, use the first one
-        if self.tools:
-            first_tool = list(self.tools.keys())[0]
-            return Action(
-                action_type=ActionType.TOOL_CALL,
-                tool_name=first_tool,
-                tool_input={"query": thought.content},
-                thought=thought.reasoning
-            )
-        
-        return Action(
-            action_type=ActionType.ANSWER,
-            thought=thought.reasoning
-        )
-    
-    def execute_action(self, action: Action) -> Observation:
-        """Execute the decided action."""
-        if action.action_type == ActionType.ANSWER:
-            return Observation(
-                content=f"Final answer: {action.thought}",
-                success=True
-            )
-        
-        if action.action_type == ActionType.TOOL_CALL:
-            if action.tool_name and action.tool_name in self.tools:
-                tool = self.tools[action.tool_name]
-                return tool.execute(**(action.tool_input or {}))
-            return Observation(
-                content=f"Tool '{action.tool_name}' not found",
-                success=False
-            )
-        
-        return Observation(
-            content="No action taken",
-            success=False
-        )
-    
-    def run(self, task: str) -> Dict[str, Any]:
-        """
-        Run the ReAct loop to complete a task.
-        
-        Args:
-            task: The task to complete
-            
-        Returns:
-            Dict with final answer, steps taken, and success status
-        """
-        print(f"\n{'='*50}")
-        print(f"🤖 {self.name} starting task: {task}")
-        print(f"{'='*50}\n")
-        
-        context = f"Task: {task}\n"
-        
-        for step_num in range(self.max_steps):
-            print(f"\n📍 Step {step_num + 1}/{self.max_steps}")
-            
-            # REASON
-            thought = self.think(context)
-            print(f"💭 Thought: {thought.reasoning}")
-            
-            # ACT
-            action = self.decide_action(thought)
-            print(f"🔧 Action: {action.action_type.value}")
-            if action.tool_name:
-                print(f"   Tool: {action.tool_name}")
-            
-            # OBSERVE
-            observation = self.execute_action(action)
-            print(f"👁️  Observation: {observation.content[:100]}...")
-            
-            # Record step
-            step = Step(thought=thought, action=action, observation=observation)
-            self.history.append(step)
-            
-            # Update context
-            context += f"\nStep {step_num + 1}: {thought.reasoning}\n"
-            context += f"Action: {action.action_type.value}\n"
-            context += f"Result: {observation.content}\n"
-            
-            # Check if done
-            if action.action_type == ActionType.ANSWER:
-                print(f"\n✅ Task completed!")
-                return {
-                    "success": observation.success,
-                    "answer": observation.content,
-                    "steps_taken": step_num + 1,
-                    "history": self.history
-                }
-        
-        print(f"\n⚠️ Max steps reached")
+    def _generate_plan(self, task: Task, iteration: int) -> Dict:
+        """Generate a plan for the task - to be enhanced with core/planner.py"""
         return {
-            "success": False,
-            "answer": "Max steps reached without completion",
-            "steps_taken": len(self.history),
-            "history": self.history
+            "iteration": iteration,
+            "action": "execute_skill",
+            "target": task.description,
+            "steps": ["analyze", "execute", "verify"]
         }
     
-    def reset(self):
-        """Clear history for a new task."""
-        self.history = []
+    def _execute_plan_step(self, plan: Dict, iteration: int) -> Dict:
+        """Execute a single plan step"""
+        return {
+            "iteration": iteration,
+            "status": "executed",
+            "plan": plan
+        }
+    
+    def _reflect_on_step(self, result: Dict, iteration: int) -> bool:
+        """
+        Reflect on execution and decide if adaptation is needed.
+        
+        This is the test-time refinement loop from ARC-AGI research.
+        """
+        # Basic implementation - will be enhanced with core/reflection.py
+        if "error" in result:
+            return True  # Adapt on error
+        return False
+    
+    def _adapt_plan(self, task: Task, result: Dict) -> None:
+        """Adapt the plan based on reflection"""
+        # Placeholder for adaptive planning
+        task.context["adaptation_count"] = task.context.get("adaptation_count", 0) + 1
+    
+    def _is_task_complete(self, task: Task, result: Dict) -> bool:
+        """Check if task is complete"""
+        return result.get("status") == "completed"
+    
+    def get_status(self) -> Dict:
+        """Get current agent status"""
+        return {
+            "identity": self.identity.to_dict(),
+            "state": self.state.value,
+            "skills": list(self.skills.keys()),
+            "current_task": self.current_task.to_dict() if self.current_task else None,
+            "task_count": len(self.task_history)
+        }
+    
+    def save_state(self, path: str) -> None:
+        """Save agent state to file"""
+        state = {
+            "identity": self.identity.to_dict(),
+            "memory": self.memory,
+            "task_history": [t.to_dict() for t in self.task_history],
+            "skills_registered": list(self.skills.keys())
+        }
+        with open(path, 'w') as f:
+            json.dump(state, f, indent=2)
+    
+    def load_state(self, path: str) -> None:
+        """Load agent state from file"""
+        with open(path, 'r') as f:
+            state = json.load(f)
+        
+        self.identity = AgentIdentity(**state["identity"])
+        self.memory = state.get("memory", {})
+        # Skills must be re-registered (functions can't be serialized)
+        self.task_history = [Task(**t) for t in state.get("task_history", [])]
 
 
-def example_search_tool(query: str) -> str:
-    """Example tool that simulates a search."""
-    return f"Search results for '{query}': [simulated result]"
-
-
-def example_calculator_tool(expression: str) -> str:
-    """Example tool that calculates."""
-    try:
-        result = eval(expression)
-        return str(result)
-    except Exception as e:
-        return f"Error: {str(e)}"
+def example_skill(name: str = "world") -> str:
+    """Example skill for testing"""
+    return f"Hello, {name}!"
 
 
 if __name__ == "__main__":
-    # Demo usage
-    tools = [
-        Tool("search", "Search for information", example_search_tool, {}),
-        Tool("calculator", "Calculate expressions", example_calculator_tool, {})
-    ]
+    # Basic test
+    agent = BaseAgent()
+    agent.register_skill("greet", example_skill)
     
-    agent = BaseAgent(name="DemoAgent", tools=tools, max_steps=5)
-    result = agent.run("What is 2 + 2?")
+    print("Agent Identity:", agent.get_identity())
     
-    print(f"\n📊 Result:")
-    print(json.dumps({
-        "success": result["success"],
-        "answer": result["answer"],
-        "steps_taken": result["steps_taken"]
-    }, indent=2))
+    task = agent.create_task(
+        description="Test greeting",
+        goal="Execute a greeting skill"
+    )
+    
+    result = agent.execute_task(task, max_iterations=1)
+    print("Task Result:", result.to_dict())
+    print("Agent Status:", agent.get_status())

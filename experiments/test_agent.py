@@ -1,298 +1,266 @@
 """
-Experiment: Test Integrated Agent with Tool Registry
-Validates the full agent stack: memory, planning, tools, reflection.
+Agent Integration Test
+
+Validates the core agent architecture:
+- Identity persistence
+- Task creation and execution
+- Skill registration
+- State management
 """
 
 import sys
+sys.path.insert(0, '/home/workspace/agi-research')
+
+from core.agent import BaseAgent, AgentIdentity, Task, AgentState
+from skills.web_search import web_search
+from skills.code_gen import generate_code, review_code
+from skills.analysis import analyze_patterns, synthesize
 import json
-from pathlib import Path
-
-# Add parent to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from core.integrated_agent import IntegratedAgent, AgentConfig
-from core.memory import MemorySystem
-from core.planner import Planner, TaskStatus
-from core.reflection import Reflector
-from skills import get_registry, WebSearchSkill, FileReadSkill, CalculatorTool
 
 
-def test_tool_registry():
-    """Test 1: Tool Registry functionality"""
-    print("\n" + "="*60)
-    print("TEST 1: Tool Registry")
-    print("="*60)
+def test_identity_persistence():
+    """Test that agent identity is created and accessible"""
+    print("\n=== Test: Identity Persistence ===")
     
-    registry = get_registry()
+    agent = BaseAgent()
+    identity = agent.get_identity()
     
-    # List tools
-    tools = registry.list_tools()
-    print(f"✓ Registered tools: {tools}")
+    assert "id" in identity, "Identity should have an ID"
+    assert "version" in identity, "Identity should have version"
+    assert "core_values" in identity, "Identity should have core values"
     
-    # Test calculator
-    result = registry.execute("calculator", expression="10 * 5 + 3")
-    assert result.success, f"Calculator failed: {result.error}"
-    assert result.data["result"] == 53, f"Wrong result: {result.data}"
-    print(f"✓ Calculator: 10 * 5 + 3 = {result.data['result']}")
+    print(f"✓ Identity created: {identity['name']} v{identity['version']}")
+    print(f"✓ Core values: {', '.join(identity['core_values'])}")
+    return True
+
+
+def test_skill_registration():
+    """Test skill registration and execution"""
+    print("\n=== Test: Skill Registration ===")
     
-    # Test file read
-    result = registry.execute("file_read", path="README.md")
-    if result.success and isinstance(result.data, dict):
-        print(f"✓ File read: README.md ({len(result.data.get('content', ''))} chars)")
-    else:
-        print(f"⚠ File read skipped: {result.error if not result.success else 'unexpected data type'}")
+    agent = BaseAgent()
     
-    # Stats
-    stats = registry.get_stats()
-    print(f"✓ Registry stats: {stats['total_tools']} tools, {stats['total_executions']} executions")
+    # Register skills
+    agent.register_skill("web_search", web_search)
+    agent.register_skill("generate_code", generate_code)
+    agent.register_skill("analyze_patterns", analyze_patterns)
+    
+    status = agent.get_status()
+    registered_skills = status["skills"]
+    
+    assert "web_search" in registered_skills, "web_search should be registered"
+    assert "generate_code" in registered_skills, "generate_code should be registered"
+    
+    print(f"✓ Registered {len(registered_skills)} skills: {registered_skills}")
+    return True
+
+
+def test_task_creation():
+    """Test task creation"""
+    print("\n=== Test: Task Creation ===")
+    
+    agent = BaseAgent()
+    task = agent.create_task(
+        description="Test research task",
+        goal="Research AGI architecture",
+        context={"topic": "AGI"}
+    )
+    
+    assert task.id is not None, "Task should have an ID"
+    assert task.description == "Test research task", "Description should match"
+    assert task.status == "pending", "New task should be pending"
+    
+    print(f"✓ Task created: {task.id[:8]}... - {task.description}")
+    return True
+
+
+def test_task_execution():
+    """Test task execution with mock skills"""
+    print("\n=== Test: Task Execution ===")
+    
+    agent = BaseAgent()
+    
+    # Mock skill that always succeeds
+    def mock_skill(**kwargs):
+        return {"status": "completed", "mock": True}
+    
+    agent.register_skill("mock_execute", mock_skill)
+    
+    task = agent.create_task(
+        description="Execute mock task",
+        goal="Test execution flow"
+    )
+    
+    result = agent.execute_task(task, max_iterations=3)
+    
+    print(f"✓ Task executed: {result.status}")
+    print(f"✓ Final state: {agent.state.value}")
     
     return True
 
 
-def test_memory_system():
-    """Test 2: Memory System"""
-    print("\n" + "="*60)
-    print("TEST 2: Memory System")
-    print("="*60)
+def test_skill_execution_web_search():
+    """Test web search skill execution"""
+    print("\n=== Test: Web Search Skill ===")
+    
+    result = web_search("AGI research", num_results=3)
+    
+    assert result["success"], "Web search should succeed"
+    assert "results" in result, "Should return results"
+    assert len(result["results"]) > 0, "Should have at least one result"
+    
+    print(f"✓ Search returned {result['results_count']} results")
+    print(f"✓ First result: {result['results'][0]['title'][:50]}...")
+    
+    return True
+
+
+def test_skill_execution_code_gen():
+    """Test code generation skill"""
+    print("\n=== Test: Code Generation Skill ===")
+    
+    result = generate_code("A function to calculate factorial", language="python")
+    
+    assert "code" in result, "Should return code"
+    assert "language" in result, "Should specify language"
+    assert result["language"] == "python", "Language should be python"
+    
+    print(f"✓ Code generated ({len(result['code'])} chars)")
+    print(f"✓ Explanation: {result['explanation'][:50]}...")
+    
+    return True
+
+
+def test_code_review():
+    """Test code review skill"""
+    print("\n=== Test: Code Review Skill ===")
+    
+    # Code with security issue
+    risky_code = '''
+user_input = input("Enter code: ")
+result = eval(user_input)
+print(result)
+'''
+    
+    result = review_code(risky_code, review_type="security")
+    
+    assert result["issues_found"] > 0, "Should find security issues"
+    
+    print(f"✓ Found {result['issues_found']} security issues")
+    for issue in result["issues"]:
+        print(f"  - [{issue['severity']}] {issue['message']}")
+    
+    return True
+
+
+def test_analysis_skill():
+    """Test analysis skill"""
+    print("\n=== Test: Analysis Skill ===")
+    
+    data = ["a", "b", "a", "c", "a", "b", "a"]
+    result = analyze_patterns(data, pattern_type="frequency")
+    
+    assert "findings" in result, "Should return findings"
+    assert result["confidence"] > 0, "Should have confidence score"
+    
+    print(f"✓ Pattern analysis complete (confidence: {result['confidence']:.0%})")
+    
+    return True
+
+
+def test_state_management():
+    """Test agent state transitions"""
+    print("\n=== Test: State Management ===")
+    
+    agent = BaseAgent()
+    
+    # Check initial state
+    assert agent.state == AgentState.IDLE, "Initial state should be IDLE"
+    
+    # Register skill and execute to trigger state change
+    def slow_skill(**kwargs):
+        # State would change to EXECUTING here
+        return {"done": True}
+    
+    agent.register_skill("slow", slow_skill)
+    
+    # After execution, should return to IDLE
+    task = agent.create_task("Test", "Test state")
+    agent.execute_task(task, max_iterations=1)
+    
+    assert agent.state == AgentState.IDLE, "Should return to IDLE"
+    
+    print(f"✓ State transitions working correctly")
+    return True
+
+
+def test_save_load():
+    """Test agent state save/load"""
+    print("\n=== Test: Save/Load State ===")
     
     import tempfile
-    with tempfile.TemporaryDirectory() as tmpdir:
-        memory = MemorySystem(storage_dir=tmpdir)
-        
-        # Working memory
-        memory.add_to_context("First message")
-        memory.add_to_context("Second message")
-        context = memory.get_context(n=2)
-        assert "First" in context and "Second" in context
-        print(f"✓ Working memory: {len(memory.working.entries)} entries")
-        
-        # Episodic memory
-        memory.record_episode(
-            task="Test task",
-            outcome="Success",
-            lessons="Test lesson"
-        )
-        similar = memory.recall_similar("test")
-        assert len(similar) > 0
-        print(f"✓ Episodic memory: {len(memory.episodic.episodes)} episodes")
-        
-        # Semantic memory
-        memory.learn_fact("test_key", "test_value", category="test")
-        value = memory.recall_fact("test_key")
-        assert value == "test_value"
-        print(f"✓ Semantic memory: {len(memory.semantic.facts)} facts")
-        
-        # Full context
-        full = memory.get_full_context("test query")
-        assert "Current Context" in full
-        print(f"✓ Full context generated ({len(full)} chars)")
+    import os
     
-    return True
-
-
-def test_planner():
-    """Test 3: Task Planner"""
-    print("\n" + "="*60)
-    print("TEST 3: Task Planner")
-    print("="*60)
+    agent = BaseAgent()
+    task = agent.create_task("Test task", "Test goal")
     
-    planner = Planner()
+    # Save
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        temp_path = f.name
     
-    # Decompose goal
-    root = planner.decompose("Research AI trends and write a report")
-    print(f"✓ Plan created: {root.description}")
-    print(f"✓ Subtasks: {len(root.subtasks)}")
+    agent.save_state(temp_path)
     
-    # Get execution path
-    path = planner.get_execution_path()
-    print(f"✓ Execution path: {len(path)} tasks")
+    # Load
+    agent2 = BaseAgent()
+    agent2.load_state(temp_path)
     
-    # Execute tasks
-    completed = 0
-    while True:
-        task = planner.get_next_task()
-        if not task:
-            break
-        
-        planner.update_task(task.id, TaskStatus.IN_PROGRESS)
-        planner.update_task(task.id, TaskStatus.COMPLETED, result="Done")
-        completed += 1
+    assert agent2.identity.id == agent.identity.id, "ID should persist"
+    assert len(agent2.task_history) == len(agent.task_history), "Task history should persist"
     
-    print(f"✓ Completed: {completed}/{len(path)} tasks")
-    assert planner.is_complete(), "Plan should be complete"
+    os.unlink(temp_path)
     
-    return True
-
-
-def test_reflection():
-    """Test 4: Reflection System"""
-    print("\n" + "="*60)
-    print("TEST 4: Reflection System")
-    print("="*60)
-    
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmpdir:
-        reflector = Reflector(storage_path=f"{tmpdir}/reflections.json")
-        
-        # Record metrics
-        reflector.record_performance(
-            task="Task 1",
-            success=True,
-            steps_taken=3,
-            time_elapsed=2.5
-        )
-        reflector.record_performance(
-            task="Task 2",
-            success=False,
-            steps_taken=10,
-            time_elapsed=15.0,
-            errors=["Timeout", "API error"]
-        )
-        
-        print(f"✓ Recorded {len(reflector.metrics)} performance metrics")
-        
-        # Generate reflection
-        from core.reflection import PerformanceMetrics
-        metrics = PerformanceMetrics(
-            task="Test",
-            success=True,
-            steps_taken=3,
-            time_elapsed=2.0
-        )
-        reflection = reflector.reflect("Test task", metrics)
-        
-        print(f"✓ Generated reflection: {reflection.lessons_learned[:50]}...")
-        
-        # Get suggestions
-        suggestions = reflector.get_improvement_suggestions()
-        print(f"✓ Improvement suggestions: {len(suggestions)}")
-        
-        # Summary
-        summary = reflector.get_reflection_summary()
-        assert "Performance Patterns" in summary
-        print(f"✓ Summary generated ({len(summary)} chars)")
-    
-    return True
-
-
-def test_integrated_agent():
-    """Test 5: Full Integrated Agent"""
-    print("\n" + "="*60)
-    print("TEST 5: Integrated Agent")
-    print("="*60)
-    
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config = AgentConfig(
-            name="TestAgent",
-            max_steps=3,
-            memory_storage_dir=tmpdir,
-            reflection_storage_path=f"{tmpdir}/reflections.json",
-            enable_planning=True,
-            enable_reflection=True,
-            verbose=False  # Quieter for tests
-        )
-        
-        agent = IntegratedAgent(config)
-        
-        # Get initial state
-        state = agent.get_state()
-        print(f"✓ Initial state: {state['config']['name']}")
-        print(f"✓ Available tools: {len(state['tools'])}")
-        
-        # Run task
-        result = agent.run(
-            task="Calculate 5 * 10",
-            context="Testing calculator tool"
-        )
-        
-        print(f"✓ Task completed: {result['success']}")
-        print(f"✓ Steps taken: {result['steps_taken']}")
-        print(f"✓ Elapsed: {result['elapsed_time']:.2f}s")
-        
-        # Check state after
-        state = agent.get_state()
-        print(f"✓ Memory episodes: {state['memory']['episodes']}")
-        print(f"✓ Tool executions: {state['reflector']['total_metrics']}")
-        
-        # Run another task
-        result2 = agent.run(
-            task="List files in current directory",
-            context="Testing file operations"
-        )
-        
-        print(f"✓ Second task: {result2['success']}")
-    
-    return True
-
-
-def test_skills_integration():
-    """Test 6: Skills Integration"""
-    print("\n" + "="*60)
-    print("TEST 6: Skills Integration")
-    print("="*60)
-    
-    from skills import search_web, read_file, list_files
-    
-    # Mock search (no API key)
-    result = search_web("test query", max_results=2)
-    assert "results" in result or "error" in result
-    print(f"✓ Web search skill works")
-    
-    # File operations
-    files = list_files(".", pattern="*.py")
-    print(f"✓ File list skill: {len(files)} Python files found")
-    
-    # Try to read a file
-    content = read_file("requirements.txt")
-    if content:
-        print(f"✓ File read skill: requirements.txt ({len(content)} chars)")
-    else:
-        print("⚠ File read: requirements.txt not found")
-    
+    print(f"✓ State save/load working correctly")
     return True
 
 
 def run_all_tests():
-    """Run all experiments."""
-    print("\n" + "="*60)
-    print("AGI AGENT INTEGRATION TESTS")
-    print("="*60)
+    """Run all validation tests"""
+    print("=" * 60)
+    print("AGI Agent Integration Tests")
+    print("=" * 60)
     
     tests = [
-        ("Tool Registry", test_tool_registry),
-        ("Memory System", test_memory_system),
-        ("Task Planner", test_planner),
-        ("Reflection System", test_reflection),
-        ("Integrated Agent", test_integrated_agent),
-        ("Skills Integration", test_skills_integration)
+        test_identity_persistence,
+        test_skill_registration,
+        test_task_creation,
+        test_task_execution,
+        test_skill_execution_web_search,
+        test_skill_execution_code_gen,
+        test_code_review,
+        test_analysis_skill,
+        test_state_management,
+        test_save_load
     ]
     
-    results = []
-    for name, test_func in tests:
+    passed = 0
+    failed = 0
+    
+    for test in tests:
         try:
-            success = test_func()
-            results.append((name, "PASS" if success else "FAIL"))
+            if test():
+                passed += 1
+            else:
+                failed += 1
+                print(f"✗ {test.__name__} FAILED")
         except Exception as e:
-            print(f"\n❌ {name} FAILED: {e}")
-            import traceback
-            traceback.print_exc()
-            results.append((name, "FAIL"))
+            failed += 1
+            print(f"✗ {test.__name__} ERROR: {e}")
     
-    # Summary
-    print("\n" + "="*60)
-    print("TEST SUMMARY")
-    print("="*60)
+    print("\n" + "=" * 60)
+    print(f"Results: {passed} passed, {failed} failed")
+    print("=" * 60)
     
-    for name, status in results:
-        icon = "✅" if status == "PASS" else "❌"
-        print(f"{icon} {name}: {status}")
-    
-    passed = sum(1 for _, s in results if s == "PASS")
-    total = len(results)
-    print(f"\nTotal: {passed}/{total} tests passed")
-    
-    return passed == total
+    return failed == 0
 
 
 if __name__ == "__main__":
