@@ -1,87 +1,220 @@
-# AGI Architecture
+# AGI Agent Architecture
 
-## Core Philosophy
+## System Overview
 
-Based on 2026 research insights, this architecture emphasizes:
+This project implements a modular, self-evolving agent architecture inspired by current research (2026) on hierarchical agent systems, Model Context Protocol (MCP), and multi-agent orchestration.
 
-1. **Cartesian Agency**: Clear separation between learned core and explicit runtime interface
-2. **Test-Time Adaptation**: Refinement loops for continuous improvement
-3. **Compositional Reasoning**: Building complex behaviors from simple primitives
-4. **Constitutional Governance**: Safety constraints before self-modification
+## Core Components
 
-## System Architecture
+### 1. Agent (`core/agent.py`)
+
+The base agent class provides:
+- **Identity & Role**: Configurable persona and capabilities
+- **LLM Integration**: Provider-agnostic (OpenAI, Anthropic, local)
+- **Tool Registry**: Dynamic tool loading and execution
+- **Event Loop**: Main execution cycle for perception → reasoning → action
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     AGENT RUNTIME                            │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐   │
-│  │   Agent     │  │   Memory    │  │      Planner        │   │
-│  │   Core      │◄─┤   System    │◄─┤  (with Refinement)  │   │
-│  │             │  │             │  │                     │   │
-│  │ - Identity  │  │ - Working   │  │ - Decomposition     │   │
-│  │ - Reasoning │  │ - Episodic  │  │ - Reflection        │   │
-│  │ - Values    │  │ - Semantic  │  │ - Test-Time Adapt   │   │
-│  └──────┬──────┘  └─────────────┘  └─────────────────────┘   │
-│         │                                                    │
-│         ▼                                                    │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │              SYMBOLIC INTERFACE LAYER                   │  │
-│  │    (Governed by Constitution - BIBLE.md equivalent)    │  │
-│  └────────────────────────────────────────────────────────┘  │
-│         │                                                    │
-│         ▼                                                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐   │
-│  │   Skills    │  │   Tools     │  │    Multi-Agent      │   │
-│  │   Registry  │  │   (MCP)     │  │      Review         │   │
-│  │             │  │             │  │                     │   │
-│  │ - WebSearch │  │ - File Ops  │  │ - Code Review       │   │
-│  │ - CodeGen   │  │ - Shell     │  │ - Safety Check      │   │
-│  │ - Analysis  │  │ - Browser   │  │ - Consensus         │   │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+Agent
+├── identity: AgentIdentity
+├── llm: LLMProvider
+├── tools: ToolRegistry
+├── memory: MemorySystem
+├── planner: Planner
+├── reflection: ReflectionEngine
+└── run_cycle() → Action
 ```
 
-## Component Details
+### 2. Memory System (`core/memory.py`)
 
-### Agent Core (`core/agent.py`)
-- **Identity**: Persistent self-model across sessions
-- **Reasoning**: Chain-of-thought with reflection integration
-- **Values**: Constitutional constraints from governance layer
+Multi-tier memory architecture:
 
-### Memory System (`core/memory.py`)
-- **Working Memory**: Current context and active goals
-- **Episodic Memory**: Past experiences with outcomes
-- **Semantic Memory**: Learned facts and patterns
-- **Procedural Memory**: Skill execution traces
+| Tier | Type | Purpose | Persistence |
+|------|------|---------|-------------|
+| Working | Short-term | Active context, conversation | Session |
+| Episodic | Medium-term | Task history, experiences | Persistent |
+| Semantic | Long-term | Knowledge, facts, skills | Persistent |
+| Procedural | Learned | Tool usage patterns, heuristics | Persistent |
 
-### Planner (`core/planner.py`)
-- **Task Decomposition**: Break complex goals into subtasks
-- **Reflection Integration**: Learn from past planning failures
-- **Test-Time Refinement**: Adapt plan during execution based on feedback
-- **Compositional Assembly**: Build plans from reusable components
+**Key Features**:
+- Vector-based semantic search
+- Importance-based retention
+- Memory consolidation (working → episodic → semantic)
+- Context window optimization
 
-### Reflection System (`core/reflection.py`)
-- **Self-Evaluation**: Assess own performance
-- **Error Analysis**: Identify failure modes
-- **Improvement Proposals**: Suggest architectural changes
-- **Safety Review**: Flag risky modifications
+### 3. Planner (`core/planner.py`)
 
-### Governance Layer
-- **Constitution**: BIBLE.md equivalent with core principles
-- **Multi-Model Review**: Multiple LLMs review changes before commit
-- **Human-in-the-Loop**: Critical changes require approval
+Goal decomposition and task management:
 
-## Research-Driven Design Decisions
+- **Hierarchical Planning**: Breaks goals into sub-goals and atomic tasks
+- **Dependency Graph**: Tracks task prerequisites and ordering
+- **Dynamic Replanning**: Adapts when tasks fail or context changes
+- **Estimation**: Predicts time/resource needs
 
-1. **From ARC-AGI**: Test-time adaptation loops are critical
-2. **From Cartesian Agency**: Explicit symbolic interface for safety
-3. **From Self-Evolving Agents**: Curriculum learning for skill acquisition
-4. **From Multi-Agent Research**: Internal deliberation improves outcomes
+```
+Goal
+├── Task 1 (atomic or compound)
+│   ├── Sub-task 1.1
+│   └── Sub-task 1.2
+├── Task 2
+└── Task 3
+```
 
-## Evolution Roadmap
+### 4. Reflection Engine (`core/reflection.py`)
 
-1. **Phase 1**: Basic agent with memory and planning
-2. **Phase 2**: Add test-time refinement loops
-3. **Phase 3**: Implement compositional reasoning
-4. **Phase 4**: Add self-reflection and improvement proposals
-5. **Phase 5**: Enable governed self-modification with review
+Self-improvement and learning:
+
+- **Outcome Analysis**: Evaluates task success/failure
+- **Pattern Recognition**: Identifies recurring strategies
+- **Skill Assessment**: Tracks capability gaps
+- **Improvement Proposals**: Suggests new tools or refinements
+
+**Safety Note**: Reflection generates proposals but requires human review for implementation.
+
+## Agent Types
+
+### Single Agent
+Standard autonomous agent with full capability stack.
+
+### Supervisor Agent
+Coordinates sub-agents, manages delegation:
+- Task distribution
+- Result aggregation
+- Conflict resolution
+
+### Sub-Agent
+Specialized agent with constrained capabilities:
+- Narrow tool set
+- Specific domain knowledge
+- Reports to supervisor
+
+## Tool System
+
+### Native Tools
+Built-in capabilities:
+- `search_web`: Internet search
+- `read_file`: File system access
+- `execute_code`: Sandbox code execution
+- `llm_call`: Delegate to LLM
+
+### MCP Tools
+External tools via Model Context Protocol:
+- Tool discovery from MCP servers
+- Dynamic registration
+- Cross-agent compatibility
+
+### Dynamic Tool Generation
+Code-generation capability:
+- Synthesizes new tools when needed
+- Tests generated tools before registration
+- Maintains tool library with versioning
+
+## Execution Flow
+
+```
+┌─────────────┐
+│  Perceive   │ ← Environment, user input, tool results
+└──────┬──────┘
+       ↓
+┌─────────────┐
+│   Memory    │ ← Retrieve relevant context
+│   Query     │
+└──────┬──────┘
+       ↓
+┌─────────────┐
+│   Plan      │ ← Decompose goals, select strategy
+└──────┬──────┘
+       ↓
+┌─────────────┐
+│   Reason    │ ← LLM reasoning with context
+└──────┬──────┘
+       ↓
+┌─────────────┐
+│   Act       │ ← Execute tool, delegate, respond
+└──────┬──────┘
+       ↓
+┌─────────────┐
+│   Reflect   │ ← Learn from outcome
+└─────────────┘
+```
+
+## Communication Protocols
+
+### Internal (Agent ↔ Components)
+Python object messages with typed schemas.
+
+### Inter-Agent (Agent ↔ Agent)
+JSON messages with standard envelope:
+```json
+{
+  "from": "agent_id",
+  "to": "agent_id",
+  "type": "delegate|report|request",
+  "payload": {...},
+  "timestamp": "...",
+  "correlation_id": "..."
+}
+```
+
+### MCP (Agent ↔ External Tools)
+Model Context Protocol standard.
+
+## State Management
+
+### Checkpointing
+- Save full agent state to disk
+- Resume from any checkpoint
+- Branch execution from checkpoints ("time travel")
+
+### Persistence
+- SQLite/PostgreSQL for structured data
+- Vector DB for semantic memory
+- File system for code artifacts
+
+## Governance & Safety
+
+### Built-in Controls
+- **Permission System**: Tiered access (read, write, execute, network)
+- **Approval Gates**: Human approval for sensitive actions
+- **Rate Limiting**: Prevent runaway execution
+- **Audit Logging**: Complete action history
+
+### Kill Switches
+- Soft stop: Finish current task, then halt
+- Hard stop: Immediate termination
+- Scope limiting: Restrict to specific domains/tools
+
+## Configuration
+
+```yaml
+agent:
+  name: "research-agent"
+  model: "claude-3-5-sonnet"
+  
+memory:
+  working_limit: 10
+  vector_db: "chroma"
+  
+planning:
+  max_depth: 5
+  replan_threshold: 0.3
+  
+reflection:
+  auto_improve: false  # Requires review
+  skill_library: "./skills"
+  
+mcp:
+  servers:
+    - url: "https://mcp.example.com"
+```
+
+## Future Extensions
+
+- [ ] Multi-agent crew coordination
+- [ ] Distributed agent execution
+- [ ] Continuous learning from interactions
+- [ ] Natural language skill specification
+- [ ] Visual workflow designer
+
+---
+*Architecture evolving with research*
