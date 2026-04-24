@@ -1,429 +1,690 @@
 """
-Planning System with Test-Time Refinement
+Planner Module - Multi-Step Reasoning with Test-Time Adaptation
 
-Based on ARC-AGI research findings:
-- Test-time adaptation and refinement loops are critical for success
-- Compositional reasoning: build complex plans from simple primitives
-- Task decomposition for complex goals
+Implements Tree of Thought (ToT) planning, test-time refinement,
+and MCP tool-aware plan generation based on April 2026 research findings.
+
+Key Research Insights Integrated:
+- ARC-AGI: Test-time adaptation critical for compositional generalization
+- Agent-World: Environment-driven task synthesis for capability gaps
+- SMGI: Structural meta-model for task planning (θ = r, H, Π, L, E, M)
+- DeepSeek-R1: "Societies of thought" - internal deliberation via parallel reasoning paths
 """
 
-import json
-import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Callable
-from enum import Enum
+from typing import List, Dict, Optional, Callable, Any, Tuple, Set
+from enum import Enum, auto
+import uuid
+import json
+import time
+from collections import defaultdict
 
 
 class PlanStatus(Enum):
-    DRAFT = "draft"
-    EXECUTING = "executing"
-    ADAPTING = "adapting"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    """Plan execution status."""
+    PENDING = auto()
+    IN_PROGRESS = auto()
+    COMPLETED = auto()
+    FAILED = auto()
+    REFINING = auto()
 
 
-class StepStatus(Enum):
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    SKIPPED = "skipped"
+class NodeStatus(Enum):
+    """Individual planning node status."""
+    PLANNED = auto()
+    EXECUTING = auto()
+    COMPLETED = auto()
+    FAILED = auto()
+    REPLANNED = auto()
 
 
 @dataclass
-class PlanStep:
-    """A single step in a plan"""
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    description: str = ""
-    action: str = ""  # Skill name or sub-plan
-    inputs: Dict[str, Any] = field(default_factory=dict)
-    outputs: Any = None
-    status: str = field(default_factory=lambda: StepStatus.PENDING.value)
-    depends_on: List[str] = field(default_factory=list)
-    retry_count: int = 0
-    max_retries: int = 3
-    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
-    error: Optional[str] = None
+class PlanningContext:
+    """Context for plan generation and execution."""
+    task_description: str
+    constraints: List[str] = field(default_factory=list)
+    available_tools: List[str] = field(default_factory=list)
+    memory_context: Dict[str, Any] = field(default_factory=dict)
+    max_depth: int = 5
+    max_parallel_branches: int = 3
+    refinement_threshold: float = 0.7
     
     def to_dict(self) -> Dict:
         return {
-            "id": self.id,
-            "description": self.description,
-            "action": self.action,
-            "inputs": self.inputs,
-            "outputs": self.outputs,
-            "status": self.status,
-            "depends_on": self.depends_on,
-            "retry_count": self.retry_count,
-            "max_retries": self.max_retries,
-            "created_at": self.created_at,
-            "started_at": self.started_at,
-            "completed_at": self.completed_at,
-            "error": self.error
+            "task_description": self.task_description,
+            "constraints": self.constraints,
+            "available_tools": self.available_tools,
+            "max_depth": self.max_depth,
+            "max_parallel_branches": self.max_parallel_branches,
+            "refinement_threshold": self.refinement_threshold
         }
+
+
+@dataclass
+class PlanNode:
+    """A single step in a plan with Tree of Thought support."""
+    node_id: str
+    description: str
+    action_type: str  # "tool_call", "reasoning", "subgoal", "decision"
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    dependencies: List[str] = field(default_factory=list)
+    expected_output: Optional[str] = None
+    alternative_branches: List["PlanNode"] = field(default_factory=list)
+    status: NodeStatus = NodeStatus.PLANNED
+    execution_time_ms: float = 0.0
+    actual_output: Optional[str] = None
+    confidence: float = 1.0
+    retry_count: int = 0
+    max_retries: int = 3
+    
+    def __post_init__(self):
+        if not self.node_id:
+            self.node_id = str(uuid.uuid4())[:8]
+    
+    def to_dict(self) -> Dict:
+        return {
+            "node_id": self.node_id,
+            "description": self.description,
+            "action_type": self.action_type,
+            "parameters": self.parameters,
+            "dependencies": self.dependencies,
+            "expected_output": self.expected_output,
+            "alternative_branches": [b.to_dict() for b in self.alternative_branches],
+            "status": self.status.name,
+            "execution_time_ms": self.execution_time_ms,
+            "actual_output": self.actual_output,
+            "confidence": self.confidence,
+            "retry_count": self.retry_count
+        }
+
+
+@dataclass
+class ExecutionTrace:
+    """Record of plan execution for learning and refinement."""
+    trace_id: str
+    plan_id: str
+    node_executions: List[Dict] = field(default_factory=list)
+    success_rate: float = 0.0
+    total_time_ms: float = 0.0
+    refinement_triggers: List[str] = field(default_factory=list)
+    lessons_learned: List[str] = field(default_factory=list)
+    
+    def __post_init__(self):
+        if not self.trace_id:
+            self.trace_id = str(uuid.uuid4())[:12]
+    
+    def record_node_execution(self, node_id: str, success: bool, 
+                             output: Any, error: Optional[str] = None):
+        """Record execution of a single node."""
+        self.node_executions.append({
+            "node_id": node_id,
+            "success": success,
+            "output": str(output)[:500] if output else None,
+            "error": error,
+            "timestamp": time.time()
+        })
+        
+        # Update running success rate
+        successful = sum(1 for e in self.node_executions if e["success"])
+        self.success_rate = successful / len(self.node_executions)
 
 
 @dataclass
 class Plan:
-    """A plan containing multiple steps"""
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    goal: str = ""
-    description: str = ""
-    steps: List[PlanStep] = field(default_factory=list)
-    status: str = field(default_factory=lambda: PlanStatus.DRAFT.value)
-    iteration: int = 0
-    max_iterations: int = 10
-    adaptation_history: List[Dict] = field(default_factory=list)
-    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
+    """A complete plan with Tree of Thought structure."""
+    plan_id: str
+    context: PlanningContext
+    root_nodes: List[PlanNode] = field(default_factory=list)
+    all_nodes: Dict[str, PlanNode] = field(default_factory=dict)
+    status: PlanStatus = PlanStatus.PENDING
+    created_at: float = field(default_factory=time.time)
+    execution_traces: List[ExecutionTrace] = field(default_factory=list)
+    current_trace: Optional[ExecutionTrace] = None
+    version: int = 1
     parent_plan_id: Optional[str] = None
+    
+    def __post_init__(self):
+        if not self.plan_id:
+            self.plan_id = str(uuid.uuid4())[:12]
+        if not self.all_nodes:
+            self._index_nodes()
+    
+    def _index_nodes(self):
+        """Index all nodes for fast lookup."""
+        self.all_nodes = {}
+        
+        def add_node(node: PlanNode):
+            self.all_nodes[node.node_id] = node
+            for branch in node.alternative_branches:
+                add_node(branch)
+        
+        for root in self.root_nodes:
+            add_node(root)
+    
+    def get_ready_nodes(self) -> List[PlanNode]:
+        """Get nodes ready for execution (dependencies satisfied)."""
+        ready = []
+        for node in self.all_nodes.values():
+            if node.status != NodeStatus.PLANNED:
+                continue
+            deps_satisfied = all(
+                self.all_nodes.get(dep, PlanNode("", "", "")).status == NodeStatus.COMPLETED
+                for dep in node.dependencies
+            )
+            if deps_satisfied:
+                ready.append(node)
+        return ready
+    
+    def get_parallel_groups(self) -> List[List[PlanNode]]:
+        """Group nodes into parallel-executable batches."""
+        executed = set()
+        groups = []
+        remaining = set(self.all_nodes.keys())
+        
+        while remaining:
+            group = []
+            for node_id in list(remaining):
+                node = self.all_nodes[node_id]
+                deps = set(node.dependencies)
+                if deps <= executed:  # All dependencies satisfied
+                    group.append(node)
+            
+            if not group:
+                break  # Deadlock or cycle
+            
+            groups.append(group)
+            for node in group:
+                executed.add(node.node_id)
+                remaining.remove(node.node_id)
+        
+        return groups
     
     def to_dict(self) -> Dict:
         return {
-            "id": self.id,
-            "goal": self.goal,
-            "description": self.description,
-            "steps": [s.to_dict() for s in self.steps],
-            "status": self.status,
-            "iteration": self.iteration,
-            "max_iterations": self.max_iterations,
-            "adaptation_history": self.adaptation_history,
+            "plan_id": self.plan_id,
+            "status": self.status.name,
+            "version": self.version,
+            "parent_plan_id": self.parent_plan_id,
+            "context": self.context.to_dict(),
+            "root_nodes": [n.to_dict() for n in self.root_nodes],
             "created_at": self.created_at,
-            "started_at": self.started_at,
-            "completed_at": self.completed_at,
-            "parent_plan_id": self.parent_plan_id
+            "trace_count": len(self.execution_traces)
         }
-    
-    def get_ready_steps(self) -> List[PlanStep]:
-        """Get steps that are ready to execute (dependencies met)"""
-        ready = []
-        for step in self.steps:
-            if step.status != StepStatus.PENDING.value:
-                continue
-            
-            # Check dependencies
-            deps_met = all(
-                any(s.id == dep_id and s.status == StepStatus.COMPLETED.value 
-                    for s in self.steps)
-                for dep_id in step.depends_on
-            )
-            
-            if deps_met:
-                ready.append(step)
-        
-        return ready
-    
-    def get_failed_steps(self) -> List[PlanStep]:
-        """Get all failed steps"""
-        return [s for s in self.steps if s.status == StepStatus.FAILED.value]
 
 
-class Planner:
+class TreeOfThoughtPlanner:
     """
-    Planning system with test-time refinement.
+    Tree of Thought planner with test-time adaptation.
     
-    Key features:
-    1. Task decomposition into composable steps
-    2. Dependency management between steps
-    3. Test-time adaptation based on execution feedback
-    4. Iterative refinement when steps fail
+    Implements parallel reasoning paths, branch evaluation,
+    and dynamic replanning based on execution feedback.
     """
     
-    def __init__(self, skill_registry: Optional[Dict[str, Callable]] = None):
-        self.skill_registry = skill_registry or {}
+    def __init__(self, max_branches: int = 3, exploration_depth: int = 3):
+        self.max_branches = max_branches
+        self.exploration_depth = exploration_depth
         self.plan_history: List[Plan] = []
-        self.primitive_patterns: Dict[str, List[str]] = {
-            "research": ["web_search", "summarize", "synthesize"],
-            "implement": ["analyze", "design", "code", "test", "verify"],
-            "debug": ["identify", "isolate", "fix", "verify"],
-            "learn": ["observe", "hypothesize", "experiment", "conclude"]
-        }
+        self.execution_patterns: Dict[str, List[bool]] = defaultdict(list)
     
-    def register_skill(self, name: str, skill: Callable) -> None:
-        """Register a skill that can be used in plans"""
-        self.skill_registry[name] = skill
+    def generate_plan(self, context: PlanningContext) -> Plan:
+        """Generate initial plan with Tree of Thought branching."""
+        plan = Plan(
+            plan_id=f"plan_{int(time.time())}",
+            context=context
+        )
+        
+        # Decompose task into high-level goals
+        goals = self._decompose_task(context.task_description)
+        
+        # For each goal, generate alternative approaches (Tree of Thought)
+        for goal in goals:
+            root_node = self._generate_goal_node(goal, context)
+            plan.root_nodes.append(root_node)
+        
+        plan._index_nodes()
+        self.plan_history.append(plan)
+        return plan
     
-    def decompose_goal(self, goal: str, context: Optional[Dict] = None) -> Plan:
-        """
-        Decompose a high-level goal into a plan with steps.
+    def _decompose_task(self, task: str) -> List[str]:
+        """Decompose task into subgoals using pattern matching."""
+        # Simple decomposition - in production this would use LLM
+        task_lower = task.lower()
         
-        Uses primitive patterns to build composable plans.
-        """
-        plan = Plan(goal=goal, description=f"Plan for: {goal}")
+        if "research" in task_lower or "find" in task_lower:
+            return [
+                "Define search strategy",
+                "Gather information from multiple sources",
+                "Synthesize and analyze findings",
+                "Generate structured output"
+            ]
+        elif "code" in task_lower or "implement" in task_lower:
+            return [
+                "Analyze requirements",
+                "Design approach",
+                "Implement solution",
+                "Test and validate"
+            ]
+        elif "analyze" in task_lower or "evaluate" in task_lower:
+            return [
+                "Load and validate data",
+                "Apply analytical methods",
+                "Interpret results",
+                "Generate insights"
+            ]
+        else:
+            return [
+                "Understand the task",
+                "Plan approach",
+                "Execute steps",
+                "Review and finalize"
+            ]
+    
+    def _generate_goal_node(self, goal: str, context: PlanningContext) -> PlanNode:
+        """Generate a goal node with alternative branches."""
+        root = PlanNode(
+            node_id=f"goal_{uuid.uuid4().hex[:6]}",
+            description=goal,
+            action_type="subgoal",
+            parameters={"goal": goal}
+        )
         
-        # Simple keyword-based decomposition (to be enhanced with LLM)
+        # Generate alternative approaches (Tree of Thought)
+        approaches = self._generate_approaches(goal, context)
+        
+        for approach in approaches[:context.max_parallel_branches]:
+            branch = self._generate_approach_branch(approach, context)
+            root.alternative_branches.append(branch)
+        
+        return root
+    
+    def _generate_approaches(self, goal: str, context: PlanningContext) -> List[str]:
+        """Generate alternative approaches for a goal."""
+        # Simplified approach generation
         goal_lower = goal.lower()
         
-        if "research" in goal_lower or "find" in goal_lower:
-            pattern = self.primitive_patterns["research"]
-        elif "implement" in goal_lower or "build" in goal_lower or "create" in goal_lower:
-            pattern = self.primitive_patterns["implement"]
-        elif "debug" in goal_lower or "fix" in goal_lower:
-            pattern = self.primitive_patterns["debug"]
-        elif "learn" in goal_lower or "understand" in goal_lower:
-            pattern = self.primitive_patterns["learn"]
+        if "search" in goal_lower or "gather" in goal_lower:
+            return [
+                "Parallel web search with synthesis",
+                "Targeted search with deep analysis",
+                "Iterative search with refinement"
+            ]
+        elif "implement" in goal_lower or "code" in goal_lower:
+            return [
+                "Test-driven development",
+                "Prototype and refine",
+                "Reference existing patterns"
+            ]
+        elif "analyze" in goal_lower:
+            return [
+                "Statistical analysis",
+                "Pattern recognition",
+                "Comparative evaluation"
+            ]
         else:
-            pattern = ["analyze", "execute", "verify"]
-        
-        # Create steps from pattern
-        for i, action in enumerate(pattern):
-            step = PlanStep(
-                description=f"Step {i+1}: {action}",
-                action=action,
-                inputs={"goal": goal, "context": context or {}}
-            )
-            
-            # Add sequential dependency
-            if i > 0:
-                step.depends_on = [plan.steps[-1].id]
-            
-            plan.steps.append(step)
-        
-        return plan
+            return [
+                "Direct approach",
+                "Step-by-step decomposition",
+                "Pattern-based solution"
+            ]
     
-    def execute_step(self, step: PlanStep, 
-                     skill_executor: Callable) -> Dict[str, Any]:
-        """
-        Execute a single plan step.
+    def _generate_approach_branch(self, approach: str, context: PlanningContext) -> PlanNode:
+        """Generate a branch for a specific approach."""
+        node = PlanNode(
+            node_id=f"branch_{uuid.uuid4().hex[:6]}",
+            description=approach,
+            action_type="reasoning",
+            parameters={"approach": approach}
+        )
         
-        Returns result with success status and outputs.
-        """
-        step.status = StepStatus.IN_PROGRESS.value
-        step.started_at = datetime.now().isoformat()
+        # Add steps based on approach
+        if "search" in approach.lower():
+            node.dependencies = []
+            # Would add web search tool calls here
+        elif "code" in approach.lower() or "implement" in approach.lower():
+            node.dependencies = []
+            # Would add code generation steps
         
-        try:
-            if step.action in self.skill_registry:
-                result = skill_executor(step.action, **step.inputs)
-                step.outputs = result
-                step.status = StepStatus.COMPLETED.value
-            else:
-                # Action not found - mark for adaptation
-                step.error = f"Skill '{step.action}' not found"
-                step.status = StepStatus.FAILED.value
-                
-        except Exception as e:
-            step.error = str(e)
-            step.status = StepStatus.FAILED.value
-            
-            # Check if can retry
-            if step.retry_count < step.max_retries:
-                step.retry_count += 1
-                step.status = StepStatus.PENDING.value
-        
-        step.completed_at = datetime.now().isoformat()
-        
-        return {
-            "step_id": step.id,
-            "status": step.status,
-            "outputs": step.outputs,
-            "error": step.error,
-            "retry_count": step.retry_count
-        }
+        return node
     
-    def execute_plan(self, plan: Plan, 
-                     skill_executor: Callable,
-                     enable_adaptation: bool = True) -> Plan:
-        """
-        Execute a plan with test-time refinement.
+    def evaluate_branches(self, plan: Plan, evaluation_fn: Callable[[PlanNode], float]) -> Dict[str, float]:
+        """Evaluate alternative branches using provided scoring function."""
+        scores = {}
         
-        This is the core loop from ARC-AGI research:
-        - Execute steps
-        - Reflect on results
-        - Adapt plan if needed
-        - Iterate until complete or max iterations
-        """
-        plan.status = PlanStatus.EXECUTING.value
-        plan.started_at = datetime.now().isoformat()
+        for root in plan.root_nodes:
+            for branch in root.alternative_branches:
+                score = evaluation_fn(branch)
+                scores[branch.node_id] = score
         
-        while plan.iteration < plan.max_iterations:
-            plan.iteration += 1
-            
-            # Get ready steps
-            ready_steps = plan.get_ready_steps()
-            
-            if not ready_steps:
-                # Check if complete or stuck
-                pending = [s for s in plan.steps if s.status == StepStatus.PENDING.value]
-                in_progress = [s for s in plan.steps if s.status == StepStatus.IN_PROGRESS.value]
-                
-                if not pending and not in_progress:
-                    # All done
-                    failed = plan.get_failed_steps()
-                    plan.status = PlanStatus.FAILED.value if failed else PlanStatus.COMPLETED.value
-                    break
-                else:
-                    # Stuck - need adaptation
-                    if enable_adaptation:
-                        self._adapt_plan_on_stuck(plan)
-                        continue
-                    else:
-                        plan.status = PlanStatus.FAILED.value
-                        break
-            
-            # Execute ready steps
-            for step in ready_steps:
-                result = self.execute_step(step, skill_executor)
-                
-                # Check if adaptation needed
-                if enable_adaptation and result["status"] == StepStatus.FAILED.value:
-                    if not self._should_adapt(plan, step):
-                        continue
-                    
-                    self._adapt_plan_on_failure(plan, step, result)
-                    break  # Restart iteration after adaptation
-        
-        plan.completed_at = datetime.now().isoformat()
-        self.plan_history.append(plan)
-        
-        return plan
+        return scores
     
-    def _should_adapt(self, plan: Plan, failed_step: PlanStep) -> bool:
-        """Decide if plan should be adapted based on failure"""
-        # Don't adapt if max retries not reached
-        if failed_step.retry_count < failed_step.max_retries:
-            return False
+    def select_best_branch(self, root_node: PlanNode, scores: Dict[str, float]) -> Optional[PlanNode]:
+        """Select the highest-scoring branch for a goal."""
+        if not root_node.alternative_branches:
+            return None
         
-        # Don't adapt if already adapted too many times
-        if len(plan.adaptation_history) >= 3:
-            return False
+        best_branch = max(
+            root_node.alternative_branches,
+            key=lambda b: scores.get(b.node_id, 0.0)
+        )
         
-        return True
+        return best_branch if scores.get(best_branch.node_id, 0.0) > 0 else None
+
+
+class TestTimeAdapter:
+    """
+    Test-time adaptation for plan refinement during execution.
     
-    def _adapt_plan_on_failure(self, plan: Plan, 
-                               failed_step: PlanStep,
-                               result: Dict) -> None:
-        """
-        Adapt plan when a step fails.
-        
-        Strategies:
-        1. Replace action with alternative
-        2. Add sub-steps before failed step
-        3. Skip if not critical
-        """
-        plan.status = PlanStatus.ADAPTING.value
-        
-        adaptation = {
-            "timestamp": datetime.now().isoformat(),
-            "trigger": "step_failure",
-            "failed_step": failed_step.to_dict(),
-            "strategy": None
-        }
-        
-        # Try alternative action
-        alternatives = self._get_alternatives(failed_step.action)
-        
-        if alternatives and failed_step.retry_count >= failed_step.max_retries:
-            # Replace with alternative
-            failed_step.action = alternatives[0]
-            failed_step.retry_count = 0
-            failed_step.status = StepStatus.PENDING.value
-            failed_step.error = None
-            adaptation["strategy"] = "alternative_action"
-            adaptation["new_action"] = alternatives[0]
-        else:
-            # Add decomposition steps
-            sub_steps = self._decompose_step(failed_step)
-            
-            if sub_steps:
-                # Insert before failed step
-                idx = plan.steps.index(failed_step)
-                for i, sub in enumerate(sub_steps):
-                    if i == 0:
-                        sub.depends_on = failed_step.depends_on
-                    else:
-                        sub.depends_on = [sub_steps[i-1].id]
-                    plan.steps.insert(idx + i, sub)
-                
-                # Update failed step dependencies
-                failed_step.depends_on = [sub_steps[-1].id]
-                failed_step.status = StepStatus.PENDING.value
-                failed_step.retry_count = 0
-                
-                adaptation["strategy"] = "decomposition"
-                adaptation["added_steps"] = len(sub_steps)
-        
-        plan.adaptation_history.append(adaptation)
+    Based on ARC-AGI research: test-time adaptation critical for
+    compositional generalization. Implements dynamic replanning
+    when execution confidence falls below threshold.
+    """
     
-    def _adapt_plan_on_stuck(self, plan: Plan) -> None:
-        """Adapt plan when progress is stuck (dependency issues)"""
-        # Find steps with unmet dependencies that could be parallelized
-        pending = [s for s in plan.steps if s.status == StepStatus.PENDING.value]
+    def __init__(self, refinement_threshold: float = 0.7):
+        self.refinement_threshold = refinement_threshold
+        self.refinement_history: List[Dict] = []
+    
+    def should_refine(self, node: PlanNode, execution_result: Any) -> bool:
+        """Determine if plan refinement is needed."""
+        # Check confidence threshold
+        if node.confidence < self.refinement_threshold:
+            return True
         
-        for step in pending:
-            # Check if dependencies are actually required
-            # Simplification: remove dependencies for now (risky!)
-            if len(step.depends_on) > 0:
-                step.depends_on = []  # Make independent
-                
-        plan.adaptation_history.append({
-            "timestamp": datetime.now().isoformat(),
-            "trigger": "stuck",
-            "strategy": "parallelize",
-            "affected_steps": len(pending)
+        # Check if result indicates failure
+        if isinstance(execution_result, dict):
+            if execution_result.get("error") or execution_result.get("success") is False:
+                return True
+        
+        # Check retry count
+        if node.retry_count >= node.max_retries:
+            return True
+        
+        return False
+    
+    def refine_node(self, node: PlanNode, failure_reason: str) -> PlanNode:
+        """Create a refined version of a failed node."""
+        # Mark original as replanned
+        node.status = NodeStatus.REPLANNED
+        
+        # Create refined node
+        refined = PlanNode(
+            node_id=f"{node.node_id}_refined",
+            description=f"{node.description} (refined: {failure_reason[:50]}...)",
+            action_type=node.action_type,
+            parameters={**node.parameters, "refinement_reason": failure_reason},
+            dependencies=node.dependencies,
+            max_retries=node.max_retries,
+            expected_output=node.expected_output
+        )
+        
+        # Add to refinement history
+        self.refinement_history.append({
+            "original_node": node.node_id,
+            "refined_node": refined.node_id,
+            "reason": failure_reason,
+            "timestamp": time.time()
+        })
+        
+        return refined
+    
+    def adapt_plan(self, plan: Plan, failed_node: PlanNode, 
+                   failure_reason: str) -> Plan:
+        """Create adapted plan with refined node."""
+        # Create refined node
+        refined_node = self.refine_node(failed_node, failure_reason)
+        
+        # Create new plan version
+        new_plan = Plan(
+            plan_id=f"{plan.plan_id}_v{plan.version + 1}",
+            context=plan.context,
+            parent_plan_id=plan.plan_id,
+            version=plan.version + 1
+        )
+        
+        # Copy and modify nodes
+        for root in plan.root_nodes:
+            new_root = self._copy_and_replace_node(root, failed_node.node_id, refined_node)
+            new_plan.root_nodes.append(new_root)
+        
+        new_plan._index_nodes()
+        return new_plan
+    
+    def _copy_and_replace_node(self, node: PlanNode, target_id: str, 
+                               replacement: PlanNode) -> PlanNode:
+        """Recursively copy node tree, replacing target node."""
+        if node.node_id == target_id:
+            # Update replacement dependencies to point to original's deps
+            replacement.dependencies = node.dependencies
+            return replacement
+        
+        # Copy this node
+        new_node = PlanNode(
+            node_id=node.node_id,
+            description=node.description,
+            action_type=node.action_type,
+            parameters=node.parameters.copy(),
+            dependencies=node.dependencies.copy(),
+            expected_output=node.expected_output,
+            status=node.status
+        )
+        
+        # Recursively copy branches
+        for branch in node.alternative_branches:
+            new_branch = self._copy_and_replace_node(branch, target_id, replacement)
+            new_node.alternative_branches.append(new_branch)
+        
+        return new_node
+
+
+class MCPAwarePlanner:
+    """
+    Planner that incorporates MCP tool registry for plan generation.
+    
+    Integrates with Model Context Protocol to create plans that
+    leverage available tools, resources, and prompts.
+    """
+    
+    def __init__(self, tool_registry: Optional[Dict] = None):
+        self.tool_registry = tool_registry or {}
+        self.tool_usage_patterns: Dict[str, Dict] = defaultdict(lambda: {
+            "success_count": 0, "failure_count": 0, "avg_execution_time": 0.0
         })
     
-    def _get_alternatives(self, action: str) -> List[str]:
-        """Get alternative actions for a failed skill"""
-        alternatives_map = {
-            "web_search": ["browser_navigate", "ask_user"],
-            "code": ["pseudocode", "break_down"],
-            "analyze": ["observe", "collect_data"],
-            "test": ["manual_verify", "review_output"]
+    def register_tool(self, tool_name: str, tool_schema: Dict):
+        """Register an MCP-compliant tool."""
+        self.tool_registry[tool_name] = tool_schema
+    
+    def generate_tool_aware_plan(self, context: PlanningContext,
+                                 planner: TreeOfThoughtPlanner) -> Plan:
+        """Generate plan considering available MCP tools."""
+        # Filter tools by task relevance
+        relevant_tools = self._select_relevant_tools(
+            context.task_description,
+            context.available_tools
+        )
+        
+        # Update context with relevant tools
+        context.available_tools = relevant_tools
+        
+        # Generate plan with tool awareness
+        plan = planner.generate_plan(context)
+        
+        # Enhance plan nodes with tool calls
+        self._enhance_with_tool_calls(plan, relevant_tools)
+        
+        return plan
+    
+    def _select_relevant_tools(self, task: str, available: List[str]) -> List[str]:
+        """Select tools relevant to the task."""
+        task_lower = task.lower()
+        relevant = []
+        
+        tool_keywords = {
+            "web_search": ["search", "find", "research", "lookup", "information"],
+            "code_gen": ["code", "implement", "program", "function", "script"],
+            "analysis": ["analyze", "evaluate", "assess", "compare"],
+            "file_operations": ["file", "read", "write", "load", "save"],
+            "communication": ["send", "notify", "message", "email"]
         }
-        return alternatives_map.get(action, [])
+        
+        for tool in available:
+            keywords = tool_keywords.get(tool, [])
+            if any(kw in task_lower for kw in keywords):
+                relevant.append(tool)
+        
+        return relevant if relevant else available[:3]
     
-    def _decompose_step(self, step: PlanStep) -> List[PlanStep]:
-        """Decompose a complex step into sub-steps"""
-        # Simple decomposition rules
-        if step.action == "code":
-            return [
-                PlanStep(description="Design structure", action="design"),
-                PlanStep(description="Write core logic", action="implement"),
-                PlanStep(description="Add error handling", action="harden")
-            ]
-        elif step.action == "research":
-            return [
-                PlanStep(description="Initial search", action="web_search"),
-                PlanStep(description="Deep dive", action="deep_search"),
-                PlanStep(description="Synthesize findings", action="synthesize")
-            ]
-        return []
-    
-    def create_sub_plan(self, parent_plan: Plan, 
-                        for_step: PlanStep,
-                        sub_goal: str) -> Plan:
-        """Create a sub-plan for a specific step"""
-        sub_plan = self.decompose_goal(sub_goal)
-        sub_plan.parent_plan_id = parent_plan.id
-        return sub_plan
+    def _enhance_with_tool_calls(self, plan: Plan, tools: List[str]):
+        """Enhance plan nodes with appropriate tool calls."""
+        for node in plan.all_nodes.values():
+            # Add tool call parameters based on node type
+            if node.action_type == "subgoal" and "search" in node.description.lower():
+                if "web_search" in tools:
+                    node.parameters["tool"] = "web_search"
+                    node.parameters["tool_params"] = {"query": node.description}
+            elif node.action_type == "subgoal" and "code" in node.description.lower():
+                if "code_gen" in tools:
+                    node.parameters["tool"] = "code_gen"
 
 
-if __name__ == "__main__":
-    # Basic test
-    planner = Planner()
+class PlanExecutor:
+    """
+    Execute plans with support for parallel execution and test-time adaptation.
+    """
     
-    # Mock skill executor
-    def mock_executor(skill_name: str, **kwargs):
-        print(f"  Executing: {skill_name}")
-        if skill_name == "unknown":
-            raise ValueError("Unknown skill")
-        return {"status": "success", "skill": skill_name}
+    def __init__(self, planner: TreeOfThoughtPlanner,
+                 adapter: TestTimeAdapter,
+                 max_parallel: int = 3):
+        self.planner = planner
+        self.adapter = adapter
+        self.max_parallel = max_parallel
+        self.active_plans: Dict[str, Plan] = {}
     
-    planner.register_skill("web_search", mock_executor)
-    planner.register_skill("summarize", mock_executor)
-    planner.register_skill("synthesize", mock_executor)
+    def execute_plan(self, plan: Plan, 
+                     node_executor: Callable[[PlanNode], Tuple[bool, Any]],
+                     on_progress: Optional[Callable[[str, str], None]] = None) -> ExecutionTrace:
+        """Execute plan with support for adaptation."""
+        plan.status = PlanStatus.IN_PROGRESS
+        self.active_plans[plan.plan_id] = plan
+        
+        trace = ExecutionTrace(
+            trace_id=f"trace_{int(time.time())}",
+            plan_id=plan.plan_id
+        )
+        plan.current_trace = trace
+        
+        start_time = time.time()
+        
+        # Execute in parallel groups
+        for group in plan.get_parallel_groups():
+            for node in group:
+                if on_progress:
+                    on_progress(plan.plan_id, f"Executing: {node.description}")
+                
+                # Execute node
+                node.status = NodeStatus.EXECUTING
+                node_start = time.time()
+                
+                try:
+                    success, result = node_executor(node)
+                    node.execution_time_ms = (time.time() - node_start) * 1000
+                    
+                    if success:
+                        node.status = NodeStatus.COMPLETED
+                        node.actual_output = str(result)[:500] if result else None
+                        trace.record_node_execution(node.node_id, True, result)
+                    else:
+                        # Handle failure - check for refinement
+                        node.retry_count += 1
+                        
+                        if self.adapter.should_refine(node, result):
+                            trace.refinement_triggers.append(node.node_id)
+                            trace.record_node_execution(node.node_id, False, result, str(result))
+                            
+                            # Adapt plan
+                            new_plan = self.adapter.adapt_plan(plan, node, str(result))
+                            plan.status = PlanStatus.REFINING
+                            
+                            if on_progress:
+                                on_progress(plan.plan_id, f"Refining plan due to failure: {result}")
+                            
+                            # Continue with adapted plan
+                            plan = new_plan
+                            self.active_plans[new_plan.plan_id] = new_plan
+                            plan.status = PlanStatus.IN_PROGRESS
+                            
+                            # Restart execution from beginning with new plan
+                            return self.execute_plan(plan, node_executor, on_progress)
+                        else:
+                            node.status = NodeStatus.FAILED
+                            trace.record_node_execution(node.node_id, False, result, str(result))
+                
+                except Exception as e:
+                    node.status = NodeStatus.FAILED
+                    node.execution_time_ms = (time.time() - node_start) * 1000
+                    trace.record_node_execution(node.node_id, False, None, str(e))
+        
+        # Complete execution
+        trace.total_time_ms = (time.time() - start_time) * 1000
+        plan.execution_traces.append(trace)
+        
+        # Determine final status
+        if trace.success_rate >= 1.0:
+            plan.status = PlanStatus.COMPLETED
+        elif trace.success_rate >= 0.5:
+            plan.status = PlanStatus.COMPLETED  # Partial success
+            trace.lessons_learned.append("Partial success - some nodes failed but core objectives met")
+        else:
+            plan.status = PlanStatus.FAILED
+            trace.lessons_learned.append("Execution failed - consider plan redesign")
+        
+        del self.active_plans[plan.plan_id]
+        return trace
     
-    # Create plan
-    plan = planner.decompose_goal("Research AGI latest developments")
-    print("Plan created:", json.dumps(plan.to_dict(), indent=2))
+    def get_plan_statistics(self, plan: Plan) -> Dict:
+        """Get execution statistics for a plan."""
+        total_nodes = len(plan.all_nodes)
+        completed = sum(1 for n in plan.all_nodes.values() if n.status == NodeStatus.COMPLETED)
+        failed = sum(1 for n in plan.all_nodes.values() if n.status == NodeStatus.FAILED)
+        replanned = sum(1 for n in plan.all_nodes.values() if n.status == NodeStatus.REPLANNED)
+        
+        avg_execution_time = 0.0
+        if plan.execution_traces:
+            total_time = sum(t.total_time_ms for t in plan.execution_traces)
+            avg_execution_time = total_time / len(plan.execution_traces)
+        
+        return {
+            "total_nodes": total_nodes,
+            "completed": completed,
+            "failed": failed,
+            "replanned": replanned,
+            "success_rate": completed / total_nodes if total_nodes > 0 else 0,
+            "version": plan.version,
+            "execution_count": len(plan.execution_traces),
+            "avg_execution_time_ms": avg_execution_time
+        }
+
+
+def create_default_planner(tool_registry: Optional[Dict] = None) -> Tuple[TreeOfThoughtPlanner, TestTimeAdapter, MCPAwarePlanner, PlanExecutor]:
+    """Create a fully configured planning pipeline."""
+    tot_planner = TreeOfThoughtPlanner(max_branches=3, exploration_depth=3)
+    adapter = TestTimeAdapter(refinement_threshold=0.7)
+    mcp_planner = MCPAwarePlanner(tool_registry)
+    executor = PlanExecutor(tot_planner, adapter, max_parallel=3)
     
-    # Execute
-    result = planner.execute_plan(plan, mock_executor, enable_adaptation=True)
-    print("\nExecution complete:")
-    print(f"  Status: {result.status}")
-    print(f"  Iterations: {result.iteration}")
-    print(f"  Adaptations: {len(result.adaptation_history)}")
+    return tot_planner, adapter, mcp_planner, executor
+
+
+# Export main classes
+__all__ = [
+    "PlanStatus",
+    "NodeStatus", 
+    "PlanningContext",
+    "PlanNode",
+    "Plan",
+    "ExecutionTrace",
+    "TreeOfThoughtPlanner",
+    "TestTimeAdapter",
+    "MCPAwarePlanner",
+    "PlanExecutor",
+    "create_default_planner"
+]

@@ -213,3 +213,103 @@ From Ouroboros and related projects:
 
 *Research compiled by AGI Continuous Research & Build Agent*  
 *Next update: April 24, 2026*
+
+## April 24, 2026 Research Findings
+
+### AGI Timeline & Predictions (April 2026)
+- **Anthropic CEO Dario Amodei**: Predicts powerful AI/AGI could come as early as 2026 (per October 2024 essay, reaffirmed in April 2026 analysis)
+- **NVIDIA CEO Jensen Huang**: Claims AGI has been achieved (April 2026), though definitions vary widely
+- **Consensus shifting**: AGI is transitioning from long-term hypothesis to near-term problem
+- **SWE AGI Prediction**: 2026 may see Software Engineering AGI - systems matching human performance in mainstream software engineering tasks
+
+### Latest arXiv Papers (Past 2 Weeks)
+1. **[2603.13372v1] The ARC of Progress towards AGI: A Living Survey**
+   - Cross-generation analysis of ARC-AGI benchmarks (ARC-AGI-1 to ARC-AGI-3)
+   - 2-3x performance degradation from ARC-1 to ARC-2 across all methods
+   - Test-time cost dropped 390x ($4,500 → $12 per task) via hardware/parallelism
+   - Key insight: Compositional generalization and test-time adaptation remain critical gaps
+
+2. **[2603.20639] Agentic AI and the next intelligence explosion**
+   - Intelligence is plural/social/relational, not monolithic
+   - "Societies of thought" internal deliberation in models like DeepSeek-R1
+   - Shift from dyadic alignment to institutional alignment
+   - Human-AI "centaur" hybrids as collective agency
+
+3. **[2604.18292] Agent-World: Scaling Real-World Environment Synthesis**
+   - Self-evolving training arena for general agent intelligence
+   - Uses Model Context Protocol (MCP) for tool integration
+   - Agent-World-8B/14B outperform proprietary models on 23 agent benchmarks
+   - Environment diversity scales with agent performance
+
+4. **[2603.07896v1] SMGI: A Structural Theory of General AI**
+   - Formal meta-model: θ = (r, H, Π, L, E, M)
+   - 4 obligations for general AI: structural closure, dynamical stability, bounded capacity, evaluative invariance
+   - Unifies ERM, RL, Solomonoff-style models under structural framework
+
+### Trending Open-Source AI Agent Repos (April 2026)
+1. **VoltAgent** (voltagent/voltagent) - TypeScript framework
+   - Full-stack with cloud/self-hosted console
+   - Workflow engine, supervisors/sub-agents, MCP support
+   - 70+ contributors, 674 releases, MIT licensed
+
+2. **Microsoft Agent Framework** (microsoft/agent-framework)
+   - Multi-language (Python/.NET), graph-based orchestration
+   - DevUI for debugging, checkpointing, time-travel
+   - ~9.7k stars, 120+ contributors
+
+3. **LightAgent** (wxai-space/LightAgent)
+   - 1000 lines core Python, no LangChain dependency
+   - Tree of Thought, mem0 memory, LightSwarm multi-agent
+   - Apache 2.0, supports OpenAI/Qwen/DeepSeek/Baichuan
+
+4. **Agency Swarm** (vrsen/agency-swarm)
+   - Extends OpenAI Agents SDK
+   - Role-based agents (CEO/VA/Developer), type-safe Pydantic tools
+   - v1.8.0 (Feb 2026), active maintenance
+
+5. **SuperAgentX** (superagentxai/superagentx)
+   - 100+ LLMs, 10,000+ MCP tools, Playwright browser automation
+   - Human-in-the-loop governance, audit trails
+   - SQLite/PostgreSQL persistence
+
+6. **CrewAI** (crewAIInc/crewAI)
+   - LangChain-independent Python framework
+   - "Crews" for collaboration, "Flows" for orchestration
+   - AMP Suite for enterprise, v1.14.2 (April 17, 2026)
+
+### Key Industry Trends (April 2026)
+1. **MCP (Model Context Protocol) adoption accelerating**
+   - Anthropic's MCP now under Linux Foundation
+   - Major frameworks (Claude Desktop, OpenAI Agents SDK) integrating MCP
+   - Standardized tool/resource/prompt interfaces across vendors
+
+2. **Enterprise Agent Orchestration maturing**
+   - Salesforce Agentforce/Agent Fabric: 84% case resolution improvement, $100M+ savings at Reddit
+   - JPMorgan LLM Suite: 83% faster research cycles, 360,000 manual hours automated
+   - 40% of AI agent projects fail due to architecture gaps (FifthRow analysis)
+
+3. **Agent-to-Agent (A2A) protocols emerging**
+   - Secure escrow for agent transactions
+   - Reputation-based access control (AgentGram pattern)
+   - Cryptographic identity verification (Ed25519)
+
+4. **Multi-agent system patterns**
+   - Orchestrated systems (Salesforce-style control planes)
+   - Peer-to-peer systems (AgentGram social network model)
+   - Hierarchical systems (Agency Swarm role-based)
+
+### Research Gaps & Opportunities
+1. **Verification bandwidth bottleneck**: Measurability gap (∆m) between execution and verification is critical constraint
+2. **Compositional generalization**: ARC benchmarks show persistent 2-3x degradation on novel compositions
+3. **Test-time adaptation**: Interactive learning loops beneficial but not fully solved
+4. **Institutional alignment**: Need governance frameworks beyond single-agent alignment
+5. **Tiered memory**: L0/L1/L2 memory architecture for agent context retention
+
+### Next Build Priorities
+1. ✅ MCP Tool Registry (completed April 19)
+2. ✅ Constitutional Governance (completed April 20)
+3. ✅ A2A Escrow Protocol (completed April 22)
+4. ✅ Verification & Attestation (completed April 22)
+5. **Pending**: Planner module with multi-step reasoning
+6. **Pending**: Integration of tiered memory with A2A communication
+7. **Pending**: Self-evaluation benchmark harness

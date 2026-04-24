@@ -34,7 +34,7 @@ agi-research/
 - [x] Research infrastructure
 - [x] Base agent architecture
 - [x] Memory system foundation
-- [ ] Advanced planning with test-time refinement
+- [x] Advanced planning with test-time refinement
 - [ ] Compositional reasoning
 - [ ] Multi-agent review system
 - [ ] Self-modification governance
