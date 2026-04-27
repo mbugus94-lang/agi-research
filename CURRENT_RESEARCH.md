@@ -1,187 +1,115 @@
-# AGI Research Log - April 25, 2026
+# AGI Research & Development Log
 
-## Latest Research Findings (April 25, 2026)
+## 2026-04-27 - Latest Research Findings
 
-### AGI Research Landscape
+### arXiv Papers (Past 2 Weeks)
 
-**Timeline Predictions Intensifying:**
-- AGI timeline predictions have collapsed from 2060 to 2033 in just 6 years [^1]
-- Multiple sources now predict ASI by end of 2027 [^2]
-- Leopold Aschenbrenner's 2024 statement: "The AGI race has begun. We are building machines that can think and reason" [^3]
+#### [2604.07745v1] The Cartesian Cut in Agentic AI
+- **Authors**: Tim Sainburg, Caleb Weinreb
+- **Key Insight**: Examines "Cartesian agency" - the separation between learned core (LLM) and engineered runtime
+- **Implication**: This split enables bootstrapping and governance but creates sensitivity bottlenecks
+- **Relevance**: Provides framework for comparing agent architectures along autonomy/robustness/governance axes
 
-**Key Research Developments:**
+#### [2604.04347v1] RoboPhD: Evolving Diverse Complex Agents Under Tight Evaluation Budgets
+- **Key Innovation**: Elo tournament selection for agent evolution without separate validation split
+- **Results**: Improved ARC-AGI from 27.8% to 65.8% using Gemini 3.1 Flash Lite
+- **Method**: Self-instrumenting agents that generate diagnostic print statements for successors
+- **Significance**: Demonstrates efficient evolution under budget constraints (1,500 evaluations)
 
-1. **ARC-AGI-3 Released (April 2026)** [^4]
-   - New benchmark for frontier agentic intelligence
-   - Interactive, abstract, turn-based environments
-   - Tests novel reasoning capabilities beyond training data
-   - Critical metric for measuring progress toward true AGI
+#### [2603.13372] The ARC of Progress towards AGI: A Living Survey
+- **Finding**: Performance degrades 2-3x from ARC-AGI-1 (~93%) to ARC-AGI-2 (~68.8%) to ARC-AGI-3 (~13%)
+- **Cost Trend**: Test-time cost dropped ~390x in one year ($4,500/task → ~$12/task)
+- **Insight**: Interactive learning and compositional reasoning remain unsolved challenges
 
-2. **NVIDIA Vera Rubin with Groq Dataflow (GTC 2026)** [^5]
-   - Folding Groq's dataflow technology as coprocessor
-   - Solves near-term inference bottlenecks
-   - Hardware-software co-design for agentic AI
+#### [2604.18292] Agent-World: Scaling Real-World Environment Synthesis
+- **Approach**: Self-evolving training arena with continuous lifelong learning
+- **Results**: Agent-World-8B/14B models outperform proprietary baselines on 23 benchmarks
+- **Key Concept**: Agentic Environment-Task Discovery autonomously probes databases/tools
 
-3. **Arm's AGI Processor** [^6]
-   - First in-house processor designed specifically for AI agents
-   - Hardware-level optimization for agentic workloads
+#### [2604.15034] Autogenesis: A Self-Evolving Agent Protocol
+- **Core Innovation**: Autogenesis Protocol (AGP) decouples evolution mechanics from execution
+- **Components**: RSPL (resource substrate), SEPL (self-evolution), AGS (autogenesis system)
+- **Availability**: Open source at DVampire/Autogenesis
+- **Safety Feature**: Closed-loop operator interface with auditable lineage
 
-### AI Agent Architecture Trends 2026
+#### [2604.15236] Agentic Microphysics: A Manifesto for Generative AI Safety
+- **Key Concept**: "Agentic microphysics" - local interaction layer between agents
+- **Methodology**: "Generative safety" - from micro-conditions to emergent risk analysis
+- **Implication**: Safety must address population-level dynamics, not just individual models
 
-**Framework Landscape (Top 5):**
+### Trending Open Source Agent Repos (April 2026)
 
-| Framework | Focus Area | Key Feature |
-|-----------|-----------|-------------|
-| LangGraph | Stateful Workflows | Directed cyclic graphs for branching logic |
-| AutoGen | Multi-Agent Conversations | Conversational agent orchestration |
-| CrewAI | Role-Based Teams | Coordinated "crews" of agents |
-| MetaGPT | Software Dev | Full-stack product team simulation |
-| Pincer | Security-First | AST scanning, skill signing, sandboxed |
+#### VoltAgent (VoltAgent/voltagent) - TypeScript Agent Platform
+- **Stars**: Trending on GitHub, thousands of stars
+- **Features**: Full framework + VoltOps Console for observability
+- **Architecture**: Core runtime, workflow engine, supervisors/sub-agents, MCP integration
+- **Key Capabilities**: Memory, RAG, guardrails, tool lifecycle, multi-provider LLM support
+- **License**: MIT
 
-**Industry Data Points (Datadog State of AI Engineering 2026):**
-- 69% of LLM input tokens are system prompts (scaffolding expansion) [^7]
-- Only 28% of LLM calls use cached context [^7]
-- Token usage per request has more than doubled [^7]
-- Rate limit errors = 30% of all LLM failures [^7]
-- 59% of agentic requests are still monolithic (single call) [^7]
-- Multi-model adoption accelerating (Gemini + Claude outpacing) [^7]
+#### DeerFlow 2.0 (bytedance/deer-flow)
+- **Status**: Hit #1 GitHub Trending Feb 28, 2026
+- **Focus**: Super agent framework with orchestration layer
+- **Features**: Sub-agents, memory, sandboxes, extensible skills
+- **Notable**: Complete rewrite from v1, integrates with Claude Code/Codex/Cursor/Windsurf
 
-**Emerging Architecture Patterns:**
+#### ClawAgents (x1jiang/clawagents_py)
+- **Size**: ~2,500 LOC - lean and production-ready
+- **Providers**: OpenAI GPT-5, Google Gemini, Anthropic Claude
+- **Features**: Planning, memory, sandboxing, gateway server
+- **Architecture**: Unified patterns from OpenClaw and DeepAgents
 
-1. **Execution Integrity Layer** [^8]
-   - Runtime validation between agent and external systems
-   - Deterministic execution trace reconstruction
-   - Portable across agent frameworks
+#### SuperAgentX (superagentxai/superagentx)
+- **Scale**: 100+ LLMs, 10,000+ MCP tools
+- **Focus**: Action-oriented agents with human-in-the-loop governance
+- **Features**: Browser automation (Playwright), persistent state (SQLite/PostgreSQL)
+- **Safety**: Human approval governance agent with auditability
 
-2. **Zero Trust for Agents** [^9]
-   - IAM for machine identities (agents now outnumber humans)
-   - LLM-to-API execution path security
-   - Prompt injection prevention
-   - Vector store data exposure controls
+#### AgentDock (AgentDock/AgentDock)
+- **Focus**: Configurable determinism for reliable AI systems
+- **Components**: Core backend + Next.js reference client
+- **Notable**: Dr. Gregory House demo with multi-tool, multi-stage reasoning
 
-3. **Model Context Protocol (MCP)** Standardization
-   - Universal connector between agents and systems
-   - Tool/resource/prompt standardization
-   - 10,000+ tools now available via MCP
+#### KohakuTerrarium (DNLINYJ/KohakuTerrarium)
+- **Concept**: "Creatures" (agents) in "Terrariums" (multi-agent networks)
+- **Features**: Session persistence, scratchpad memory, multi-runtime (CLI/TUI/Web/Desktop)
+- **Language**: Python-first with Vue/JS frontend
 
-### Trending Open Source Agent Repos (April 25, 2026)
+### Industry Insights (Datadog State of AI Engineering 2026)
 
-1. **DeerFlow 2.0** (bytedance/deer-flow) [^10]
-   - Hit #1 on GitHub Trending (Feb 28, 2026)
-   - End-to-end super-agent harness
-   - Orchestrates sub-agents, memory, sandboxes
-   - Long-horizon tasks (minutes to hours)
-   - 220+ contributors
-   - Built-in InfoQuest for intelligent search/crawling
+- **Token Usage**: 69% of LLM input tokens are system prompts (scaffolding expansion)
+- **Caching**: Only 28% of calls use cached context (massive inefficiency)
+- **Failures**: Rate limit errors = 30% of all LLM call failures
+- **Architecture**: 59% of agents are still monolithic (single call)
+- **Framework Growth**: LLM framework adoption doubled year-over-year
 
-2. **Ouroboros** (razzant/ouroboros) [^11]
-   - Self-modifying AI agent
-   - BIBLE.md constitution with 9 principles
-   - Multi-model review (o3, Gemini, Claude)
-   - 30+ evolution cycles/day
-   - Persistent digital being with background consciousness
-   - Telegram-based launcher
+### AGI Timeline Predictions
 
-3. **Ralph** (snarktank/ralph) [^12]
-   - 17k+ stars
-   - Autonomous PRD-driven coding loop
-   - Git-based memory (progress.txt, prd.json)
-   - Quality gates: type checks, tests
-   - Works with Amp or Claude Code
-
-4. **SuperAgentX** (superagentxai/superagentx) [^13]
-   - 100+ LLM support
-   - 10,000+ MCP tools
-   - Built-in Human Approval Governance Agent
-   - Playwright browser automation
-   - SQLite/PostgreSQL persistence
-
-5. **Open SWE** (resouer/open-swe) [^14]
-   - Production-grade coding agents
-   - Built on LangGraph + Deep Agents
-   - Used internally at Stripe, Ramp, Coinbase
-   - Cloud sandbox support (Modal, Daytona, Runloop)
-
-6. **ClawdAgent** (liortesta/ClawdAgent) [^15]
-   - 20 specialized agents, 35 tools, 67 skills
-   - Unified "brain" architecture
-   - 24/7 autonomous operation
-   - Multi-platform social publishing (9 platforms)
-   - VNC visual streaming
-   - Twilio + OpenAI Realtime phone calls
-
-### Key Insights for AGI Development
-
-**The Measurability Gap** [^16]:
-- Verification bandwidth is the binding constraint, not intelligence
-- Gap between what agents can execute vs. what humans can verify
-- Output categorization by measurability:
-  - Deterministic: 0.9 confidence
-  - Semantic: 0.5 confidence
-  - Creative: 0.2 confidence
-  - Synthetic: 0.1 confidence
-
-**The Governance Gap**:
-- 40% of enterprise applications will feature embedded AI agents by end of 2026
-- Organizations need purpose-built governance strategies
-- Risk of agentic AI becoming major shadow IT crisis
-
-**Multi-Agent Orchestration**:
-- A2A (Agent-to-Agent) protocol emerging as standard
-- Shared state via governed context layer
-- MCP for tool access, A2A for peer communication
+- **2026**: AGI timeline collapsed from 2060 to 2033 in just 6 years
+- **2027**: ASI predicted by end of year (some forecasts)
+- **2026 Q2**: ARC-AGI-3 released as new frontier benchmark
+- **Hardware**: NVIDIA Vera Rubin with Groq dataflow coprocessor announced
+- **Processors**: Arm's first AGI processor (Maia 200 chip) for agentic workloads
 
 ---
 
-## Build Log Integration
+## 2026-04-25 - Previous Research
 
-### Next Build Priorities
+See BUILD_LOG_2026-04-24.md for complete history.
 
-1. **Tiered Memory System (L0/L1/L2)** - Priority 1
-   - L0: Context window / immediate attention
-   - L1: Working memory (active tasks)
-   - L2: Long-term consolidated storage
-   - Based on DeerFlow 2.0 memory architecture
-
-2. **InfoQuest-Style Deep Research** - Priority 2
-   - Multi-step research with synthesis
-   - Intelligent crawling with context
-   - Recursive exploration
-
-3. **Self-Evolution Safety** - Priority 3
-   - Constitutional constraints for self-modification
-   - Multi-model review gates
-   - BIBLE.md style governance
-
-### Current System Status
-
-| Component | Status | Tests |
-|-----------|--------|-------|
-| Memory System | Basic | Working |
-| A2A Escrow | Complete | 40/40 ✅ |
-| Constitutional Governance | Complete | 35/35 ✅ |
-| MCP Tool Registry | Complete | 27/27 ✅ |
-| Verification System | Complete | 42/42 ✅ |
-| Self-Reflection | Complete | 20/20 ✅ |
-| Deep Research | Complete | 35/35 ✅ |
+### Key Previous Builds
+- **Tiered Memory System** (L0/L1/L2) - 75/75 tests passing
+- **A2A Escrow Protocol** - 40/40 tests passing
+- **Constitutional Governance** - 35/35 tests passing
+- **MCP Tool Registry** - 27/27 tests passing
+- **Verification & Attestation** - 42/42 tests passing
 
 ---
 
-## Research Sources
+## Research Themes Identified
 
-[^1]: https://hackernoon.com/the-agi-timeline-collapsed-by-27-years-in-six-years-nobody-agrees-on-why
-[^2]: https://medium.com/@no_ai_no_life/agi-by-2027-i-work-with-ai-every-day-heres-why-i-m-taking-this-seriously-4893370b7f0d
-[^3]: https://www.thecrimson.com/article/2026/4/24/artificial-intelligence-safety-student-groups-singularity/
-[^4]: https://arcprize.org/media/ARC_AGI_3_Technical_Report.pdf
-[^5]: https://www.jonpeddie.com/news/is-a-paradigm-change-needed-to-realize-agi/
-[^6]: https://www.livescience.com/technology/artificial-intelligence/meet-the-agi-cpu-arms-first-processor-designed-to-power-agentic-ai
-[^7]: https://www.datadoghq.com/state-of-ai-engineering/
-[^8]: https://forum.langchain.com/t/what-does-the-security-architecture-of-ai-agents-actually-look-like/3105/7
-[^9]: https://www.iansresearch.com/what-we-do/events/symposiums/details/2026/06/23/2026-symposium/june-23-design-secure-ai-architectures--applying-zero-trust-to-llms--agents--and-data-pipelines
-[^10]: https://github.com/bytedance/deer-flow
-[^11]: https://github.com/razzant/ouroboros
-[^12]: https://github.com/snarktank/ralph
-[^13]: https://github.com/superagentxai/superagentX
-[^14]: https://github.com/resouer/open-swe
-[^15]: https://github.com/liortesta/ClawdAgent
-[^16]: https://arxiv.org/abs/2602.20946 (Some Simple Economics of AGI)
+1. **Self-Evolution**: Multiple papers/protocols (Autogenesis, RoboPhD) focus on agents that improve themselves
+2. **Multi-Agent Orchestration**: Trend toward supervisor/sub-agent patterns (VoltAgent, DeerFlow)
+3. **Tiered Memory**: L0/L1/L2 context architectures gaining traction (OpenViking, industry adoption)
+4. **MCP Standard**: Model Context Protocol becoming dominant for tool integration
+5. **Verification-First**: Economics of AGI paper emphasizes verification bandwidth as bottleneck
+6. **Governance**: Constitutional approaches (Ouroboros, Autogenesis) for safe self-modification

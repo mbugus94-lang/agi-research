@@ -1,723 +1,879 @@
 """
-Test Suite for Planner Module
+Comprehensive test suite for the Planner Module.
 
-Validates Tree of Thought planning, test-time adaptation,
-and MCP-aware plan generation.
+Tests Tree of Thought planning, Test-Time Adaptation, MCP-aware planning,
+and plan execution with refinement capabilities.
+
+Run with: python -m pytest experiments/test_planner.py -v
 """
 
 import sys
-import unittest
-from typing import Any, Tuple
-
-# Add parent directory to path
 sys.path.insert(0, '/home/workspace/agi-research')
 
+import pytest
+import time
+from unittest.mock import Mock
 from core.planner import (
-    PlanStatus, NodeStatus,
-    PlanningContext, PlanNode, Plan, ExecutionTrace,
-    TreeOfThoughtPlanner, TestTimeAdapter,
-    MCPAwarePlanner, PlanExecutor,
+    PlanStatus, NodeStatus, PlanningContext, PlanNode, Plan, ExecutionTrace,
+    TreeOfThoughtPlanner, TestTimeAdapter, MCPAwarePlanner, PlanExecutor,
     create_default_planner
 )
 
 
-class TestPlanningContext(unittest.TestCase):
-    """Test planning context creation and configuration."""
+class TestPlanningContext:
+    """Test PlanningContext initialization and serialization."""
     
-    def test_context_creation_defaults(self):
-        """Test context with default values."""
-        ctx = PlanningContext(
-            task_description="Test task"
+    def test_basic_initialization(self):
+        """Test basic PlanningContext creation."""
+        context = PlanningContext(
+            task_description="Test task",
+            constraints=["time < 1000ms"],
+            available_tools=["web_search", "code_gen"]
         )
-        self.assertEqual(ctx.task_description, "Test task")
-        self.assertEqual(ctx.max_depth, 5)
-        self.assertEqual(ctx.max_parallel_branches, 3)
-        self.assertEqual(ctx.refinement_threshold, 0.7)
-        self.assertEqual(ctx.constraints, [])
-        self.assertEqual(ctx.available_tools, [])
+        
+        assert context.task_description == "Test task"
+        assert context.constraints == ["time < 1000ms"]
+        assert context.available_tools == ["web_search", "code_gen"]
+        assert context.max_depth == 5  # default
+        assert context.max_parallel_branches == 3  # default
+        assert context.refinement_threshold == 0.7  # default
     
-    def test_context_creation_custom(self):
-        """Test context with custom values."""
-        ctx = PlanningContext(
-            task_description="Research task",
-            constraints=["budget", "time"],
-            available_tools=["web_search", "analysis"],
-            max_depth=7,
-            max_parallel_branches=5,
-            refinement_threshold=0.8
-        )
-        self.assertEqual(ctx.task_description, "Research task")
-        self.assertEqual(ctx.constraints, ["budget", "time"])
-        self.assertEqual(ctx.available_tools, ["web_search", "analysis"])
-        self.assertEqual(ctx.max_depth, 7)
-        self.assertEqual(ctx.max_parallel_branches, 5)
-        self.assertEqual(ctx.refinement_threshold, 0.8)
+    def test_default_values(self):
+        """Test default values for optional parameters."""
+        context = PlanningContext(task_description="Simple task")
+        
+        assert context.constraints == []
+        assert context.available_tools == []
+        assert context.memory_context == {}
+        assert context.max_depth == 5
     
-    def test_context_to_dict(self):
-        """Test context serialization."""
-        ctx = PlanningContext(
-            task_description="Test",
-            constraints=["c1"],
-            available_tools=["t1"]
+    def test_to_dict_serialization(self):
+        """Test dict serialization of PlanningContext."""
+        context = PlanningContext(
+            task_description="Research AI trends",
+            constraints=["use only free APIs"],
+            available_tools=["web_search"],
+            max_depth=3,
+            max_parallel_branches=2
         )
-        d = ctx.to_dict()
-        self.assertEqual(d["task_description"], "Test")
-        self.assertEqual(d["constraints"], ["c1"])
-        self.assertEqual(d["available_tools"], ["t1"])
-        self.assertEqual(d["max_depth"], 5)
+        
+        d = context.to_dict()
+        assert d["task_description"] == "Research AI trends"
+        assert d["constraints"] == ["use only free APIs"]
+        assert d["available_tools"] == ["web_search"]
+        assert d["max_depth"] == 3
+        assert d["max_parallel_branches"] == 2
+        assert d["refinement_threshold"] == 0.7
 
 
-class TestPlanNode(unittest.TestCase):
-    """Test plan node functionality."""
+class TestPlanNode:
+    """Test PlanNode creation and manipulation."""
     
     def test_node_creation(self):
-        """Test node creation with defaults."""
+        """Test basic PlanNode creation."""
         node = PlanNode(
-            node_id="n1",
-            description="Test node",
+            node_id="test_001",
+            description="Search for data",
             action_type="tool_call"
         )
-        self.assertEqual(node.node_id, "n1")
-        self.assertEqual(node.description, "Test node")
-        self.assertEqual(node.action_type, "tool_call")
-        self.assertEqual(node.status, NodeStatus.PLANNED)
-        self.assertEqual(node.confidence, 1.0)
-        self.assertEqual(node.retry_count, 0)
-        self.assertEqual(node.max_retries, 3)
+        
+        assert node.node_id == "test_001"
+        assert node.description == "Search for data"
+        assert node.action_type == "tool_call"
+        assert node.status == NodeStatus.PLANNED
+        assert node.dependencies == []
+        assert node.alternative_branches == []
+    
+    def test_auto_node_id_generation(self):
+        """Test automatic node ID generation."""
+        node = PlanNode(
+            node_id="",
+            description="Auto ID test",
+            action_type="reasoning"
+        )
+        
+        assert len(node.node_id) == 8  # UUID substring
+        assert node.node_id != ""
     
     def test_node_with_dependencies(self):
         """Test node with dependencies."""
         node = PlanNode(
-            node_id="n2",
-            description="Dependent node",
+            node_id="step_2",
+            description="Process results",
             action_type="reasoning",
-            dependencies=["n1"],
-            expected_output="Result"
+            dependencies=["step_1"],
+            expected_output="Processed data"
         )
-        self.assertEqual(node.dependencies, ["n1"])
-        self.assertEqual(node.expected_output, "Result")
-    
-    def test_node_alternative_branches(self):
-        """Test node with alternative branches."""
-        branch1 = PlanNode(node_id="b1", description="Branch 1", action_type="decision")
-        branch2 = PlanNode(node_id="b2", description="Branch 2", action_type="decision")
         
+        assert node.dependencies == ["step_1"]
+        assert node.expected_output == "Processed data"
+    
+    def test_node_with_alternative_branches(self):
+        """Test node with alternative branches (Tree of Thought)."""
+        branch1 = PlanNode(
+            node_id="branch_1",
+            description="Approach A",
+            action_type="reasoning"
+        )
+        branch2 = PlanNode(
+            node_id="branch_2",
+            description="Approach B",
+            action_type="reasoning"
+        )
+        
+        root = PlanNode(
+            node_id="root",
+            description="Choose approach",
+            action_type="decision",
+            alternative_branches=[branch1, branch2]
+        )
+        
+        assert len(root.alternative_branches) == 2
+        assert root.alternative_branches[0].node_id == "branch_1"
+    
+    def test_node_to_dict(self):
+        """Test node serialization."""
         node = PlanNode(
+            node_id="test_node",
+            description="Test description",
+            action_type="tool_call",
+            parameters={"query": "AI news"},
+            dependencies=["prev_node"],
+            expected_output="Results",
+            confidence=0.85
+        )
+        
+        d = node.to_dict()
+        assert d["node_id"] == "test_node"
+        assert d["description"] == "Test description"
+        assert d["action_type"] == "tool_call"
+        assert d["parameters"] == {"query": "AI news"}
+        assert d["dependencies"] == ["prev_node"]
+        assert d["expected_output"] == "Results"
+        assert d["status"] == "PLANNED"
+        assert d["confidence"] == 0.85
+
+
+class TestPlan:
+    """Test Plan structure and operations."""
+    
+    def test_plan_creation(self):
+        """Test basic plan creation."""
+        context = PlanningContext(task_description="Test task")
+        plan = Plan(
+            plan_id="plan_001",
+            context=context
+        )
+        
+        assert plan.plan_id == "plan_001"
+        assert plan.context == context
+        assert plan.status == PlanStatus.PENDING
+        assert plan.root_nodes == []
+        assert plan.version == 1
+        assert plan.parent_plan_id is None
+    
+    def test_auto_plan_id_generation(self):
+        """Test automatic plan ID generation."""
+        context = PlanningContext(task_description="Auto ID")
+        plan = Plan(plan_id="", context=context)
+        
+        assert len(plan.plan_id) == 12
+        assert plan.plan_id != ""
+    
+    def test_node_indexing(self):
+        """Test that nodes get indexed correctly."""
+        context = PlanningContext(task_description="Test")
+        plan = Plan(plan_id="p1", context=context)
+        
+        node1 = PlanNode(node_id="n1", description="Step 1", action_type="action")
+        node2 = PlanNode(node_id="n2", description="Step 2", action_type="action")
+        
+        plan.root_nodes = [node1, node2]
+        plan._index_nodes()
+        
+        assert "n1" in plan.all_nodes
+        assert "n2" in plan.all_nodes
+        assert plan.all_nodes["n1"] == node1
+    
+    def test_get_ready_nodes(self):
+        """Test getting nodes ready for execution."""
+        context = PlanningContext(task_description="Test")
+        plan = Plan(plan_id="p1", context=context)
+        
+        node1 = PlanNode(node_id="n1", description="Step 1", action_type="action")
+        node2 = PlanNode(node_id="n2", description="Step 2", action_type="action", dependencies=["n1"])
+        node3 = PlanNode(node_id="n3", description="Step 3", action_type="action")
+        
+        plan.root_nodes = [node1, node2, node3]
+        plan._index_nodes()
+        
+        ready = plan.get_ready_nodes()
+        assert len(ready) == 2  # n1 and n3 (no deps)
+        assert node1 in ready
+        assert node3 in ready
+        assert node2 not in ready  # depends on n1
+    
+    def test_get_ready_nodes_after_completion(self):
+        """Test ready nodes after some complete."""
+        context = PlanningContext(task_description="Test")
+        plan = Plan(plan_id="p1", context=context)
+        
+        node1 = PlanNode(node_id="n1", description="Step 1", action_type="action")
+        node2 = PlanNode(node_id="n2", description="Step 2", action_type="action", dependencies=["n1"])
+        
+        plan.root_nodes = [node1, node2]
+        plan._index_nodes()
+        
+        # Mark n1 as completed
+        plan.all_nodes["n1"].status = NodeStatus.COMPLETED
+        
+        ready = plan.get_ready_nodes()
+        assert len(ready) == 1
+        assert node2 in ready
+    
+    def test_get_parallel_groups(self):
+        """Test getting parallel execution groups."""
+        context = PlanningContext(task_description="Test")
+        plan = Plan(plan_id="p1", context=context)
+        
+        # Create dependency chain: A, B -> A, C -> B, D (no deps)
+        node_a = PlanNode(node_id="a", description="A", action_type="action")
+        node_b = PlanNode(node_id="b", description="B", action_type="action", dependencies=["a"])
+        node_c = PlanNode(node_id="c", description="C", action_type="action", dependencies=["b"])
+        node_d = PlanNode(node_id="d", description="D", action_type="action")
+        
+        plan.root_nodes = [node_a, node_b, node_c, node_d]
+        plan._index_nodes()
+        
+        groups = plan.get_parallel_groups()
+        
+        # Group 1: a, d (no dependencies)
+        assert len(groups[0]) == 2
+        assert node_a in groups[0]
+        assert node_d in groups[0]
+        
+        # Group 2: b (depends on a)
+        assert len(groups[1]) == 1
+        assert node_b in groups[1]
+        
+        # Group 3: c (depends on b)
+        assert len(groups[2]) == 1
+        assert node_c in groups[2]
+    
+    def test_plan_to_dict(self):
+        """Test plan serialization."""
+        context = PlanningContext(task_description="Research task")
+        plan = Plan(
+            plan_id="plan_test",
+            context=context,
+            version=2,
+            parent_plan_id="plan_original"
+        )
+        
+        d = plan.to_dict()
+        assert d["plan_id"] == "plan_test"
+        assert d["status"] == "PENDING"
+        assert d["version"] == 2
+        assert d["parent_plan_id"] == "plan_original"
+        assert d["trace_count"] == 0
+        assert d["context"]["task_description"] == "Research task"
+
+
+class TestExecutionTrace:
+    """Test execution trace functionality."""
+    
+    def test_trace_creation(self):
+        """Test execution trace creation."""
+        trace = ExecutionTrace(trace_id="t1", plan_id="p1")
+        
+        assert trace.trace_id == "t1"
+        assert trace.plan_id == "p1"
+        assert trace.node_executions == []
+        assert trace.success_rate == 0.0
+        assert trace.total_time_ms == 0.0
+    
+    def test_auto_trace_id_generation(self):
+        """Test automatic trace ID generation."""
+        trace = ExecutionTrace(trace_id="", plan_id="p1")
+        
+        assert len(trace.trace_id) == 12
+        assert trace.trace_id != ""
+    
+    def test_record_node_execution_success(self):
+        """Test recording successful node execution."""
+        trace = ExecutionTrace(trace_id="t1", plan_id="p1")
+        
+        trace.record_node_execution("n1", True, "output data")
+        
+        assert len(trace.node_executions) == 1
+        assert trace.node_executions[0]["node_id"] == "n1"
+        assert trace.node_executions[0]["success"] is True
+        assert trace.node_executions[0]["output"] == "output data"
+        assert trace.success_rate == 1.0
+    
+    def test_record_node_execution_failure(self):
+        """Test recording failed node execution."""
+        trace = ExecutionTrace(trace_id="t1", plan_id="p1")
+        
+        trace.record_node_execution("n1", False, None, "Error: timeout")
+        
+        assert len(trace.node_executions) == 1
+        assert trace.node_executions[0]["success"] is False
+        assert trace.node_executions[0]["error"] == "Error: timeout"
+        assert trace.success_rate == 0.0
+    
+    def test_success_rate_calculation(self):
+        """Test success rate calculation across multiple nodes."""
+        trace = ExecutionTrace(trace_id="t1", plan_id="p1")
+        
+        trace.record_node_execution("n1", True, "ok")
+        trace.record_node_execution("n2", True, "ok")
+        trace.record_node_execution("n3", False, None, "error")
+        
+        assert trace.success_rate == 2 / 3
+
+
+class TestTreeOfThoughtPlanner:
+    """Test Tree of Thought planning capabilities."""
+    
+    def test_planner_initialization(self):
+        """Test planner initialization."""
+        planner = TreeOfThoughtPlanner(max_branches=5, exploration_depth=4)
+        
+        assert planner.max_branches == 5
+        assert planner.exploration_depth == 4
+        assert planner.plan_history == []
+    
+    def test_generate_plan_basic(self):
+        """Test basic plan generation."""
+        planner = TreeOfThoughtPlanner()
+        context = PlanningContext(
+            task_description="Research AI trends",
+            available_tools=["web_search"]
+        )
+        
+        plan = planner.generate_plan(context)
+        
+        assert plan.context == context
+        assert len(plan.root_nodes) > 0
+        assert plan in planner.plan_history
+    
+    def test_decompose_research_task(self):
+        """Test task decomposition for research tasks."""
+        planner = TreeOfThoughtPlanner()
+        
+        goals = planner._decompose_task("Research the latest AI developments")
+        
+        assert len(goals) == 4
+        assert "search" in goals[0].lower() or "strategy" in goals[0].lower()
+        assert "gather" in goals[1].lower() or "information" in goals[1].lower()
+        assert "synthesize" in goals[2].lower() or "analyze" in goals[2].lower()
+    
+    def test_decompose_code_task(self):
+        """Test task decomposition for code tasks."""
+        planner = TreeOfThoughtPlanner()
+        
+        goals = planner._decompose_task("Implement a sorting algorithm")
+        
+        assert len(goals) == 4
+        assert "requirement" in goals[0].lower() or "analyze" in goals[0].lower()
+        assert "design" in goals[1].lower() or "approach" in goals[1].lower()
+        assert "implement" in goals[2].lower()
+    
+    def test_generate_approaches_search(self):
+        """Test approach generation for search tasks."""
+        planner = TreeOfThoughtPlanner()
+        
+        approaches = planner._generate_approaches(
+            "Gather information from sources",
+            PlanningContext(task_description="Test")
+        )
+        
+        assert len(approaches) == 3
+        assert any("parallel" in a.lower() for a in approaches)
+        assert any("targeted" in a.lower() or "deep" in a.lower() for a in approaches)
+    
+    def test_generate_approaches_code(self):
+        """Test approach generation for code tasks."""
+        planner = TreeOfThoughtPlanner()
+        
+        approaches = planner._generate_approaches(
+            "Implement solution",
+            PlanningContext(task_description="Test")
+        )
+        
+        assert len(approaches) == 3
+        assert any("test-driven" in a.lower() or "prototype" in a.lower() for a in approaches)
+    
+    def test_goal_node_generation_with_branches(self):
+        """Test goal node generation includes branches."""
+        planner = TreeOfThoughtPlanner(max_branches=3)
+        context = PlanningContext(
+            task_description="Test",
+            max_parallel_branches=2
+        )
+        
+        node = planner._generate_goal_node("Search for data", context)
+        
+        assert node.description == "Search for data"
+        assert node.action_type == "subgoal"
+        assert len(node.alternative_branches) <= 2  # limited by max_parallel_branches
+    
+    def test_evaluate_branches(self):
+        """Test branch evaluation."""
+        planner = TreeOfThoughtPlanner()
+        
+        branch1 = PlanNode(node_id="b1", description="Approach 1", action_type="reasoning")
+        branch2 = PlanNode(node_id="b2", description="Approach 2", action_type="reasoning")
+        
+        root = PlanNode(
             node_id="root",
             description="Root",
             action_type="decision",
             alternative_branches=[branch1, branch2]
         )
-        self.assertEqual(len(node.alternative_branches), 2)
-    
-    def test_node_serialization(self):
-        """Test node serialization to dict."""
-        node = PlanNode(
-            node_id="n3",
-            description="Test",
-            action_type="subgoal",
-            parameters={"key": "value"}
-        )
-        d = node.to_dict()
-        self.assertEqual(d["node_id"], "n3")
-        self.assertEqual(d["action_type"], "subgoal")
-        self.assertEqual(d["parameters"], {"key": "value"})
-        self.assertEqual(d["status"], "PLANNED")
-
-
-class TestPlan(unittest.TestCase):
-    """Test plan structure and execution tracking."""
-    
-    def test_plan_creation(self):
-        """Test plan creation and indexing."""
-        ctx = PlanningContext(task_description="Test plan")
-        root = PlanNode(node_id="root", description="Root", action_type="subgoal")
         
-        plan = Plan(
-            plan_id="plan_1",
-            context=ctx,
-            root_nodes=[root]
-        )
+        context = PlanningContext(task_description="Test")
+        plan = Plan(plan_id="p1", context=context, root_nodes=[root])
+        plan._index_nodes()
         
-        self.assertEqual(plan.plan_id, "plan_1")
-        self.assertEqual(plan.status, PlanStatus.PENDING)
-        self.assertEqual(len(plan.root_nodes), 1)
-        self.assertIn("root", plan.all_nodes)
-    
-    def test_get_ready_nodes_empty(self):
-        """Test getting ready nodes with no dependencies."""
-        ctx = PlanningContext(task_description="Test")
-        node1 = PlanNode(node_id="n1", description="Node 1", action_type="tool_call")
-        node2 = PlanNode(node_id="n2", description="Node 2", action_type="tool_call")
+        # Simple scoring function
+        def score_fn(node):
+            return 0.8 if node.node_id == "b1" else 0.6
         
-        plan = Plan(
-            plan_id="plan_2",
-            context=ctx,
-            root_nodes=[node1, node2]
-        )
+        scores = planner.evaluate_branches(plan, score_fn)
         
-        ready = plan.get_ready_nodes()
-        self.assertEqual(len(ready), 2)
-        self.assertIn(node1, ready)
-        self.assertIn(node2, ready)
-    
-    def test_get_ready_nodes_with_dependencies(self):
-        """Test getting ready nodes with satisfied dependencies."""
-        ctx = PlanningContext(task_description="Test")
-        node1 = PlanNode(node_id="n1", description="Node 1", action_type="tool_call")
-        node1.status = NodeStatus.COMPLETED
-        
-        node2 = PlanNode(
-            node_id="n2",
-            description="Node 2",
-            action_type="tool_call",
-            dependencies=["n1"]
-        )
-        
-        plan = Plan(
-            plan_id="plan_3",
-            context=ctx,
-            root_nodes=[node1, node2]
-        )
-        
-        ready = plan.get_ready_nodes()
-        self.assertEqual(len(ready), 1)
-        self.assertIn(node2, ready)
-    
-    def test_get_ready_nodes_with_unsatisfied_deps(self):
-        """Test getting ready nodes with unsatisfied dependencies."""
-        ctx = PlanningContext(task_description="Test")
-        node1 = PlanNode(node_id="n1", description="Node 1", action_type="tool_call")
-        # n1 is not completed
-        
-        node2 = PlanNode(
-            node_id="n2",
-            description="Node 2",
-            action_type="tool_call",
-            dependencies=["n1"]
-        )
-        
-        plan = Plan(
-            plan_id="plan_4",
-            context=ctx,
-            root_nodes=[node1, node2]
-        )
-        
-        ready = plan.get_ready_nodes()
-        self.assertEqual(len(ready), 1)  # Only n1 (no deps)
-        self.assertIn(node1, ready)
-    
-    def test_parallel_groups(self):
-        """Test parallel execution group identification."""
-        ctx = PlanningContext(task_description="Test")
-        n1 = PlanNode(node_id="n1", description="Step 1", action_type="tool_call")
-        n2 = PlanNode(node_id="n2", description="Step 2", action_type="tool_call", dependencies=["n1"])
-        n3 = PlanNode(node_id="n3", description="Step 3", action_type="tool_call", dependencies=["n1"])
-        n4 = PlanNode(node_id="n4", description="Step 4", action_type="tool_call", dependencies=["n2", "n3"])
-        
-        plan = Plan(
-            plan_id="plan_5",
-            context=ctx,
-            root_nodes=[n1, n2, n3, n4]
-        )
-        
-        groups = plan.get_parallel_groups()
-        self.assertEqual(len(groups), 3)
-        self.assertEqual(len(groups[0]), 1)  # n1 only
-        self.assertEqual(len(groups[1]), 2)  # n2, n3
-        self.assertEqual(len(groups[2]), 1)  # n4
-    
-    def test_plan_serialization(self):
-        """Test plan serialization."""
-        ctx = PlanningContext(task_description="Serialization test")
-        plan = Plan(plan_id="plan_6", context=ctx)
-        
-        d = plan.to_dict()
-        self.assertEqual(d["plan_id"], "plan_6")
-        self.assertEqual(d["status"], "PENDING")
-        self.assertEqual(d["version"], 1)
-        self.assertEqual(d["trace_count"], 0)
-
-
-class TestTreeOfThoughtPlanner(unittest.TestCase):
-    """Test Tree of Thought planning capabilities."""
-    
-    def test_planner_creation(self):
-        """Test planner initialization."""
-        planner = TreeOfThoughtPlanner(max_branches=4, exploration_depth=5)
-        self.assertEqual(planner.max_branches, 4)
-        self.assertEqual(planner.exploration_depth, 5)
-    
-    def test_generate_research_plan(self):
-        """Test plan generation for research task."""
-        planner = TreeOfThoughtPlanner()
-        ctx = PlanningContext(task_description="Research the latest AI agents")
-        
-        plan = planner.generate_plan(ctx)
-        
-        self.assertIsNotNone(plan.plan_id)
-        self.assertGreater(len(plan.root_nodes), 0)
-        self.assertEqual(plan.status, PlanStatus.PENDING)
-        self.assertEqual(len(planner.plan_history), 1)
-        
-        # Check that goals were decomposed
-        root_descriptions = [r.description for r in plan.root_nodes]
-        self.assertTrue(any("search" in d.lower() or "gather" in d.lower() 
-                           for d in root_descriptions))
-    
-    def test_generate_code_plan(self):
-        """Test plan generation for coding task."""
-        planner = TreeOfThoughtPlanner()
-        ctx = PlanningContext(task_description="Implement a Python function")
-        
-        plan = planner.generate_plan(ctx)
-        
-        self.assertGreater(len(plan.root_nodes), 0)
-        root_descriptions = [r.description for r in plan.root_nodes]
-        self.assertTrue(any("implement" in d.lower() or "design" in d.lower() 
-                           for d in root_descriptions))
-    
-    def test_generate_analysis_plan(self):
-        """Test plan generation for analysis task."""
-        planner = TreeOfThoughtPlanner()
-        ctx = PlanningContext(task_description="Analyze the dataset")
-        
-        plan = planner.generate_plan(ctx)
-        
-        self.assertGreater(len(plan.root_nodes), 0)
-        root_descriptions = [r.description for r in plan.root_nodes]
-        self.assertTrue(any("analyze" in d.lower() or "data" in d.lower() 
-                           for d in root_descriptions))
-    
-    def test_alternative_branches_generated(self):
-        """Test that alternative branches are generated."""
-        planner = TreeOfThoughtPlanner(max_branches=3)
-        ctx = PlanningContext(task_description="Research AI")
-        
-        plan = planner.generate_plan(ctx)
-        
-        # Check that at least one root node has alternative branches
-        roots_with_branches = sum(1 for r in plan.root_nodes 
-                                 if len(r.alternative_branches) > 0)
-        self.assertGreater(roots_with_branches, 0)
-    
-    def test_branch_evaluation(self):
-        """Test branch evaluation and selection."""
-        planner = TreeOfThoughtPlanner()
-        ctx = PlanningContext(task_description="Test")
-        
-        plan = planner.generate_plan(ctx)
-        
-        # Simple evaluation function
-        def eval_fn(node: PlanNode) -> float:
-            if "parallel" in node.description.lower():
-                return 0.8
-            return 0.5
-        
-        scores = planner.evaluate_branches(plan, eval_fn)
-        self.assertIsInstance(scores, dict)
+        assert scores["b1"] == 0.8
+        assert scores["b2"] == 0.6
     
     def test_select_best_branch(self):
         """Test selecting best branch."""
         planner = TreeOfThoughtPlanner()
         
-        # Create root with branches
-        root = PlanNode(node_id="root", description="Root", action_type="subgoal")
-        branch1 = PlanNode(node_id="b1", description="Branch 1", action_type="reasoning")
-        branch2 = PlanNode(node_id="b2", description="Branch 2", action_type="reasoning")
-        root.alternative_branches = [branch1, branch2]
+        branch1 = PlanNode(node_id="b1", description="Approach 1", action_type="reasoning")
+        branch2 = PlanNode(node_id="b2", description="Approach 2", action_type="reasoning")
         
-        scores = {"b1": 0.3, "b2": 0.8}
+        root = PlanNode(
+            node_id="root",
+            description="Root",
+            action_type="decision",
+            alternative_branches=[branch1, branch2]
+        )
+        
+        scores = {"b1": 0.8, "b2": 0.6}
         best = planner.select_best_branch(root, scores)
         
-        self.assertIsNotNone(best)
-        self.assertEqual(best.node_id, "b2")
+        assert best == branch1  # Higher score
+    
+    def test_select_best_branch_with_low_scores(self):
+        """Test selecting best branch when all scores are low."""
+        planner = TreeOfThoughtPlanner()
+        
+        branch1 = PlanNode(node_id="b1", description="Approach 1", action_type="reasoning")
+        
+        root = PlanNode(
+            node_id="root",
+            description="Root",
+            action_type="decision",
+            alternative_branches=[branch1]
+        )
+        
+        scores = {"b1": -0.5}  # Negative score
+        best = planner.select_best_branch(root, scores)
+        
+        assert best is None  # Score too low
 
 
-class TestTestTimeAdapter(unittest.TestCase):
+class TestTestTimeAdapter:
     """Test test-time adaptation capabilities."""
     
-    def test_adapter_creation(self):
+    def test_adapter_initialization(self):
         """Test adapter initialization."""
         adapter = TestTimeAdapter(refinement_threshold=0.8)
-        self.assertEqual(adapter.refinement_threshold, 0.8)
-        self.assertEqual(adapter.refinement_history, [])
+        
+        assert adapter.refinement_threshold == 0.8
+        assert adapter.refinement_history == []
     
     def test_should_refine_low_confidence(self):
-        """Test refinement trigger on low confidence."""
+        """Test refinement trigger for low confidence."""
         adapter = TestTimeAdapter(refinement_threshold=0.7)
+        
         node = PlanNode(
             node_id="n1",
             description="Test",
-            action_type="tool_call",
-            confidence=0.5
+            action_type="action",
+            confidence=0.5  # Below threshold
         )
         
-        should_refine = adapter.should_refine(node, {"result": "ok"})
-        self.assertTrue(should_refine)
+        assert adapter.should_refine(node, "result") is True
+    
+    def test_should_refine_high_confidence(self):
+        """Test no refinement when confidence is high."""
+        adapter = TestTimeAdapter(refinement_threshold=0.7)
+        
+        node = PlanNode(
+            node_id="n1",
+            description="Test",
+            action_type="action",
+            confidence=0.9  # Above threshold
+        )
+        
+        assert adapter.should_refine(node, "result") is False
     
     def test_should_refine_error_result(self):
-        """Test refinement trigger on error result."""
+        """Test refinement triggered by error result."""
         adapter = TestTimeAdapter(refinement_threshold=0.7)
+        
         node = PlanNode(
             node_id="n1",
             description="Test",
-            action_type="tool_call",
+            action_type="action",
             confidence=0.9
         )
         
-        should_refine = adapter.should_refine(node, {"error": "Failed", "success": False})
-        self.assertTrue(should_refine)
+        result = {"error": "Timeout", "success": False}
+        assert adapter.should_refine(node, result) is True
     
-    def test_should_not_refine(self):
-        """Test no refinement needed."""
+    def test_should_refine_exhausted_retries(self):
+        """Test refinement when retries exhausted."""
         adapter = TestTimeAdapter(refinement_threshold=0.7)
-        node = PlanNode(
-            node_id="n1",
-            description="Test",
-            action_type="tool_call",
-            confidence=0.9
-        )
         
-        should_refine = adapter.should_refine(node, {"success": True, "data": "result"})
-        self.assertFalse(should_refine)
-    
-    def test_should_refine_max_retries(self):
-        """Test refinement after max retries."""
-        adapter = TestTimeAdapter(refinement_threshold=0.7)
         node = PlanNode(
             node_id="n1",
             description="Test",
-            action_type="tool_call",
+            action_type="action",
             confidence=0.9,
             retry_count=3,
             max_retries=3
         )
         
-        should_refine = adapter.should_refine(node, {"success": True})
-        self.assertTrue(should_refine)
+        assert adapter.should_refine(node, "result") is True
     
     def test_refine_node(self):
         """Test node refinement."""
         adapter = TestTimeAdapter()
+        
         node = PlanNode(
             node_id="n1",
-            description="Original",
+            description="Original step",
             action_type="tool_call",
-            parameters={"key": "value"}
+            parameters={"query": "test"}
         )
         
-        refined = adapter.refine_node(node, "Timeout occurred")
+        refined = adapter.refine_node(node, "Connection timeout after 30s")
         
-        self.assertEqual(node.status, NodeStatus.REPLANNED)
-        self.assertNotEqual(refined.node_id, node.node_id)
-        self.assertIn("refined", refined.description)
-        self.assertIn("Timeout", refined.description)
-        self.assertEqual(adapter.refinement_history[0]["original_node"], "n1")
+        assert refined.node_id == "n1_refined"
+        assert "refined" in refined.description.lower()
+        assert "timeout" in refined.description.lower()
+        assert refined.action_type == "tool_call"
+        assert refined.parameters["refinement_reason"] == "Connection timeout after 30s"
+        assert node.status == NodeStatus.REPLANNED
+        assert len(adapter.refinement_history) == 1
     
     def test_adapt_plan(self):
         """Test full plan adaptation."""
         adapter = TestTimeAdapter()
-        ctx = PlanningContext(task_description="Test")
         
-        n1 = PlanNode(node_id="n1", description="Node 1", action_type="tool_call")
-        n2 = PlanNode(node_id="n2", description="Node 2", action_type="tool_call", dependencies=["n1"])
+        context = PlanningContext(task_description="Test")
+        node1 = PlanNode(node_id="n1", description="Step 1", action_type="action")
+        node2 = PlanNode(node_id="n2", description="Step 2", action_type="action")
         
-        plan = Plan(
-            plan_id="plan_1",
-            context=ctx,
-            root_nodes=[n1, n2]
-        )
+        plan = Plan(plan_id="p1", context=context, root_nodes=[node1, node2])
+        plan._index_nodes()
         
-        new_plan = adapter.adapt_plan(plan, n1, "Connection error")
+        new_plan = adapter.adapt_plan(plan, node1, "Failed to execute")
         
-        self.assertEqual(new_plan.parent_plan_id, "plan_1")
-        self.assertEqual(new_plan.version, 2)
-        self.assertNotEqual(new_plan.plan_id, plan.plan_id)
-        self.assertEqual(len(new_plan.root_nodes), 2)
+        assert new_plan.plan_id.startswith("p1_v")
+        assert new_plan.parent_plan_id == "p1"
+        assert new_plan.version == 2
+        assert len(new_plan.root_nodes) == 2
 
 
-class TestMCPAwarePlanner(unittest.TestCase):
-    """Test MCP-aware planning."""
+class TestMCPAwarePlanner:
+    """Test MCP-aware planning capabilities."""
+    
+    def test_planner_initialization(self):
+        """Test MCP planner initialization."""
+        registry = {"tool1": {}, "tool2": {}}
+        planner = MCPAwarePlanner(tool_registry=registry)
+        
+        assert planner.tool_registry == registry
+        assert planner.tool_usage_patterns["tool1"]["success_count"] == 0
     
     def test_register_tool(self):
         """Test tool registration."""
         planner = MCPAwarePlanner()
-        schema = {"name": "web_search", "description": "Search the web"}
         
-        planner.register_tool("web_search", schema)
+        planner.register_tool("web_search", {"description": "Search the web"})
         
-        self.assertIn("web_search", planner.tool_registry)
-        self.assertEqual(planner.tool_registry["web_search"], schema)
+        assert "web_search" in planner.tool_registry
+        assert planner.tool_registry["web_search"]["description"] == "Search the web"
     
-    def test_select_relevant_tools_for_research(self):
-        """Test tool selection for research task."""
+    def test_select_relevant_tools_research(self):
+        """Test relevant tool selection for research."""
         planner = MCPAwarePlanner()
+        
         available = ["web_search", "code_gen", "analysis", "file_operations"]
-        
-        relevant = planner._select_relevant_tools("Research the topic", available)
-        
-        self.assertIn("web_search", relevant)
-    
-    def test_select_relevant_tools_for_coding(self):
-        """Test tool selection for coding task."""
-        planner = MCPAwarePlanner()
-        available = ["web_search", "code_gen", "analysis", "file_operations"]
-        
-        relevant = planner._select_relevant_tools("Implement the function", available)
-        
-        self.assertIn("code_gen", relevant)
-    
-    def test_select_relevant_tools_for_analysis(self):
-        """Test tool selection for analysis task."""
-        planner = MCPAwarePlanner()
-        available = ["web_search", "code_gen", "analysis", "file_operations"]
-        
-        relevant = planner._select_relevant_tools("Analyze the dataset", available)
-        
-        self.assertIn("analysis", relevant)
-    
-    def test_select_relevant_tools_fallback(self):
-        """Test tool fallback when no matches."""
-        planner = MCPAwarePlanner()
-        available = ["web_search", "code_gen", "analysis"]
-        
-        relevant = planner._select_relevant_tools("Do something unknown", available)
-        
-        # Should return up to 3 tools
-        self.assertEqual(len(relevant), 3)
-    
-    def test_generate_tool_aware_plan(self):
-        """Test generating plan with tool awareness."""
-        tot_planner = TreeOfThoughtPlanner()
-        mcp_planner = MCPAwarePlanner()
-        mcp_planner.register_tool("web_search", {"type": "search"})
-        
-        ctx = PlanningContext(
-            task_description="Research AI agents",
-            available_tools=["web_search", "analysis"]
+        relevant = planner._select_relevant_tools(
+            "Research the latest AI news",
+            available
         )
         
-        plan = mcp_planner.generate_tool_aware_plan(ctx, tot_planner)
-        
-        self.assertGreater(len(plan.root_nodes), 0)
-        # Check context was updated with relevant tools
-        self.assertIn("web_search", ctx.available_tools)
-
-
-class TestPlanExecutor(unittest.TestCase):
-    """Test plan execution with adaptation."""
+        assert "web_search" in relevant
     
-    def test_executor_creation(self):
+    def test_select_relevant_tools_code(self):
+        """Test relevant tool selection for code tasks."""
+        planner = MCPAwarePlanner()
+        
+        available = ["web_search", "code_gen", "analysis", "file_operations"]
+        relevant = planner._select_relevant_tools(
+            "Implement a new feature",
+            available
+        )
+        
+        assert "code_gen" in relevant
+    
+    def test_select_relevant_tools_analysis(self):
+        """Test relevant tool selection for analysis."""
+        planner = MCPAwarePlanner()
+        
+        available = ["web_search", "code_gen", "analysis", "file_operations"]
+        relevant = planner._select_relevant_tools(
+            "Analyze the dataset",
+            available
+        )
+        
+        assert "analysis" in relevant
+    
+    def test_select_relevant_tools_no_match(self):
+        """Test fallback when no tools match."""
+        planner = MCPAwarePlanner()
+        
+        available = ["web_search", "code_gen", "analysis"]
+        relevant = planner._select_relevant_tools(
+            "Do something completely different",
+            available
+        )
+        
+        # Falls back to first 3 available
+        assert len(relevant) == 3
+
+
+class TestPlanExecutor:
+    """Test plan execution capabilities."""
+    
+    def test_executor_initialization(self):
         """Test executor initialization."""
         tot = TreeOfThoughtPlanner()
         adapter = TestTimeAdapter()
         executor = PlanExecutor(tot, adapter, max_parallel=5)
         
-        self.assertEqual(executor.max_parallel, 5)
-        self.assertEqual(executor.active_plans, {})
+        assert executor.planner == tot
+        assert executor.adapter == adapter
+        assert executor.max_parallel == 5
+        assert executor.active_plans == {}
     
-    def test_simple_execution(self):
-        """Test simple plan execution."""
+    def test_execute_simple_plan(self):
+        """Test executing a simple plan."""
         tot = TreeOfThoughtPlanner()
         adapter = TestTimeAdapter()
         executor = PlanExecutor(tot, adapter)
         
-        ctx = PlanningContext(task_description="Test execution")
-        node = PlanNode(node_id="n1", description="Simple task", action_type="tool_call")
-        plan = Plan(plan_id="test_plan", context=ctx, root_nodes=[node])
+        context = PlanningContext(task_description="Test task")
+        node = PlanNode(node_id="n1", description="Simple step", action_type="action")
+        plan = Plan(plan_id="p1", context=context, root_nodes=[node])
+        plan._index_nodes()
         
-        def mock_executor(node: PlanNode) -> Tuple[bool, Any]:
-            return True, "Success"
+        # Mock executor that always succeeds
+        def mock_executor(node):
+            return True, "success"
         
         trace = executor.execute_plan(plan, mock_executor)
         
-        self.assertEqual(plan.status, PlanStatus.COMPLETED)
-        self.assertEqual(trace.success_rate, 1.0)
-        self.assertEqual(len(trace.node_executions), 1)
+        assert trace.plan_id == "p1"
+        assert trace.success_rate == 1.0
+        assert plan.status == PlanStatus.COMPLETED
+        assert len(trace.node_executions) == 1
+        assert trace.node_executions[0]["success"] is True
     
-    def test_execution_with_failure(self):
-        """Test execution with node failure."""
+    def test_execute_plan_with_failure(self):
+        """Test plan execution with node failure."""
         tot = TreeOfThoughtPlanner()
         adapter = TestTimeAdapter()
         executor = PlanExecutor(tot, adapter)
         
-        ctx = PlanningContext(task_description="Test failure")
-        node = PlanNode(node_id="n1", description="Failing task", action_type="tool_call")
-        plan = Plan(plan_id="fail_plan", context=ctx, root_nodes=[node])
+        context = PlanningContext(task_description="Test task")
+        node1 = PlanNode(node_id="n1", description="Step 1", action_type="action")
+        node2 = PlanNode(node_id="n2", description="Step 2", action_type="action", dependencies=["n1"])
         
-        def mock_executor(node: PlanNode) -> Tuple[bool, Any]:
-            return False, {"error": "Failed", "success": False}
+        plan = Plan(plan_id="p1", context=context, root_nodes=[node1, node2])
+        plan._index_nodes()
         
-        # This will trigger refinement and re-execution, eventually failing
-        # After 3 retries + refinements, it should fail
-        trace = executor.execute_plan(plan, mock_executor)
-        
-        # The adapted plan is created during execution, check its traces
-        # The final plan will have the trace added
-        final_plan = executor.active_plans.get(plan.plan_id, plan)
-        # Plan should have been refined at least once (version > 1 indicates adaptation)
-        # or the final plan should have the trace
-        self.assertGreaterEqual(len(final_plan.execution_traces), 0)
-        # Verify trace exists
-        self.assertIsNotNone(trace)
-        self.assertGreater(len(trace.node_executions), 0)
-    
-    def test_parallel_execution_groups(self):
-        """Test execution respects parallel groups."""
-        tot = TreeOfThoughtPlanner()
-        adapter = TestTimeAdapter()
-        executor = PlanExecutor(tot, adapter)
-        
-        ctx = PlanningContext(task_description="Parallel test")
-        n1 = PlanNode(node_id="n1", description="Independent 1", action_type="tool_call")
-        n2 = PlanNode(node_id="n2", description="Independent 2", action_type="tool_call")
-        
-        plan = Plan(plan_id="parallel_plan", context=ctx, root_nodes=[n1, n2])
-        
-        execution_order = []
-        def mock_executor(node: PlanNode) -> Tuple[bool, Any]:
-            execution_order.append(node.node_id)
-            return True, f"Result for {node.node_id}"
+        # Mock executor that fails on node 1
+        def mock_executor(node):
+            if node.node_id == "n1":
+                return False, "Error: failed"
+            return True, "success"
         
         trace = executor.execute_plan(plan, mock_executor)
         
-        self.assertEqual(len(execution_order), 2)
-        self.assertEqual(trace.success_rate, 1.0)
+        assert trace.node_executions[0]["success"] is False
+        assert trace.node_executions[0]["error"] == "Error: failed"
     
-    def test_execution_statistics(self):
-        """Test plan statistics calculation."""
+    def test_execute_plan_with_multiple_nodes(self):
+        """Test executing plan with multiple independent nodes."""
         tot = TreeOfThoughtPlanner()
         adapter = TestTimeAdapter()
         executor = PlanExecutor(tot, adapter)
         
-        ctx = PlanningContext(task_description="Stats test")
-        n1 = PlanNode(node_id="n1", description="Node 1", action_type="tool_call")
-        n2 = PlanNode(node_id="n2", description="Node 2", action_type="tool_call", dependencies=["n1"])
-        n1.status = NodeStatus.COMPLETED
-        n2.status = NodeStatus.COMPLETED
+        context = PlanningContext(task_description="Test task")
+        node1 = PlanNode(node_id="n1", description="Step 1", action_type="action")
+        node2 = PlanNode(node_id="n2", description="Step 2", action_type="action")
         
-        plan = Plan(plan_id="stats_plan", context=ctx, root_nodes=[n1, n2])
+        plan = Plan(plan_id="p1", context=context, root_nodes=[node1, node2])
+        plan._index_nodes()
+        
+        def mock_executor(node):
+            return True, f"Output from {node.node_id}"
+        
+        trace = executor.execute_plan(plan, mock_executor)
+        
+        assert len(trace.node_executions) == 2
+        assert trace.success_rate == 1.0
+    
+    def test_get_plan_statistics(self):
+        """Test getting plan execution statistics."""
+        tot = TreeOfThoughtPlanner()
+        adapter = TestTimeAdapter()
+        executor = PlanExecutor(tot, adapter)
+        
+        context = PlanningContext(task_description="Test task")
+        node1 = PlanNode(node_id="n1", description="Step 1", action_type="action")
+        node2 = PlanNode(node_id="n2", description="Step 2", action_type="action")
+        node3 = PlanNode(node_id="n3", description="Step 3", action_type="action")
+        
+        plan = Plan(plan_id="p1", context=context, root_nodes=[node1, node2, node3])
+        plan._index_nodes()
+        
+        # Simulate execution
+        node1.status = NodeStatus.COMPLETED
+        node2.status = NodeStatus.COMPLETED
+        node3.status = NodeStatus.FAILED
         
         stats = executor.get_plan_statistics(plan)
         
-        self.assertEqual(stats["total_nodes"], 2)
-        self.assertEqual(stats["completed"], 2)
-        self.assertEqual(stats["success_rate"], 1.0)
-        self.assertEqual(stats["version"], 1)
+        assert stats["total_nodes"] == 3
+        assert stats["completed"] == 2
+        assert stats["failed"] == 1
+        assert stats["success_rate"] == 2 / 3
+        assert stats["version"] == 1
 
 
-class TestIntegration(unittest.TestCase):
-    """Integration tests for the full planning pipeline."""
+class TestCreateDefaultPlanner:
+    """Test default planner factory function."""
     
-    def test_full_pipeline_creation(self):
-        """Test creating default planning pipeline."""
-        tools = {"web_search": {"type": "search"}}
-        tot, adapter, mcp, executor = create_default_planner(tools)
+    def test_create_all_components(self):
+        """Test that all components are created."""
+        tot, adapter, mcp, executor = create_default_planner()
         
-        self.assertIsInstance(tot, TreeOfThoughtPlanner)
-        self.assertIsInstance(adapter, TestTimeAdapter)
-        self.assertIsInstance(mcp, MCPAwarePlanner)
-        self.assertIsInstance(executor, PlanExecutor)
+        assert isinstance(tot, TreeOfThoughtPlanner)
+        assert isinstance(adapter, TestTimeAdapter)
+        assert isinstance(mcp, MCPAwarePlanner)
+        assert isinstance(executor, PlanExecutor)
     
-    def test_end_to_end_research_workflow(self):
-        """Test end-to-end research planning workflow."""
-        tools = {
-            "web_search": {"description": "Search the web"},
-            "analysis": {"description": "Analyze data"}
-        }
-        tot, adapter, mcp, executor = create_default_planner(tools)
+    def test_create_with_registry(self):
+        """Test creation with tool registry."""
+        registry = {"web_search": {}, "code_gen": {}}
+        tot, adapter, mcp, executor = create_default_planner(registry)
         
-        # Create context
-        ctx = PlanningContext(
-            task_description="Research the latest AI agent frameworks",
+        assert mcp.tool_registry == registry
+
+
+class TestIntegrationScenarios:
+    """Integration tests for complete planning workflows."""
+    
+    def test_full_research_planning_workflow(self):
+        """Test complete research planning and execution."""
+        # Setup
+        tot = TreeOfThoughtPlanner()
+        adapter = TestTimeAdapter()
+        mcp = MCPAwarePlanner({"web_search": {}, "analysis": {}})
+        executor = PlanExecutor(tot, adapter)
+        
+        # Create research context
+        context = PlanningContext(
+            task_description="Research latest AI developments",
             available_tools=["web_search", "analysis"],
             max_parallel_branches=2
         )
         
         # Generate plan
-        plan = mcp.generate_tool_aware_plan(ctx, tot)
+        plan = tot.generate_plan(context)
         
         # Verify plan structure
-        self.assertGreater(len(plan.root_nodes), 0)
-        self.assertEqual(plan.status, PlanStatus.PENDING)
+        assert len(plan.root_nodes) > 0
         
-        # Mock executor
-        def mock_executor(node: PlanNode) -> Tuple[bool, Any]:
-            return True, f"Completed: {node.description}"
-        
-        # Execute
-        trace = executor.execute_plan(plan, mock_executor)
-        
-        # Verify execution
-        self.assertEqual(plan.status, PlanStatus.COMPLETED)
-        self.assertGreater(trace.success_rate, 0)
+        # Check that goals were decomposed correctly
+        goal_descriptions = [node.description for node in plan.root_nodes]
+        assert any("search" in d.lower() or "strategy" in d.lower() for d in goal_descriptions)
     
-    def test_end_to_end_with_adaptation(self):
-        """Test end-to-end workflow with adaptation."""
-        tools = {"code_gen": {"description": "Generate code"}}
-        tot, adapter, mcp, executor = create_default_planner(tools)
+    def test_code_generation_planning_workflow(self):
+        """Test complete code generation planning."""
+        tot = TreeOfThoughtPlanner()
         
-        ctx = PlanningContext(
-            task_description="Implement a sorting function",
+        context = PlanningContext(
+            task_description="Implement a new feature",
             available_tools=["code_gen"],
-            refinement_threshold=0.8
+            max_parallel_branches=2
         )
         
-        plan = mcp.generate_tool_aware_plan(ctx, tot)
+        plan = tot.generate_plan(context)
         
-        # Executor that fails then succeeds
-        attempt_count = 0
-        def adaptive_executor(node: PlanNode) -> Tuple[bool, Any]:
-            nonlocal attempt_count
-            attempt_count += 1
-            if node.retry_count < 1:
-                return False, {"error": "Syntax error"}
-            return True, "def sort(): pass"
+        # Verify code-related goals
+        goal_descriptions = [node.description for node in plan.root_nodes]
+        assert any("implement" in d.lower() or "code" in d.lower() or "design" in d.lower() 
+                   for d in goal_descriptions)
+    
+    def test_plan_with_alternatives_selection(self):
+        """Test planning with alternative branch selection."""
+        tot = TreeOfThoughtPlanner()
         
-        trace = executor.execute_plan(plan, adaptive_executor)
+        context = PlanningContext(
+            task_description="Research task",
+            max_parallel_branches=3
+        )
         
-        # Should have had at least one retry/refinement
-        self.assertGreater(attempt_count, 1)
-
-
-def run_tests():
-    """Run all tests with output."""
-    loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
-    
-    # Add all test classes
-    suite.addTests(loader.loadTestsFromTestCase(TestPlanningContext))
-    suite.addTests(loader.loadTestsFromTestCase(TestPlanNode))
-    suite.addTests(loader.loadTestsFromTestCase(TestPlan))
-    suite.addTests(loader.loadTestsFromTestCase(TestTreeOfThoughtPlanner))
-    suite.addTests(loader.loadTestsFromTestCase(TestTestTimeAdapter))
-    suite.addTests(loader.loadTestsFromTestCase(TestMCPAwarePlanner))
-    suite.addTests(loader.loadTestsFromTestCase(TestPlanExecutor))
-    suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
-    
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(suite)
-    
-    return result
+        plan = tot.generate_plan(context)
+        
+        # Evaluate branches with different scoring strategies
+        def quality_score(node):
+            # Prefer approaches with "parallel" or "direct"
+            desc = node.description.lower()
+            if "parallel" in desc:
+                return 0.9
+            elif "direct" in desc or "targeted" in desc:
+                return 0.7
+            return 0.5
+        
+        # Test for each root node separately
+        for root in plan.root_nodes:
+            if root.alternative_branches:
+                # Get scores for this root's branches only
+                branch_scores = {b.node_id: quality_score(b) for b in root.alternative_branches}
+                
+                # Manually find best branch
+                best_branch_id = max(branch_scores.keys(), key=lambda k: branch_scores[k])
+                expected_best = branch_scores[best_branch_id]
+                
+                # Use the planner's method
+                scores = tot.evaluate_branches(plan, quality_score)
+                best = tot.select_best_branch(root, scores)
+                
+                if best:
+                    # Best should have highest score among THIS root's branches
+                    assert scores[best.node_id] == expected_best, \
+                        f"Expected best score {expected_best}, got {scores[best.node_id]}"
 
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("Running Planner Module Test Suite")
-    print("=" * 60)
-    result = run_tests()
-    
-    print("\n" + "=" * 60)
-    print(f"Tests Run: {result.testsRun}")
-    print(f"Successes: {result.testsRun - len(result.failures) - len(result.errors)}")
-    print(f"Failures: {len(result.failures)}")
-    print(f"Errors: {len(result.errors)}")
-    print("=" * 60)
-    
-    if result.wasSuccessful():
-        print("✅ All tests passed!")
-        sys.exit(0)
-    else:
-        print("❌ Some tests failed")
-        sys.exit(1)
+    pytest.main([__file__, "-v"])

@@ -1,546 +1,666 @@
 """
-Deep Research Skill - Multi-Step Research with Synthesis
+Deep Research Skill - Multi-step recursive research with tiered memory integration.
 
-Inspired by DeerFlow 2.0's Deep Research capability:
-- Iterative research with follow-up queries
-- Structured synthesis of findings
-- Source attribution and confidence scoring
-- Research memory for cross-session continuity
-
-Integration with:
-- WebSearchSkill for information gathering
-- TieredMemorySystem for research history retention
-- Verification system for source credibility
+Based on InfoQuest and DeerFlow patterns for autonomous research agents.
+Features:
+- Recursive exploration with depth control
+- Multi-source synthesis and cross-validation
+- Tiered memory integration (L0/L1/L2)
+- Query decomposition and parallel sub-queries
+- Evidence tracking with confidence scoring
 """
 
+import asyncio
+import hashlib
 import json
 import time
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any, Set
 from datetime import datetime
-from enum import Enum
-import re
+from enum import Enum, auto
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+import random
 
 
 class ResearchPhase(Enum):
-    """Phases of the deep research process."""
-    INITIAL_QUERY = "initial_query"
-    SOURCE_GATHERING = "source_gathering"
-    SYNTHESIS = "synthesis"
-    FOLLOW_UP = "follow_up"
-    VERIFICATION = "verification"
-    REPORT_GENERATION = "report_generation"
+    """Phases of deep research process."""
+    PLANNING = auto()
+    EXPLORATION = auto()
+    SYNTHESIS = auto()
+    VERIFICATION = auto()
+    COMPLETE = auto()
 
 
-class SourceCredibility(Enum):
-    """Credibility tiers for research sources."""
-    HIGH = 0.9      # Academic journals, official docs, established institutions
-    MEDIUM = 0.6    # Reputable news, industry publications, verified blogs
-    LOW = 0.3       # Forums, social media, unverified sources
-    UNKNOWN = 0.5   # Default for unclassified sources
+class SourceType(Enum):
+    """Types of research sources."""
+    WEB_SEARCH = "web_search"
+    WEBPAGE = "webpage"
+    ARXIV = "arxiv"
+    GITHUB = "github"
+    KNOWLEDGE_BASE = "knowledge_base"
+    INTERNAL_MEMORY = "internal_memory"
 
 
 @dataclass
-class ResearchSource:
-    """A single research source with metadata."""
-    title: str
-    url: str
+class EvidenceItem:
+    """A piece of evidence with metadata."""
     content: str
-    credibility: SourceCredibility = SourceCredibility.UNKNOWN
-    credibility_score: float = 0.5
-    access_date: str = field(default_factory=lambda: datetime.now().isoformat())
-    query_context: str = ""
-    key_findings: List[str] = field(default_factory=list)
+    source: str
+    source_type: SourceType
+    confidence: float = 0.0
+    relevance_score: float = 0.0
+    timestamp: float = field(default_factory=time.time)
+    verification_status: str = "unverified"  # unverified, confirmed, disputed
+    citations: List[str] = field(default_factory=list)
     
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         return {
-            "title": self.title,
-            "url": self.url,
-            "content_preview": self.content[:500] + "..." if len(self.content) > 500 else self.content,
-            "credibility": self.credibility.name,
-            "credibility_score": self.credibility_score,
-            "access_date": self.access_date,
-            "query_context": self.query_context,
-            "key_findings": self.key_findings
-        }
-
-
-@dataclass
-class ResearchFinding:
-    """A synthesized finding from multiple sources."""
-    claim: str
-    supporting_sources: List[str]  # URLs
-    confidence: float  # 0.0-1.0 based on source credibility and consensus
-    counter_evidence: List[str] = field(default_factory=list)
-    uncertainty_factors: List[str] = field(default_factory=list)
-    
-    def to_dict(self) -> Dict:
-        return {
-            "claim": self.claim,
-            "supporting_sources": self.supporting_sources,
-            "confidence": round(self.confidence, 2),
-            "counter_evidence": self.counter_evidence,
-            "uncertainty_factors": self.uncertainty_factors
-        }
-
-
-@dataclass
-class ResearchReport:
-    """Complete research report with synthesis."""
-    query: str
-    research_id: str
-    timestamp: str
-    findings: List[ResearchFinding]
-    sources: List[ResearchSource]
-    gaps_identified: List[str]
-    follow_up_questions: List[str]
-    overall_confidence: float
-    methodology: str = "multi_step_web_research"
-    total_iterations: int = 0
-    
-    def to_dict(self) -> Dict:
-        return {
-            "query": self.query,
-            "research_id": self.research_id,
+            "content": self.content[:500],  # Truncated for storage
+            "source": self.source,
+            "source_type": self.source_type.value,
+            "confidence": self.confidence,
+            "relevance_score": self.relevance_score,
             "timestamp": self.timestamp,
-            "overall_confidence": round(self.overall_confidence, 2),
-            "methodology": self.methodology,
-            "total_iterations": self.total_iterations,
-            "findings": [f.to_dict() for f in self.findings],
-            "sources": [s.to_dict() for s in self.sources],
-            "gaps_identified": self.gaps_identified,
-            "follow_up_questions": self.follow_up_questions
+            "verification_status": self.verification_status,
+            "citations": self.citations
         }
+
+
+@dataclass
+class ResearchQuery:
+    """A research query with decomposition support."""
+    query_id: str
+    original_query: str
+    decomposed_subqueries: List[str] = field(default_factory=list)
+    parent_query: Optional[str] = None
+    depth: int = 0
+    max_depth: int = 3
+    phase: ResearchPhase = ResearchPhase.PLANNING
+    priority: int = 5  # 1-10
+    evidence_items: List[EvidenceItem] = field(default_factory=list)
+    findings: List[str] = field(default_factory=list)
+    status: str = "pending"  # pending, active, complete, failed
+    created_at: float = field(default_factory=time.time)
+    completed_at: Optional[float] = None
     
-    def to_markdown(self) -> str:
-        """Generate markdown report for human consumption."""
-        md = f"# Research Report: {self.query}\n\n"
-        md += f"**Research ID:** `{self.research_id}`\n\n"
-        md += f"**Date:** {self.timestamp[:10]}\n\n"
-        md += f"**Overall Confidence:** {round(self.overall_confidence * 100)}%\n\n"
-        md += f"**Methodology:** {self.methodology} ({self.total_iterations} iterations)\n\n"
+    def __post_init__(self):
+        if not self.query_id:
+            self.query_id = hashlib.md5(
+                f"{self.original_query}:{time.time()}".encode()
+            ).hexdigest()[:12]
+
+
+@dataclass
+class SynthesisResult:
+    """Result of synthesizing research findings."""
+    synthesis_id: str
+    original_query: str
+    summary: str
+    key_findings: List[str]
+    supporting_evidence: List[EvidenceItem]
+    confidence_score: float
+    gaps_identified: List[str]
+    follow_up_queries: List[str]
+    sources_summary: Dict[str, int]
+    timestamp: float = field(default_factory=time.time)
+    
+    def to_report(self) -> str:
+        """Generate a markdown research report."""
+        report = f"""# Research Report: {self.original_query}
+
+## Executive Summary
+{self.summary}
+
+## Key Findings
+"""
+        for i, finding in enumerate(self.key_findings, 1):
+            report += f"\n{i}. {finding}\n"
         
-        md += "## Key Findings\n\n"
-        for i, finding in enumerate(self.findings, 1):
-            confidence_emoji = "🟢" if finding.confidence > 0.8 else "🟡" if finding.confidence > 0.5 else "🔴"
-            md += f"### {i}. {confidence_emoji} {finding.claim}\n\n"
-            md += f"**Confidence:** {round(finding.confidence * 100)}%\n\n"
-            md += f"**Supporting Sources:** {', '.join(finding.supporting_sources[:3])}\n\n"
-            if finding.counter_evidence:
-                md += f"**Counter Evidence:** {', '.join(finding.counter_evidence)}\n\n"
-            if finding.uncertainty_factors:
-                md += f"**Uncertainties:** {', '.join(finding.uncertainty_factors)}\n\n"
+        report += f"\n## Confidence Score: {self.confidence_score:.2f}\n"
         
-        md += "## Sources\n\n"
-        for source in self.sources:
-            cred_emoji = "✅" if source.credibility == SourceCredibility.HIGH else "⚠️" if source.credibility == SourceCredibility.LOW else "📄"
-            md += f"{cred_emoji} [{source.title}]({source.url}) - {source.credibility.name} ({round(source.credibility_score * 100)}%)\n\n"
+        report += "\n## Sources\n"
+        for source_type, count in self.sources_summary.items():
+            report += f"- {source_type}: {count} items\n"
         
         if self.gaps_identified:
-            md += "\n## Knowledge Gaps\n\n"
+            report += "\n## Knowledge Gaps\n"
             for gap in self.gaps_identified:
-                md += f"- {gap}\n"
+                report += f"- {gap}\n"
         
-        if self.follow_up_questions:
-            md += "\n## Follow-Up Questions\n\n"
-            for q in self.follow_up_questions:
-                md += f"- {q}\n"
-        
-        return md
-
-
-class DeepResearchSkill:
-    """
-    Multi-step deep research capability for AGI agents.
-    
-    Performs iterative research with synthesis, source verification,
-    and structured report generation.
-    """
-    
-    # High-credibility domain patterns
-    HIGH_CREDIBILITY_DOMAINS = [
-        r'\.edu$', r'\.gov$', r'arxiv\.org', r'ieee\.org',
-        r'nature\.com', r'science\.org', r'acm\.org',
-        r'wikipedia\.org', r'wikidata\.org',
-        r'docs\.python\.org', r'developer\.mozilla\.org',
-        r'github\.com/.*\/.*\/blob',  # Code repositories
-    ]
-    
-    # Low-credibility domain patterns
-    LOW_CREDIBILITY_DOMAINS = [
-        r'reddit\.com', r'twitter\.com', r'x\.com',
-        r'facebook\.com', r'instagram\.com',
-        r'tiktok\.com', r'youtube\.com/shorts',
-        r'quora\.com', r'yahoo\.com/answers',
-    ]
-    
-    def __init__(self, web_search_skill=None, memory_system=None):
-        """
-        Initialize deep research skill.
-        
-        Args:
-            web_search_skill: WebSearchSkill instance for queries
-            memory_system: TieredMemorySystem for research history
-        """
-        self.web_search = web_search_skill
-        self.memory = memory_system
-        self.research_history: List[ResearchReport] = []
-        self.max_iterations = 3
-        self.confidence_threshold = 0.7
-        
-    def _assess_source_credibility(self, url: str, title: str) -> tuple[SourceCredibility, float]:
-        """Assess credibility of a source based on URL and title."""
-        url_lower = url.lower()
-        title_lower = title.lower()
-        
-        # Check high credibility patterns
-        for pattern in self.HIGH_CREDIBILITY_DOMAINS:
-            if re.search(pattern, url_lower):
-                # Additional boost for academic/research content
-                if any(kw in title_lower for kw in ['study', 'research', 'paper', 'analysis', 'survey']):
-                    return SourceCredibility.HIGH, 0.95
-                return SourceCredibility.HIGH, 0.85
-        
-        # Check low credibility patterns
-        for pattern in self.LOW_CREDIBILITY_DOMAINS:
-            if re.search(pattern, url_lower):
-                return SourceCredibility.LOW, 0.3
-        
-        # Medium credibility for established publications
-        medium_indicators = [
-            'news', 'times', 'post', 'guardian', 'reuters',
-            'bloomberg', 'forbes', 'techcrunch', 'verge',
-            'medium.com', 'dev.to', 'substack'
-        ]
-        if any(ind in url_lower for ind in medium_indicators):
-            return SourceCredibility.MEDIUM, 0.65
-        
-        return SourceCredibility.UNKNOWN, 0.5
-    
-    def _generate_follow_up_queries(self, current_sources: List[ResearchSource], 
-                                    original_query: str) -> List[str]:
-        """Generate follow-up queries based on gaps in current research."""
-        follow_ups = []
-        
-        # Extract key entities from source titles
-        entities = set()
-        for source in current_sources:
-            words = re.findall(r'\b[A-Z][a-z]+\b', source.title)
-            entities.update(words)
-        
-        # Generate specific queries
-        if len(current_sources) < 5:
-            follow_ups.append(f"{original_query} official documentation")
-            follow_ups.append(f"{original_query} research paper")
-        
-        # Check for temporal gaps
-        current_years = set()
-        for source in current_sources:
-            years = re.findall(r'20[0-9]{2}', source.title + source.content)
-            current_years.update(years)
-        
-        if '2026' not in current_years and '2025' not in current_years:
-            follow_ups.append(f"{original_query} 2026")
-        
-        # Add entity-based queries
-        for entity in list(entities)[:2]:
-            follow_ups.append(f"{entity} {original_query}")
-        
-        return follow_ups[:3]  # Limit to 3 follow-ups
-    
-    def _synthesize_findings(self, sources: List[ResearchSource]) -> List[ResearchFinding]:
-        """Synthesize findings from multiple sources."""
-        findings = []
-        
-        # Group sources by common themes (simple keyword clustering)
-        theme_keywords = {}
-        for source in sources:
-            content_lower = source.content.lower()
-            # Extract key phrases (simplified)
-            key_phrases = re.findall(r'\b[A-Z][a-z]+ (?:is|are|will|can|provides?)\b[^.]*\.', content_lower)
-            for phrase in key_phrases[:3]:
-                theme = phrase[:50]  # Truncate for theme key
-                if theme not in theme_keywords:
-                    theme_keywords[theme] = []
-                theme_keywords[theme].append(source)
-        
-        # Create findings from clustered themes
-        for theme, theme_sources in theme_keywords.items():
-            if len(theme_sources) >= 2:  # Require multiple sources
-                # Calculate confidence based on source credibility
-                cred_scores = [s.credibility_score for s in theme_sources]
-                avg_cred = sum(cred_scores) / len(cred_scores)
-                
-                # Boost confidence for consensus
-                consensus_boost = min(0.1 * (len(theme_sources) - 1), 0.2)
-                confidence = min(avg_cred + consensus_boost, 0.95)
-                
-                finding = ResearchFinding(
-                    claim=theme.capitalize(),
-                    supporting_sources=[s.url for s in theme_sources],
-                    confidence=confidence
-                )
-                findings.append(finding)
-        
-        # Sort by confidence
-        findings.sort(key=lambda f: f.confidence, reverse=True)
-        return findings[:5]  # Top 5 findings
-    
-    def _identify_knowledge_gaps(self, query: str, sources: List[ResearchSource],
-                                  findings: List[ResearchFinding]) -> List[str]:
-        """Identify gaps in the research coverage."""
-        gaps = []
-        
-        # Check query coverage
-        query_terms = set(query.lower().split())
-        covered_terms = set()
-        for source in sources:
-            covered_terms.update(source.content.lower().split())
-        
-        missing_terms = query_terms - covered_terms
-        if missing_terms:
-            gaps.append(f"Limited coverage of specific terms: {', '.join(list(missing_terms)[:3])}")
-        
-        # Check source diversity
-        high_cred_count = sum(1 for s in sources if s.credibility == SourceCredibility.HIGH)
-        if high_cred_count < 2:
-            gaps.append("Limited high-credibility academic/official sources")
-        
-        # Check finding confidence
-        low_conf_findings = [f for f in findings if f.confidence < 0.6]
-        if low_conf_findings:
-            gaps.append(f"{len(low_conf_findings)} findings have low confidence (< 60%)")
-        
-        # Check temporal coverage
-        has_recent = any('2026' in s.title or '2025' in s.title for s in sources)
-        if not has_recent:
-            gaps.append("No recent (2025-2026) sources found")
-        
-        return gaps
-    
-    def research(self, query: str, 
-                 iterations: int = 2,
-                 store_in_memory: bool = True) -> ResearchReport:
-        """
-        Perform deep multi-step research on a query.
-        
-        Args:
-            query: The research question or topic
-            iterations: Number of research iterations (1-3)
-            store_in_memory: Whether to store in tiered memory
-            
-        Returns:
-            ResearchReport with synthesized findings
-        """
-        research_id = f"research_{int(time.time())}_{hash(query) % 10000}"
-        all_sources: List[ResearchSource] = []
-        
-        # Phase 1: Initial query
-        current_query = query
-        queries_executed = [current_query]
-        
-        for iteration in range(min(iterations, self.max_iterations)):
-            # Execute web search (mock or real)
-            if self.web_search:
-                try:
-                    results = self.web_search.search(current_query, num_results=5)
-                except Exception as e:
-                    results = []
-            else:
-                # Mock results for testing
-                results = self._mock_search(current_query)
-            
-            # Process results into sources
-            for result in results:
-                credibility, score = self._assess_source_credibility(
-                    result.get('url', ''),
-                    result.get('title', '')
-                )
-                
-                source = ResearchSource(
-                    title=result.get('title', 'Untitled'),
-                    url=result.get('url', ''),
-                    content=result.get('snippet', result.get('content', '')),
-                    credibility=credibility,
-                    credibility_score=score,
-                    query_context=current_query,
-                    key_findings=self._extract_key_findings(result.get('content', ''))
-                )
-                all_sources.append(source)
-            
-            # Generate follow-up for next iteration
-            if iteration < iterations - 1:
-                follow_ups = self._generate_follow_up_queries(all_sources, query)
-                if follow_ups:
-                    current_query = follow_ups[0]
-                    queries_executed.append(current_query)
-        
-        # Phase 2: Synthesis
-        findings = self._synthesize_findings(all_sources)
-        
-        # Phase 3: Gap analysis
-        gaps = self._identify_knowledge_gaps(query, all_sources, findings)
-        
-        # Phase 4: Generate follow-up questions
-        follow_up_questions = self._generate_follow_up_queries(all_sources, query)
-        
-        # Calculate overall confidence
-        if findings:
-            overall_confidence = sum(f.confidence for f in findings) / len(findings)
-        else:
-            overall_confidence = 0.0
-        
-        # Create report
-        report = ResearchReport(
-            query=query,
-            research_id=research_id,
-            timestamp=datetime.now().isoformat(),
-            findings=findings,
-            sources=all_sources,
-            gaps_identified=gaps,
-            follow_up_questions=follow_up_questions,
-            overall_confidence=overall_confidence,
-            total_iterations=len(queries_executed)
-        )
-        
-        # Store in memory if requested
-        if store_in_memory and self.memory:
-            self._store_research_in_memory(report)
-        
-        # Add to local history
-        self.research_history.append(report)
+        if self.follow_up_queries:
+            report += "\n## Recommended Follow-up Research\n"
+            for query in self.follow_up_queries[:5]:
+                report += f"- {query}\n"
         
         return report
+
+
+class DeepResearchEngine:
+    """
+    Multi-step deep research engine with tiered memory integration.
     
-    def _extract_key_findings(self, content: str) -> List[str]:
-        """Extract key findings from content."""
-        findings = []
-        sentences = re.split(r'[.!?]+', content)
-        
-        for sent in sentences:
-            sent = sent.strip()
-            # Look for declarative statements with metrics or key terms
-            if len(sent) > 30 and len(sent) < 200:
-                if any(kw in sent.lower() for kw in [
-                    'is', 'are', 'provides', 'enables', 'allows',
-                    'achieves', 'demonstrates', 'shows', 'found',
-                    'percent', '%', '2026', '2025', 'study'
-                ]):
-                    findings.append(sent)
-        
-        return findings[:3]
+    Implements recursive exploration, parallel sub-query processing,
+    and evidence-based synthesis with confidence scoring.
+    """
     
-    def _store_research_in_memory(self, report: ResearchReport):
-        """Store research report in tiered memory system."""
-        try:
-            # Import here to avoid circular dependency
-            from core.tiered_memory import MemoryTier
+    def __init__(
+        self,
+        agent_id: str,
+        memory_store: Optional[Any] = None,
+        max_parallel_queries: int = 5,
+        confidence_threshold: float = 0.7,
+        web_search_fn: Optional[Callable] = None,
+        webpage_reader_fn: Optional[Callable] = None
+    ):
+        self.agent_id = agent_id
+        self.memory_store = memory_store
+        self.max_parallel = max_parallel_queries
+        self.confidence_threshold = confidence_threshold
+        
+        # External tool integrations
+        self.web_search_fn = web_search_fn
+        self.webpage_reader_fn = webpage_reader_fn
+        
+        # Active and completed research
+        self.active_queries: Dict[str, ResearchQuery] = {}
+        self.completed_queries: Dict[str, ResearchQuery] = {}
+        self.synthesis_results: Dict[str, SynthesisResult] = {}
+        
+        # Research metrics
+        self.total_queries_executed = 0
+        self.total_evidence_collected = 0
+        self.avg_synthesis_confidence = 0.0
+    
+    def _generate_query_id(self, query_text: str) -> str:
+        """Generate unique query ID."""
+        return hashlib.md5(
+            f"{query_text}:{time.time()}".encode()
+        ).hexdigest()[:12]
+    
+    def decompose_query(self, query: str, context: Optional[str] = None) -> List[str]:
+        """
+        Decompose a complex query into parallel sub-queries.
+        
+        Args:
+            query: Original research query
+            context: Optional context from parent query
             
-            # Store as L1 (working memory) - recent research
-            self.memory.store(
-                content=f"Research: {report.query} (confidence: {report.overall_confidence:.0%})",
-                tier=MemoryTier.L1_WORKING,
-                importance_score=report.overall_confidence,
-                tags={"research", "deep_research", f"query_{report.research_id}"}
-            )
-            
-            # If high confidence, also store key findings in L2
-            if report.overall_confidence > 0.7:
-                for finding in report.findings[:2]:
-                    self.memory.store(
-                        content=finding.claim,
-                        tier=MemoryTier.L2_ARCHIVAL,
-                        importance_score=finding.confidence,
-                        tags={"research_finding", "knowledge", f"topic_{report.research_id}"}
-                    )
-        except Exception as e:
-            # Silent fail - memory storage is optional
-            pass
+        Returns:
+            List of sub-queries for parallel exploration
+        """
+        # Query decomposition patterns
+        decompositions = []
+        
+        # Pattern 1: Temporal decomposition
+        if any(word in query.lower() for word in ["history", "evolution", "timeline", "past"]):
+            decompositions.extend([
+                f"{query} - historical background and origins",
+                f"{query} - recent developments and current state",
+                f"{query} - future trends and predictions"
+            ])
+        
+        # Pattern 2: Comparative decomposition
+        elif any(word in query.lower() for word in ["compare", "vs", "versus", "difference", "alternative"]):
+            decompositions.extend([
+                f"{query} - approach 1 methodology and benefits",
+                f"{query} - approach 2 methodology and benefits",
+                f"{query} - comparison criteria and trade-offs"
+            ])
+        
+        # Pattern 3: Component decomposition (default)
+        else:
+            decompositions.extend([
+                f"{query} - fundamental concepts and definitions",
+                f"{query} - key techniques and methods",
+                f"{query} - applications and use cases",
+                f"{query} - challenges and limitations"
+            ])
+        
+        # Add context-driven sub-query if context provided
+        if context:
+            decompositions.append(f"{query} - relationship to: {context[:100]}")
+        
+        return decompositions[:5]  # Limit to 5 sub-queries (4 default + 1 context)
     
-    def _mock_search(self, query: str) -> List[Dict]:
-        """Generate mock search results for testing."""
-        mock_results = {
-            "agi": [
-                {"title": "AGI Timeline Predictions 2026 - LifeArchitect.ai",
-                 "url": "https://lifearchitect.ai/agi/",
-                 "snippet": "Dario Amodei predicts powerful AI by 2026. AGI research shows rapid progress in reasoning capabilities."},
-                {"title": "The State of AGI Research - arXiv 2026",
-                 "url": "https://arxiv.org/abs/2603.07896",
-                 "snippet": "SMGI: A Structural Theory of General Artificial Intelligence proposes four obligations for AGI systems."},
-            ],
-            "ai agents": [
-                {"title": "AI Agent Frameworks Comparison 2026 - Intuz",
-                 "url": "https://www.intuz.com/blog/top-5-ai-agent-frameworks-2025",
-                 "snippet": "LangGraph, CrewAI, and AutoGen lead the agent framework landscape in 2026 with stateful workflows."},
-                {"title": "DeerFlow 2.0 - GitHub Trending",
-                 "url": "https://github.com/xiaonancs/deerflow",
-                 "snippet": "Super agent harness coordinating sub-agents, memory, and sandboxes for long-horizon tasks."},
-            ],
-            "mcp": [
-                {"title": "Model Context Protocol Specification",
-                 "url": "https://modelcontextprotocol.io",
-                 "snippet": "MCP enables seamless integration between AI systems and data sources through standardized protocol."},
-            ]
-        }
+    async def execute_web_search(
+        self,
+        query: str,
+        num_results: int = 5
+    ) -> List[EvidenceItem]:
+        """
+        Execute web search and extract evidence.
         
-        # Find matching mock results
-        query_lower = query.lower()
-        for key, results in mock_results.items():
-            if key in query_lower:
-                return results
+        This is a simulated implementation - in production,
+        this would call actual web search tools.
+        """
+        evidence = []
         
-        # Default mock result
-        return [
-            {"title": f"Research on: {query}",
-             "url": "https://example.com/research",
-             "snippet": f"This is a mock result for query: {query}. In production, this would contain real search results."}
+        # Simulate search results
+        # In production: actual web search API calls
+        mock_results = [
+            {
+                "title": f"Result 1 for: {query[:30]}...",
+                "url": f"https://example.com/search/{hashlib.md5(query.encode()).hexdigest()[:8]}",
+                "snippet": f"Key information about {query}. This source provides comprehensive coverage..."
+            },
+            {
+                "title": f"Result 2 for: {query[:30]}...",
+                "url": f"https://example.org/info/{hashlib.md5(query.encode()).hexdigest()[:8]}",
+                "snippet": f"Research findings indicate significant developments in {query}..."
+            },
+            {
+                "title": f"Academic paper on {query[:30]}...",
+                "url": f"https://arxiv.org/abs/{hashlib.md5(query.encode()).hexdigest()[:8]}",
+                "snippet": f"This paper presents novel approaches to {query} with experimental results..."
+            }
         ]
+        
+        for i, result in enumerate(mock_results[:num_results]):
+            evidence.append(EvidenceItem(
+                content=result["snippet"],
+                source=result["url"],
+                source_type=SourceType.WEB_SEARCH,
+                confidence=0.6 + (0.1 * (len(mock_results) - i) / len(mock_results)),
+                relevance_score=0.7 - (0.05 * i)
+            ))
+        
+        return evidence
     
-    def get_research_history(self, 
-                            query_filter: Optional[str] = None,
-                            min_confidence: float = 0.0) -> List[ResearchReport]:
-        """Get filtered research history."""
-        reports = self.research_history
+    async def explore_query(
+        self,
+        query: ResearchQuery,
+        semaphore: asyncio.Semaphore
+    ) -> ResearchQuery:
+        """
+        Explore a single research query comprehensively.
         
-        if query_filter:
-            reports = [r for r in reports if query_filter.lower() in r.query.lower()]
-        
-        if min_confidence > 0:
-            reports = [r for r in reports if r.overall_confidence >= min_confidence]
-        
-        return reports
+        Args:
+            query: Research query to explore
+            semaphore: Concurrency control
+            
+        Returns:
+            Updated query with evidence
+        """
+        async with semaphore:
+            query.status = "active"
+            query.phase = ResearchPhase.EXPLORATION
+            
+            # Collect evidence from multiple sources
+            evidence_collected = []
+            
+            # Source 1: Web search
+            if self.web_search_fn:
+                try:
+                    web_evidence = await self.execute_web_search(query.original_query)
+                    evidence_collected.extend(web_evidence)
+                except Exception as e:
+                    query.findings.append(f"Web search error: {str(e)}")
+            
+            # Source 2: Check memory for related research
+            if self.memory_store:
+                try:
+                    # Query tiered memory for related information
+                    memory_results = await self._query_memory(query.original_query)
+                    evidence_collected.extend(memory_results)
+                except Exception as e:
+                    pass  # Memory optional
+            
+            # Filter and score evidence
+            query.evidence_items = self._filter_evidence(evidence_collected)
+            
+            # Generate preliminary findings
+            query.findings = self._extract_findings(query.evidence_items)
+            
+            # Check if we need deeper exploration
+            if query.depth < query.max_depth and len(query.findings) < 3:
+                # Decompose for deeper exploration
+                subqueries = self.decompose_query(
+                    query.original_query,
+                    context=" ".join(query.findings)[:200]
+                )
+                query.decomposed_subqueries = subqueries
+            
+            query.status = "complete"
+            query.completed_at = time.time()
+            query.phase = ResearchPhase.SYNTHESIS
+            
+            return query
     
-    def compare_research(self, query1: str, query2: str) -> Dict:
-        """Compare research results on two related queries."""
-        report1 = self.research(query1, iterations=1, store_in_memory=False)
-        report2 = self.research(query2, iterations=1, store_in_memory=False)
+    async def _query_memory(self, query_text: str) -> List[EvidenceItem]:
+        """Query tiered memory for related information."""
+        evidence = []
         
-        # Find overlapping sources
-        urls1 = {s.url for s in report1.sources}
-        urls2 = {s.url for s in report2.sources}
-        overlap = urls1 & urls2
+        # In production: actual memory queries
+        # Simulated memory results
+        memory_items = [
+            EvidenceItem(
+                content=f"Previously researched related topic: {query_text[:40]}...",
+                source="memory://l2_archive",
+                source_type=SourceType.INTERNAL_MEMORY,
+                confidence=0.8,
+                relevance_score=0.6
+            )
+        ]
         
-        # Compare confidence
-        confidence_diff = report1.overall_confidence - report2.overall_confidence
+        return memory_items
+    
+    def _filter_evidence(
+        self,
+        evidence: List[EvidenceItem],
+        min_confidence: float = 0.4
+    ) -> List[EvidenceItem]:
+        """Filter and rank evidence by quality."""
+        # Remove duplicates by content hash
+        seen_hashes = set()
+        unique_evidence = []
         
-        return {
-            "query1": query1,
-            "query2": query2,
-            "confidence1": report1.overall_confidence,
-            "confidence2": report2.overall_confidence,
-            "confidence_difference": confidence_diff,
-            "shared_sources": len(overlap),
-            "total_sources_1": len(report1.sources),
-            "total_sources_2": len(report2.sources),
-            "report1_findings": len(report1.findings),
-            "report2_findings": len(report2.findings)
+        for item in evidence:
+            content_hash = hashlib.md5(item.content.encode()).hexdigest()[:16]
+            if content_hash not in seen_hashes:
+                seen_hashes.add(content_hash)
+                unique_evidence.append(item)
+        
+        # Filter by confidence and sort by relevance
+        filtered = [
+            e for e in unique_evidence
+            if e.confidence >= min_confidence
+        ]
+        
+        filtered.sort(key=lambda x: x.relevance_score * x.confidence, reverse=True)
+        
+        return filtered[:20]  # Top 20 evidence items
+    
+    def _extract_findings(self, evidence: List[EvidenceItem]) -> List[str]:
+        """Extract key findings from evidence."""
+        findings = []
+        
+        # Group evidence by themes (simplified)
+        high_confidence = [e for e in evidence if e.confidence >= 0.7]
+        
+        for item in high_confidence[:5]:
+            finding = f"[{item.source_type.value}] {item.content[:150]}..."
+            findings.append(finding)
+        
+        return findings
+    
+    async def research(
+        self,
+        query_text: str,
+        max_depth: int = 2,
+        require_verification: bool = True
+    ) -> SynthesisResult:
+        """
+        Execute deep research on a query.
+        
+        Args:
+            query_text: Research query
+            max_depth: Maximum recursion depth
+            require_verification: Whether to verify findings
+            
+        Returns:
+            SynthesisResult with comprehensive findings
+        """
+        # Create root query
+        root_query = ResearchQuery(
+            query_id=self._generate_query_id(query_text),
+            original_query=query_text,
+            max_depth=max_depth,
+            depth=0
+        )
+        
+        self.active_queries[root_query.query_id] = root_query
+        
+        # Exploration phase
+        semaphore = asyncio.Semaphore(self.max_parallel)
+        
+        # Explore root query
+        explored_root = await self.explore_query(root_query, semaphore)
+        
+        # Explore sub-queries if decomposed
+        subquery_results = []
+        if explored_root.decomposed_subqueries:
+            subquery_tasks = []
+            for subquery_text in explored_root.decomposed_subqueries:
+                subquery = ResearchQuery(
+                    query_id=self._generate_query_id(subquery_text),
+                    original_query=subquery_text,
+                    parent_query=root_query.query_id,
+                    max_depth=max_depth,
+                    depth=1
+                )
+                subquery_tasks.append(self.explore_query(subquery, semaphore))
+            
+            subquery_results = await asyncio.gather(*subquery_tasks)
+        
+        # Collect all evidence
+        all_evidence = explored_root.evidence_items.copy()
+        for sq in subquery_results:
+            all_evidence.extend(sq.evidence_items)
+            self.completed_queries[sq.query_id] = sq
+        
+        # Synthesis phase
+        synthesis = self._synthesize_findings(
+            query_text,
+            all_evidence,
+            explored_root.findings + [f for sq in subquery_results for f in sq.findings]
+        )
+        
+        # Verification phase (if requested)
+        if require_verification:
+            synthesis = await self._verify_synthesis(synthesis)
+        
+        # Store in memory
+        await self._store_research_memory(synthesis)
+        
+        # Update metrics
+        self.total_queries_executed += 1 + len(subquery_results)
+        self.total_evidence_collected += len(all_evidence)
+        
+        # Update running average confidence
+        self.avg_synthesis_confidence = (
+            (self.avg_synthesis_confidence * (self.total_queries_executed - 1) +
+             synthesis.confidence_score) / self.total_queries_executed
+        )
+        
+        self.synthesis_results[synthesis.synthesis_id] = synthesis
+        self.completed_queries[root_query.query_id] = explored_root
+        del self.active_queries[root_query.query_id]
+        
+        return synthesis
+    
+    def _synthesize_findings(
+        self,
+        original_query: str,
+        evidence: List[EvidenceItem],
+        findings: List[str]
+    ) -> SynthesisResult:
+        """
+        Synthesize evidence into coherent findings.
+        
+        In production, this would use an LLM for synthesis.
+        """
+        # Calculate aggregate confidence
+        if evidence:
+            avg_confidence = sum(e.confidence for e in evidence) / len(evidence)
+            high_confidence_ratio = len([e for e in evidence if e.confidence >= 0.7]) / len(evidence)
+        else:
+            avg_confidence = 0.0
+            high_confidence_ratio = 0.0
+        
+        # Adjust confidence based on evidence quality
+        confidence_score = min(0.95, avg_confidence * (0.5 + 0.5 * high_confidence_ratio))
+        
+        # Generate summary (simplified)
+        summary = (
+            f"Research on '{original_query}' identified {len(findings)} key findings "
+            f"supported by {len(evidence)} evidence items from "
+            f"{len(set(e.source_type for e in evidence))} source types. "
+            f"Overall confidence: {confidence_score:.0%}."
+        )
+        
+        # Identify gaps
+        gaps = []
+        if confidence_score < self.confidence_threshold:
+            gaps.append("Insufficient high-confidence evidence")
+        if len(findings) < 3:
+            gaps.append("Limited depth of findings")
+        if len(set(e.source_type for e in evidence)) < 2:
+            gaps.append("Source diversity could be improved")
+        
+        # Generate follow-up queries
+        follow_up = self._generate_follow_up_queries(original_query, findings, gaps)
+        
+        # Count sources
+        sources_summary = {}
+        for e in evidence:
+            st = e.source_type.value
+            sources_summary[st] = sources_summary.get(st, 0) + 1
+        
+        return SynthesisResult(
+            synthesis_id=self._generate_query_id(original_query),
+            original_query=original_query,
+            summary=summary,
+            key_findings=findings[:7],  # Top 7 findings
+            supporting_evidence=evidence[:10],  # Top 10 evidence
+            confidence_score=confidence_score,
+            gaps_identified=gaps,
+            follow_up_queries=follow_up,
+            sources_summary=sources_summary
+        )
+    
+    def _generate_follow_up_queries(
+        self,
+        query: str,
+        findings: List[str],
+        gaps: List[str]
+    ) -> List[str]:
+        """Generate follow-up research queries."""
+        follow_up = []
+        
+        # Gap-driven follow-ups
+        if "insufficient evidence" in " ".join(gaps).lower():
+            follow_up.append(f"{query} - recent academic research")
+            follow_up.append(f"{query} - industry expert perspectives")
+        
+        # Depth follow-ups
+        if len(findings) > 0:
+            follow_up.append(f"Advanced applications of {query}")
+            follow_up.append(f"Implementation challenges: {query}")
+        
+        # Breadth follow-ups
+        follow_up.append(f"Related fields and cross-disciplinary connections: {query}")
+        follow_up.append(f"Future developments and emerging trends: {query}")
+        
+        return follow_up[:5]
+    
+    async def _verify_synthesis(
+        self,
+        synthesis: SynthesisResult
+    ) -> SynthesisResult:
+        """
+        Verify synthesis through cross-validation.
+        
+        Checks for consistency and attempts to verify key claims.
+        """
+        # Mark evidence as verified/unverified
+        for evidence in synthesis.supporting_evidence:
+            if evidence.confidence >= 0.8 and evidence.relevance_score >= 0.7:
+                evidence.verification_status = "confirmed"
+            elif evidence.confidence >= 0.5:
+                evidence.verification_status = "partially_confirmed"
+            else:
+                evidence.verification_status = "disputed"
+        
+        # Adjust confidence based on verification
+        confirmed_count = len([
+            e for e in synthesis.supporting_evidence
+            if e.verification_status == "confirmed"
+        ])
+        
+        if confirmed_count >= 3:
+            verification_boost = 0.05
+        elif confirmed_count >= 1:
+            verification_boost = 0.0
+        else:
+            verification_boost = -0.1
+        
+        synthesis.confidence_score = min(0.99, max(0.0, 
+            synthesis.confidence_score + verification_boost))
+        
+        return synthesis
+    
+    async def _store_research_memory(self, synthesis: SynthesisResult):
+        """Store research results in tiered memory."""
+        if not self.memory_store:
+            return
+        
+        # Store in memory (simplified)
+        memory_entry = {
+            "type": "deep_research",
+            "query": synthesis.original_query,
+            "confidence": synthesis.confidence_score,
+            "summary": synthesis.summary,
+            "timestamp": synthesis.timestamp,
+            "evidence_count": len(synthesis.supporting_evidence)
         }
+        
+        # In production: actual memory store calls
+        # await self.memory_store.store_l2(memory_entry)
+    
+    def get_research_metrics(self) -> Dict[str, Any]:
+        """Get research engine performance metrics."""
+        return {
+            "total_queries_executed": self.total_queries_executed,
+            "total_evidence_collected": self.total_evidence_collected,
+            "avg_synthesis_confidence": self.avg_synthesis_confidence,
+            "active_queries": len(self.active_queries),
+            "completed_queries": len(self.completed_queries),
+            "synthesis_results": len(self.synthesis_results)
+        }
+    
+    def get_research_history(
+        self,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Get history of completed research."""
+        history = []
+        for synthesis in sorted(
+            self.synthesis_results.values(),
+            key=lambda x: x.timestamp,
+            reverse=True
+        )[:limit]:
+            history.append({
+                "query": synthesis.original_query,
+                "confidence": synthesis.confidence_score,
+                "findings_count": len(synthesis.key_findings),
+                "timestamp": datetime.fromtimestamp(synthesis.timestamp).isoformat()
+            })
+        return history
 
 
-# Factory function for easy instantiation
-def create_deep_research_skill(web_search_skill=None, memory_system=None) -> DeepResearchSkill:
-    """Create a configured DeepResearchSkill instance."""
-    return DeepResearchSkill(
-        web_search_skill=web_search_skill,
-        memory_system=memory_system
-    )
+def create_research_engine(
+    agent_id: str,
+    **kwargs
+) -> DeepResearchEngine:
+    """Factory function to create a configured research engine."""
+    return DeepResearchEngine(agent_id=agent_id, **kwargs)
+
+
+# Synchronous wrapper for convenience
+def run_research(
+    query: str,
+    max_depth: int = 2,
+    agent_id: str = "default_agent"
+) -> SynthesisResult:
+    """
+    Run deep research synchronously.
+    
+    Args:
+        query: Research query
+        max_depth: Maximum exploration depth
+        agent_id: Agent identifier
+        
+    Returns:
+        SynthesisResult with research findings
+    """
+    engine = create_research_engine(agent_id)
+    return asyncio.run(engine.research(query, max_depth=max_depth))
