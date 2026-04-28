@@ -138,3 +138,129 @@
 
 *Last Updated: April 27, 2026*
 *Research Agent ID: 99581720-8c77-4ea1-950e-de559ac2ea04*
+
+---
+
+## Research Update: April 28, 2026
+
+### Key Industry Trends (Late April 2026)
+
+**1. Multi-Model Routing Architecture**
+- Developers now route across 300+ models via single API (AI.cc)
+- Specialist routing: 70% to cost-optimized models, 25% to mid-tier, 5% to frontier
+- Result: Performance indistinguishable from 100% frontier routing at ~15% cost
+- Key insight: Route by task type, not just cost/performance
+
+**2. LangGraph State Management Dominance**
+- LangGraph surpassed CrewAI in GitHub stars during early 2026
+- Graph-based architecture maps cleanly to production workflows
+- StateGraph with conditional edges for complex branching logic
+- Compilation step mandatory before execution
+
+**3. AI Agent Architecture Patterns (2026)**
+- **Deterministic scaffolding + Stochastic core**: Clear separation for governance
+- **Agentic control planes**: Central orchestrators managing specialized agents
+- **Vision-enabled agents**: Moving from demos to production (healthcare, insurance)
+- **Human-in-the-loop**: Suspend/resume workflows with state persistence
+
+**4. Enterprise Orchestration Maturity**
+- 42% reduction in AI compliance violations with proper control planes
+- 58% improvement in multi-agent workflow completion rates
+- EU AI Act compliance now a core architecture requirement
+- Rate limit errors = 30% of all LLM failures (Datadog 2026)
+
+**5. Memory and Context Management**
+- 69% of LLM tokens are system prompts (scaffolding expansion)
+- Only 28% of calls use cached context
+- Token usage per request has more than doubled YoY
+- L0/L1/L2 tiered memory now standard in agent frameworks
+
+### New arXiv Papers (Past Week)
+
+**[2604.07745v1] The Cartesian Cut in Agentic AI**
+- Separation between learned core (LLM) and engineered runtime
+- Governance is only possible at the engineered layer
+- Key insight: Don't mix stochastic and deterministic components
+
+**[2604.04347v1] RoboPhD: Elo Tournament Selection for Agent Evolution**
+- Improved ARC-AGI from 27.8% to 65.8% through tournament selection
+- Agents compete, winners reproduce with mutation
+- Demonstrates power of evolutionary pressure in agent improvement
+
+**[2604.18292] Agent-World: Self-Evolving Training Arena**
+- Environment-driven task synthesis for capability gaps
+- Agent-World-8B/14B outperforms proprietary baselines
+- Self-evolving training arena generates progressively harder tasks
+
+### Trending Open Source Agent Repos (April 28, 2026)
+
+**Mastra** (mastra-ai/mastra) - TypeScript AI Framework
+- 40+ LLM providers via unified interface
+- Graph-based workflow orchestration
+- Human-in-the-loop with suspend/resume
+- Context and memory management
+- Built-in evals and observability
+
+**VoltAgent** (VoltAgent/voltagent) - Full-Stack Platform
+- Core Runtime + VoltOps Console
+- MCP (Model Context Protocol) integration
+- Workflow Engine for declarative automations
+- Supervisors & Sub-Agents for team orchestration
+
+**SuperAgentX** (superagentxai/superagentx)
+- 100+ LLMs supported
+- 10,000+ MCP tools
+- Human-in-the-loop governance
+- Audit trails and policy enforcement
+- Action-oriented beyond chat
+
+**ClawAgents** (x1jiang/clawagents_py)
+- ~2,500 lines of Python
+- OpenAI/Gemini/Claude support
+- Built-in planning, memory, sandboxing
+- Gateway server architecture
+
+**KaibanJS** (kaiban-ai/KaibanJS)
+- Kanban-inspired agent workflow
+- Real-time task progress visualization
+- TypeScript/JavaScript framework
+- 1.4k+ stars, active community
+
+**OpenGitAgent** (open-gitagent/gitagent)
+- Framework-agnostic, git-native agent standard
+- Export to Claude Code, OpenAI, LangChain, CrewAI, AutoGen
+- Uses agent.yaml, SOUL.md, RULES.md for agent definition
+- Compliance-forward design with audit trails
+
+### Research Insights for Implementation
+
+**Key Pattern: Specialist Model Routing**
+```
+Task Type → Router → Model Selection
+- Multimodal tasks → Gemini 3.1 Pro
+- Complex coding → GLM-5.1 or Claude Opus 4.7
+- Long-context retrieval → Llama 4 Scout
+- Asian languages → Qwen 3.6-Plus
+- Tool-heavy tasks → GPT-5.5
+```
+
+**Key Pattern: State Management**
+```python
+class AgentState(MessagesState):
+    next_action: str
+    retry_count: int = 0
+
+graph = StateGraph(AgentState)
+graph.add_conditional_edges("classify", lambda state: state["next_action"], {...})
+app = graph.compile()  # Mandatory compilation step
+```
+
+**Key Pattern: Memory Tier Architecture**
+- L0 Context Buffer: 7 items, seconds-minutes duration
+- L1 Working Memory: 100-500 items, minutes-hours
+- L2 Long-term Storage: 10,000+ items, hours-years
+
+### Next Build Priority
+
+**Multi-Model Router Skill**: Implement intelligent routing across multiple LLM providers based on task characteristics, cost constraints, and performance requirements. This is the defining architectural pattern of 2026 agent systems.
+
