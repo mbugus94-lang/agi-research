@@ -1,5 +1,81 @@
 # AGI Research Findings
 
+## Research Update: April 29, 2026
+
+### Key arXiv Papers (Past Week)
+
+**[2603.24621] ARC-AGI-3: New Challenge for Frontier Agentic Intelligence**
+- Interactive benchmark for turn-based agentic environments
+- Agents must infer goals, model dynamics, and plan without explicit instruction
+- Current frontier AI systems score <1% on these tasks
+- Humans solve 100% of environments
+- Emphasizes integrated agent architectures combining world modeling + planning + goal discovery
+
+**[2604.23278] Active Inference: A Method for Phenotyping Agency in AI Systems?**
+- Active inference from theoretical neurobiology applied to AI agency detection
+- World models with representational and predictive capabilities
+- Posterior beliefs over hidden states + prior preferences over observations
+- Policy selection via expected free energy minimization
+- Enables computational phenotyping of agency through explainable action selection
+
+**[2603.28906] Category-theoretic Comparative Framework for AGI**
+- Unifies diverse AGI paradigms (RL, universal AI, active inference, causal RL)
+- Treats AGI architectures as compositional systems within category-theoretic formalism
+- Enables rigorous architectural comparison and evaluation
+- Provides foundation for syntactic/informational and semantic properties
+
+**[2601.11658v1] Towards AGI: Self-Evolving Agent Framework**
+- Hierarchical pipeline: Base LLM + SLM agent + Code-Gen LLM + Teacher-LLM
+- Evolution triggered on failure: tool synthesis or explicit evolution phase
+- Curriculum Learning (CL): Fast recovery and strong generalization
+- Reinforcement Learning (RL): Superior performance on high-difficulty tasks
+- Genetic Algorithm (GA): Greater behavioral diversity
+
+### Trending Open Source Agent Repos (April 29, 2026)
+
+**Microsoft Agent Framework** (microsoft/agent-framework)
+- Cross-language framework (Python + .NET/C#)
+- Graph-based workflows with data-flow between agents
+- Streaming, checkpointing, human-in-the-loop, time-travel
+- Developer UI (DevUI) for testing/debugging
+- ~9.9k stars, 1.3k contributors
+
+**Microsoft Multi-Agent Reference Architecture** (microsoft/multi-agent-reference-architecture)
+- Enterprise-grade multi-agent system blueprint
+- Agents registry and memory management
+- Inter-agent communication and orchestration patterns
+- Observability, evaluation, security, governance
+- Production-scale, real-world deployment guidance
+
+**CAMEL** (camel-ai/camel)
+- Multi-agent framework for studying scaling laws and emergent behaviors
+- Data generation and synthetic datasets
+- World simulation and task automation
+- Strong research orientation: scaling laws, capabilities, risks
+
+**Solace Agent Mesh** (SolaceLabs/solace-agent-mesh)
+- Event-driven, multi-agent AI systems
+- Asynchronous, decoupled architecture on Solace Event Mesh
+- Automatic task delegation through Orchestrator
+- A2A Protocol for agent-to-agent communication
+
+### Key Insights for Implementation
+
+1. **Active Inference for Agency**: Move beyond reactive agents to predictive world models
+2. **Category-Theoretic Design**: Compose agents as morphisms with typed inputs/outputs
+3. **Microsoft's Graph Workflows**: Data-flow between agents more robust than simple chaining
+4. **ARC-AGI-3 Gap**: Need better world modeling + planning integration
+5. **Self-Evolution**: Hierarchical evolution (CL → RL → GA) based on task difficulty
+
+### Next Build Priorities
+
+1. **Active Inference Agent**: Implement predictive world model with free energy minimization
+2. **Graph-Based Agent Workflow**: Data-flow architecture inspired by Microsoft Agent Framework
+3. **Agent Society Simulation**: Multi-agent emergent behavior testing
+4. **A2A Protocol Integration**: Complete the agent-to-agent communication stack
+
+---
+
 ## Research Update: April 27, 2026
 
 ### Key Industry Trends (April 2026)
