@@ -24,7 +24,7 @@ from typing import Dict, List, Optional, Any, Set, Tuple
 from enum import Enum
 from collections import defaultdict
 
-from core.tiered_memory import TieredMemorySystem, MemoryTier, MemoryEntry
+from core.tiered_memory import TieredMemorySystem, MemoryTier, TieredMemoryEntry
 from core.a2a_escrow import (
     A2AProtocol, Capability, ServiceRequest, Contract, 
     TransactionStatus, CapabilityCategory
@@ -177,7 +177,7 @@ class A2AMemoryManager:
         other_agent_id: str,
         capability_name: str,
         initial_terms: Dict[str, Any]
-    ) -> MemoryEntry:
+    ) -> TieredMemoryEntry:
         """
         Record start of negotiation in L0 immediate memory.
         
@@ -194,14 +194,15 @@ class A2AMemoryManager:
             "timestamp": time.time()
         })
         
-        entry = self.memory.store(
+        # Create entry directly and add to L0 buffer
+        entry = TieredMemoryEntry(
             content=content,
-            tier=MemoryTier.L0_IMMEDIATE,
-            directory="/a2a/active/negotiations",
+            tier=0,  # L0 = 0
             importance=0.9,  # High importance - active business
-            tags={"active", "negotiation", request_id, other_agent_id},
-            source="a2a_negotiation"
+            tags=["active", "negotiation", request_id, other_agent_id],
+            agent_id=self.agent_id
         )
+        self.memory.l0_buffer.append(entry)
         
         self._active_conversations[request_id] = {
             "phase": ConversationPhase.NEGOTIATION,
@@ -218,7 +219,7 @@ class A2AMemoryManager:
         proposed_by: str,
         terms: Dict[str, Any],
         response: str  # "accepted", "rejected", "counter"
-    ) -> MemoryEntry:
+    ) -> TieredMemoryEntry:
         """Record a negotiation round in L0 memory."""
         content = json.dumps({
             "type": "negotiation_round",
@@ -230,14 +231,16 @@ class A2AMemoryManager:
             "timestamp": time.time()
         })
         
-        return self.memory.store(
+        entry = TieredMemoryEntry(
             content=content,
-            tier=MemoryTier.L0_IMMEDIATE,
-            directory="/a2a/active/negotiations",
+            tier=0,  # L0 = 0
             importance=0.85,
-            tags={"active", "negotiation", request_id, f"round_{round_num}"},
-            source="a2a_negotiation"
+            tags=["active", "negotiation", request_id, f"round_{round_num}"],
+            agent_id=self.agent_id
         )
+        self.memory.l0_buffer.append(entry)
+        
+        return entry
     
     def start_execution(
         self,
@@ -245,7 +248,7 @@ class A2AMemoryManager:
         request_id: str,
         provider_id: str,
         expected_duration_ms: int
-    ) -> MemoryEntry:
+    ) -> TieredMemoryEntry:
         """Record contract execution start in L0 memory."""
         content = json.dumps({
             "type": "execution_start",
@@ -257,14 +260,14 @@ class A2AMemoryManager:
             "expected_by": time.time() + (expected_duration_ms / 1000)
         })
         
-        entry = self.memory.store(
+        entry = TieredMemoryEntry(
             content=content,
-            tier=MemoryTier.L0_IMMEDIATE,
-            directory="/a2a/active/executions",
+            tier=0,  # L0 = 0
             importance=0.95,  # Critical - money/resources committed
-            tags={"active", "execution", contract_id, provider_id},
-            source="a2a_execution"
+            tags=["active", "execution", contract_id, provider_id],
+            agent_id=self.agent_id
         )
+        self.memory.l0_buffer.append(entry)
         
         if request_id in self._active_conversations:
             self._active_conversations[request_id]["phase"] = ConversationPhase.EXECUTION
@@ -644,7 +647,7 @@ class A2AMemoryManager:
         agents_to_consolidate = set()
         
         # Scan L1 for agents
-        for entry in self.memory.l1_entries:
+        for entry in self.memory.l1_working.values():
             if "agent:" in entry.content:
                 for tag in entry.tags:
                     if tag.startswith("agent_"):

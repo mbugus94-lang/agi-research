@@ -22,7 +22,15 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Set
 from collections import deque, defaultdict
+from enum import Enum
 import math
+
+
+class MemoryTier(Enum):
+    """Memory tier enumeration for L0/L1/L2 architecture."""
+    L0_IMMEDIATE = 0  # Context buffer, seconds to minutes
+    L1_WORKING = 1    # Working memory, minutes to hours
+    L2_ARCHIVAL = 2   # Long-term storage, hours to years
 
 
 @dataclass
@@ -30,7 +38,7 @@ class TieredMemoryEntry:
     """A memory entry in the tiered system"""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     content: Any = None
-    tier: int = 1  # 0=L0, 1=L1, 2=L2
+    tier: Any = field(default=MemoryTier.L1_WORKING)  # Can be int or MemoryTier
     timestamp: datetime = field(default_factory=datetime.now)
     last_accessed: datetime = field(default_factory=datetime.now)
     access_count: int = 0
@@ -46,11 +54,25 @@ class TieredMemoryEntry:
     task_id: Optional[str] = None
     agent_id: Optional[str] = None
     
+    def __post_init__(self):
+        """Normalize tier to MemoryTier enum after init"""
+        if isinstance(self.tier, int):
+            try:
+                self.tier = MemoryTier(self.tier)
+            except ValueError:
+                self.tier = MemoryTier.L1_WORKING
+        # If already MemoryTier, leave it as is
+    
+    @property
+    def importance_score(self):
+        """Alias for importance for backward compatibility"""
+        return self.importance
+    
     def to_dict(self) -> Dict:
         return {
             "id": self.id,
             "content": self.content,
-            "tier": self.tier,
+            "tier": self.tier.value if isinstance(self.tier, MemoryTier) else self.tier,
             "timestamp": self.timestamp.isoformat(),
             "last_accessed": self.last_accessed.isoformat(),
             "access_count": self.access_count,
@@ -258,7 +280,9 @@ class TieredMemorySystem:
     def store(self, content: Any, tier: int = 1,
               tags: Optional[List[str]] = None,
               importance: float = 0.5,
-              task_id: Optional[str] = None) -> str:
+              task_id: Optional[str] = None,
+              directory: Optional[str] = None,
+              source: Optional[str] = None) -> str:
         """Store to specified tier"""
         if tier == 0:
             return self.store_l0(content, tags, task_id)
@@ -659,6 +683,62 @@ class TieredMemorySystem:
         
         self.last_consolidation = datetime.fromisoformat(
             state.get("last_consolidation", datetime.now().isoformat()))
+    
+    def _ensure_directory(self, directory: str):
+        """Creates a directory path in memory structure (just logs/returns for now)"""
+        pass
+    
+    def load_context(self, query: str, max_tokens: int = 2000, expand_tiers: bool = True):
+        """Returns a dict with l0_entries, l1_entries, l2_entries containing memory contents"""
+        # Get L0 entries (most recent context)
+        l0_entries = [str(e.content) for e in self.get_l0_context()]
+        
+        # Get L1 entries
+        l1_entries = [str(e.content) for e in self.l1_working.values()]
+        
+        result = {
+            "l0_entries": l0_entries,
+            "l1_entries": l1_entries,
+            "l2_entries": []
+        }
+        
+        # Optionally include L2
+        if expand_tiers:
+            l2_entries = [str(e.content) for e in self.l2_longterm.values()]
+            result["l2_entries"] = l2_entries
+        
+        return result
+    
+    def retrieve_relevant(self, query: str, directory: str = "", top_k: int = 10):
+        """Returns list of (entry, score) tuples using semantic search"""
+        # Use semantic search to find relevant entries
+        results = self.semantic_search(query, limit=top_k * 2)  # Get more to filter
+        
+        filtered_results = []
+        for entry, score in results:
+            # If directory specified, check if entry matches directory context
+            if directory:
+                # Check tags or content for directory match
+                entry_str = str(entry.content)
+                if directory in entry_str or any(directory in tag for tag in entry.tags):
+                    filtered_results.append((entry, score))
+            else:
+                filtered_results.append((entry, score))
+            
+            if len(filtered_results) >= top_k:
+                break
+        
+        return filtered_results
+    
+    def session_summary(self) -> Dict:
+        """Get summary statistics for the memory system."""
+        return {
+            "total_memories": len(self.l0_buffer) + len(self.l1_working) + len(self.l2_longterm),
+            "l0_count": len(self.l0_buffer),
+            "l1_count": len(self.l1_working),
+            "l2_count": len(self.l2_longterm),
+            "session_id": self.session_id
+        }
 
 
 if __name__ == "__main__":
