@@ -1,354 +1,488 @@
 """
-Memory System for AGI Agent
+Memory System for AGI Research
 
-Based on research findings:
-- Working memory for current context
-- Episodic memory for experiences
-- Semantic memory for facts/patterns
-- Procedural memory for skill traces
-
-Inspired by Ouroboros' persistent identity and Clawith's memory architecture.
+Implements a unified memory interface supporting multiple memory types
+and storage backends. Based on research findings from SMGI [^7] and
+LLM-in-Sandbox [^9] papers.
 """
 
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field, asdict
+from datetime import datetime
+from enum import Enum
+from typing import Dict, List, Optional, Any, Callable
 import json
-import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
-from collections import deque
 import hashlib
+import os
+from pathlib import Path
+
+
+class MemoryType(Enum):
+    """Types of memory supported by the system."""
+    WORKING = "working"       # Short-term, limited capacity (~7 items)
+    EPISODIC = "episodic"     # Event sequences and experiences
+    SEMANTIC = "semantic"     # Facts, concepts, knowledge
+    PROCEDURAL = "procedural" # Skills and procedures
 
 
 @dataclass
 class MemoryEntry:
-    """A single memory entry"""
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    content: Any = None
-    memory_type: str = "episodic"  # working, episodic, semantic, procedural
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    tags: List[str] = field(default_factory=list)
-    importance: float = 0.5  # 0-1 scale
+    """A single memory entry."""
+    id: str
+    content: Any
+    memory_type: MemoryType
+    timestamp: datetime = field(default_factory=datetime.now)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    importance: float = 1.0  # 0.0 to 1.0
     access_count: int = 0
-    last_accessed: Optional[str] = None
-    embeddings: Optional[List[float]] = None  # For semantic search
+    last_accessed: Optional[datetime] = None
     
-    def to_dict(self) -> Dict:
+    def __post_init__(self):
+        if not self.id:
+            self.id = self._generate_id()
+    
+    def _generate_id(self) -> str:
+        """Generate unique ID based on content and timestamp."""
+        content_str = json.dumps(self.content, sort_keys=True, default=str)
+        hash_input = f"{content_str}{self.timestamp.isoformat()}"
+        return hashlib.md5(hash_input.encode()).hexdigest()[:16]
+    
+    def touch(self):
+        """Update access statistics."""
+        self.access_count += 1
+        self.last_accessed = datetime.now()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
         return {
             "id": self.id,
             "content": self.content,
-            "memory_type": self.memory_type,
-            "timestamp": self.timestamp,
-            "tags": self.tags,
+            "memory_type": self.memory_type.value,
+            "timestamp": self.timestamp.isoformat(),
+            "metadata": self.metadata,
             "importance": self.importance,
             "access_count": self.access_count,
-            "last_accessed": self.last_accessed,
-            "embeddings": self.embeddings
+            "last_accessed": self.last_accessed.isoformat() if self.last_accessed else None
         }
     
     @classmethod
-    def from_dict(cls, data: Dict) -> "MemoryEntry":
-        return cls(**data)
-
-
-class MemorySystem:
-    """
-    Multi-tier memory system:
-    
-    1. Working Memory: Small, fast, recent context
-    2. Episodic Memory: Experiences with outcomes
-    3. Semantic Memory: Facts and learned patterns
-    4. Procedural Memory: Skill execution traces
-    """
-    
-    def __init__(self, 
-                 working_capacity: int = 10,
-                 episodic_capacity: int = 1000,
-                 semantic_capacity: int = 500):
-        
-        # Working memory: limited size, fast access
-        self.working_memory: deque = deque(maxlen=working_capacity)
-        
-        # Episodic memory: experiences with timestamps
-        self.episodic_memory: Dict[str, MemoryEntry] = {}
-        
-        # Semantic memory: facts and patterns
-        self.semantic_memory: Dict[str, MemoryEntry] = {}
-        
-        # Procedural memory: how to do things
-        self.procedural_memory: Dict[str, MemoryEntry] = {}
-        
-        # Index for search
-        self.tag_index: Dict[str, List[str]] = {}
-        
-    def store(self, content: Any, 
-              memory_type: str = "episodic",
-              tags: Optional[List[str]] = None,
-              importance: float = 0.5) -> str:
-        """Store a new memory entry"""
-        
-        entry = MemoryEntry(
-            content=content,
-            memory_type=memory_type,
-            tags=tags or [],
-            importance=importance
+    def from_dict(cls, data: Dict[str, Any]) -> 'MemoryEntry':
+        """Create from dictionary."""
+        return cls(
+            id=data["id"],
+            content=data["content"],
+            memory_type=MemoryType(data["memory_type"]),
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            metadata=data.get("metadata", {}),
+            importance=data.get("importance", 1.0),
+            access_count=data.get("access_count", 0),
+            last_accessed=datetime.fromisoformat(data["last_accessed"]) if data.get("last_accessed") else None
         )
-        
-        # Store in appropriate memory tier
-        if memory_type == "working":
-            self.working_memory.append(entry)
-        elif memory_type == "episodic":
-            self.episodic_memory[entry.id] = entry
-        elif memory_type == "semantic":
-            self.semantic_memory[entry.id] = entry
-        elif memory_type == "procedural":
-            self.procedural_memory[entry.id] = entry
-        
-        # Update tag index
-        for tag in entry.tags:
-            if tag not in self.tag_index:
-                self.tag_index[tag] = []
-            self.tag_index[tag].append(entry.id)
-        
+
+
+class MemoryAdapter(ABC):
+    """Abstract base class for memory storage backends."""
+    
+    @abstractmethod
+    def store(self, entry: MemoryEntry) -> str:
+        """Store a memory entry, return its ID."""
+        pass
+    
+    @abstractmethod
+    def retrieve(self, memory_id: str) -> Optional[MemoryEntry]:
+        """Retrieve a memory entry by ID."""
+        pass
+    
+    @abstractmethod
+    def query(self, memory_type: Optional[MemoryType] = None, 
+              limit: int = 10,
+              filter_fn: Optional[Callable[[MemoryEntry], bool]] = None) -> List[MemoryEntry]:
+        """Query memory entries with optional filtering."""
+        pass
+    
+    @abstractmethod
+    def update(self, memory_id: str, entry: MemoryEntry) -> bool:
+        """Update an existing memory entry."""
+        pass
+    
+    @abstractmethod
+    def delete(self, memory_id: str) -> bool:
+        """Delete a memory entry."""
+        pass
+    
+    @abstractmethod
+    def clear(self, memory_type: Optional[MemoryType] = None):
+        """Clear memory, optionally by type."""
+        pass
+
+
+class InMemoryAdapter(MemoryAdapter):
+    """In-memory storage adapter (fast, non-persistent)."""
+    
+    def __init__(self):
+        self._storage: Dict[str, MemoryEntry] = {}
+    
+    def store(self, entry: MemoryEntry) -> str:
+        self._storage[entry.id] = entry
         return entry.id
     
-    def retrieve(self, memory_id: str, 
-                 memory_type: Optional[str] = None) -> Optional[MemoryEntry]:
-        """Retrieve a specific memory by ID"""
-        
-        entry = None
-        
-        if memory_type == "working":
-            for e in self.working_memory:
-                if e.id == memory_id:
-                    entry = e
-                    break
-        elif memory_type == "episodic":
-            entry = self.episodic_memory.get(memory_id)
-        elif memory_type == "semantic":
-            entry = self.semantic_memory.get(memory_id)
-        elif memory_type == "procedural":
-            entry = self.procedural_memory.get(memory_id)
-        else:
-            # Search all tiers
-            for e in self.working_memory:
-                if e.id == memory_id:
-                    entry = e
-                    break
-            entry = entry or self.episodic_memory.get(memory_id)
-            entry = entry or self.semantic_memory.get(memory_id)
-            entry = entry or self.procedural_memory.get(memory_id)
-        
+    def retrieve(self, memory_id: str) -> Optional[MemoryEntry]:
+        entry = self._storage.get(memory_id)
         if entry:
-            entry.access_count += 1
-            entry.last_accessed = datetime.now().isoformat()
-        
+            entry.touch()
         return entry
     
-    def search_by_tags(self, tags: List[str], 
-                       memory_type: Optional[str] = None) -> List[MemoryEntry]:
-        """Search memories by tags"""
+    def query(self, memory_type: Optional[MemoryType] = None,
+              limit: int = 10,
+              filter_fn: Optional[Callable[[MemoryEntry], bool]] = None) -> List[MemoryEntry]:
         results = []
-        
-        for tag in tags:
-            if tag in self.tag_index:
-                for memory_id in self.tag_index[tag]:
-                    entry = self.retrieve(memory_id, memory_type)
-                    if entry and entry not in results:
-                        results.append(entry)
+        for entry in self._storage.values():
+            if memory_type and entry.memory_type != memory_type:
+                continue
+            if filter_fn and not filter_fn(entry):
+                continue
+            results.append(entry)
         
         # Sort by importance and recency
         results.sort(key=lambda e: (e.importance, e.timestamp), reverse=True)
-        return results
+        return results[:limit]
     
-    def get_working_memory(self) -> List[MemoryEntry]:
-        """Get all entries in working memory"""
-        return list(self.working_memory)
+    def update(self, memory_id: str, entry: MemoryEntry) -> bool:
+        if memory_id not in self._storage:
+            return False
+        self._storage[memory_id] = entry
+        return True
     
-    def get_recent_episodes(self, n: int = 10) -> List[MemoryEntry]:
-        """Get most recent episodic memories"""
-        episodes = sorted(
-            self.episodic_memory.values(),
-            key=lambda e: e.timestamp,
-            reverse=True
-        )
-        return episodes[:n]
+    def delete(self, memory_id: str) -> bool:
+        if memory_id not in self._storage:
+            return False
+        del self._storage[memory_id]
+        return True
     
-    def get_important_memories(self, 
-                               memory_type: Optional[str] = None,
-                               threshold: float = 0.7,
-                               n: int = 10) -> List[MemoryEntry]:
-        """Get most important memories above threshold"""
-        
-        all_memories = []
-        
-        if memory_type is None or memory_type == "working":
-            all_memories.extend(self.working_memory)
-        if memory_type is None or memory_type == "episodic":
-            all_memories.extend(self.episodic_memory.values())
-        if memory_type is None or memory_type == "semantic":
-            all_memories.extend(self.semantic_memory.values())
-        if memory_type is None or memory_type == "procedural":
-            all_memories.extend(self.procedural_memory.values())
-        
-        important = [m for m in all_memories if m.importance >= threshold]
-        important.sort(key=lambda e: e.importance, reverse=True)
-        
-        return important[:n]
+    def clear(self, memory_type: Optional[MemoryType] = None):
+        if memory_type is None:
+            self._storage.clear()
+        else:
+            self._storage = {
+                k: v for k, v in self._storage.items() 
+                if v.memory_type != memory_type
+            }
     
-    def consolidate_working_to_episodic(self) -> None:
+    def __len__(self) -> int:
+        return len(self._storage)
+
+
+class FileAdapter(MemoryAdapter):
+    """File-based persistent storage adapter."""
+    
+    def __init__(self, storage_dir: str = ".memory"):
+        self._storage_dir = Path(storage_dir)
+        self._storage_dir.mkdir(parents=True, exist_ok=True)
+        self._cache: Dict[str, MemoryEntry] = {}
+        self._load_all()
+    
+    def _get_file_path(self, memory_id: str) -> Path:
+        """Get file path for a memory entry."""
+        return self._storage_dir / f"{memory_id}.json"
+    
+    def _load_all(self):
+        """Load all memories from disk."""
+        for file_path in self._storage_dir.glob("*.json"):
+            try:
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                    entry = MemoryEntry.from_dict(data)
+                    self._cache[entry.id] = entry
+            except Exception as e:
+                print(f"Warning: Failed to load {file_path}: {e}")
+    
+    def _save_entry(self, entry: MemoryEntry):
+        """Save a single entry to disk."""
+        file_path = self._get_file_path(entry.id)
+        with open(file_path, 'w') as f:
+            json.dump(entry.to_dict(), f, indent=2, default=str)
+    
+    def store(self, entry: MemoryEntry) -> str:
+        self._cache[entry.id] = entry
+        self._save_entry(entry)
+        return entry.id
+    
+    def retrieve(self, memory_id: str) -> Optional[MemoryEntry]:
+        entry = self._cache.get(memory_id)
+        if entry:
+            entry.touch()
+            self._save_entry(entry)
+        return entry
+    
+    def query(self, memory_type: Optional[MemoryType] = None,
+              limit: int = 10,
+              filter_fn: Optional[Callable[[MemoryEntry], bool]] = None) -> List[MemoryEntry]:
+        results = []
+        for entry in self._cache.values():
+            if memory_type and entry.memory_type != memory_type:
+                continue
+            if filter_fn and not filter_fn(entry):
+                continue
+            results.append(entry)
+        
+        # Sort by importance and recency
+        results.sort(key=lambda e: (e.importance, e.timestamp), reverse=True)
+        return results[:limit]
+    
+    def update(self, memory_id: str, entry: MemoryEntry) -> bool:
+        if memory_id not in self._cache:
+            return False
+        self._cache[memory_id] = entry
+        self._save_entry(entry)
+        return True
+    
+    def delete(self, memory_id: str) -> bool:
+        if memory_id not in self._cache:
+            return False
+        del self._cache[memory_id]
+        file_path = self._get_file_path(memory_id)
+        if file_path.exists():
+            file_path.unlink()
+        return True
+    
+    def clear(self, memory_type: Optional[MemoryType] = None):
+        if memory_type is None:
+            for memory_id in list(self._cache.keys()):
+                self.delete(memory_id)
+        else:
+            to_delete = [
+                k for k, v in self._cache.items() 
+                if v.memory_type == memory_type
+            ]
+            for memory_id in to_delete:
+                self.delete(memory_id)
+
+
+class Memory:
+    """
+    Main memory system interface.
+    
+    Provides unified access to multiple memory types with configurable
+    storage backends. Supports working memory capacity management and
+    consolidation to long-term memory.
+    """
+    
+    WORKING_MEMORY_CAPACITY = 7  # Miller's law
+    
+    def __init__(self, adapter: Optional[MemoryAdapter] = None):
+        self._adapter = adapter or InMemoryAdapter()
+        self._working_memory: List[str] = []  # IDs in working memory
+    
+    def store(self, content: Any, 
+              memory_type: MemoryType = MemoryType.WORKING,
+              metadata: Optional[Dict[str, Any]] = None,
+              importance: float = 1.0) -> str:
         """
-        Move working memory entries to episodic memory.
-        Called periodically to free up working memory.
-        """
-        while self.working_memory:
-            entry = self.working_memory.popleft()
-            entry.memory_type = "episodic"
-            self.episodic_memory[entry.id] = entry
-    
-    def store_skill_trace(self, skill_name: str, 
-                          inputs: Dict, 
-                          outputs: Any,
-                          success: bool,
-                          duration_ms: float) -> str:
-        """
-        Store a procedural memory (skill execution trace).
-        Used for learning from experience.
-        """
-        trace = {
-            "skill": skill_name,
-            "inputs": inputs,
-            "outputs": outputs,
-            "success": success,
-            "duration_ms": duration_ms
-        }
+        Store content in memory.
         
-        importance = 0.8 if not success else 0.5  # Failed attempts more important
+        Args:
+            content: The content to store (any JSON-serializable data)
+            memory_type: Type of memory to store in
+            metadata: Optional metadata dictionary
+            importance: Importance score (0.0 to 1.0)
         
-        return self.store(
-            content=trace,
-            memory_type="procedural",
-            tags=["skill", skill_name, "success" if success else "failure"],
+        Returns:
+            Memory entry ID
+        """
+        entry = MemoryEntry(
+            id="",
+            content=content,
+            memory_type=memory_type,
+            metadata=metadata or {},
             importance=importance
         )
-    
-    def get_skill_traces(self, skill_name: str, 
-                         success_only: bool = False) -> List[MemoryEntry]:
-        """Get execution traces for a specific skill"""
-        traces = self.search_by_tags(["skill", skill_name], "procedural")
         
-        if success_only:
-            traces = [t for t in traces if t.content.get("success", False)]
+        memory_id = self._adapter.store(entry)
         
-        return traces
+        # Manage working memory capacity
+        if memory_type == MemoryType.WORKING:
+            self._working_memory.append(memory_id)
+            self._enforce_working_memory_limit()
+        
+        return memory_id
     
-    def get_context_for_task(self, task_description: str,
-                            relevant_tags: Optional[List[str]] = None) -> Dict:
+    def retrieve(self, memory_id: str) -> Optional[Any]:
         """
-        Gather relevant context for a new task.
-        Combines working memory with relevant episodic/semantic memories.
+        Retrieve content by memory ID.
+        
+        Args:
+            memory_id: The memory entry ID
+        
+        Returns:
+            The stored content, or None if not found
         """
-        context = {
-            "working_memory": [e.to_dict() for e in self.get_working_memory()],
-            "relevant_episodes": [],
-            "relevant_semantic": [],
-            "skill_traces": []
-        }
-        
-        if relevant_tags:
-            episodes = self.search_by_tags(relevant_tags, "episodic")
-            context["relevant_episodes"] = [e.to_dict() for e in episodes[:5]]
-            
-            semantic = self.search_by_tags(relevant_tags, "semantic")
-            context["relevant_semantic"] = [e.to_dict() for e in semantic[:5]]
-        
-        # Add recent important memories
-        important = self.get_important_memories(threshold=0.8, n=5)
-        context["important_memories"] = [e.to_dict() for e in important]
-        
-        return context
+        entry = self._adapter.retrieve(memory_id)
+        return entry.content if entry else None
     
-    def save(self, path: str) -> None:
-        """Save memory system to file"""
-        state = {
-            "working_memory": [e.to_dict() for e in self.working_memory],
-            "episodic_memory": {k: v.to_dict() for k, v in self.episodic_memory.items()},
-            "semantic_memory": {k: v.to_dict() for k, v in self.semantic_memory.items()},
-            "procedural_memory": {k: v.to_dict() for k, v in self.procedural_memory.items()},
-            "tag_index": self.tag_index
-        }
+    def recall(self, query: Optional[str] = None,
+               memory_type: Optional[MemoryType] = None,
+               limit: int = 10,
+               min_importance: float = 0.0) -> List[Dict[str, Any]]:
+        """
+        Recall memories matching criteria.
         
-        with open(path, 'w') as f:
-            json.dump(state, f, indent=2)
+        Args:
+            query: Optional search query (simple substring match for now)
+            memory_type: Filter by memory type
+            limit: Maximum number of results
+            min_importance: Minimum importance threshold
+        
+        Returns:
+            List of memory entries as dictionaries
+        """
+        def filter_fn(entry: MemoryEntry) -> bool:
+            if entry.importance < min_importance:
+                return False
+            if query:
+                content_str = json.dumps(entry.content, default=str).lower()
+                return query.lower() in content_str
+            return True
+        
+        entries = self._adapter.query(memory_type, limit, filter_fn)
+        return [e.to_dict() for e in entries]
     
-    def load(self, path: str) -> None:
-        """Load memory system from file"""
-        with open(path, 'r') as f:
-            state = json.load(f)
+    def update(self, memory_id: str, new_content: Any,
+               new_importance: Optional[float] = None) -> bool:
+        """
+        Update an existing memory entry.
         
-        self.working_memory = deque(
-            [MemoryEntry.from_dict(e) for e in state.get("working_memory", [])],
-            maxlen=self.working_memory.maxlen
-        )
+        Args:
+            memory_id: The memory entry ID
+            new_content: New content
+            new_importance: Optional new importance score
         
-        self.episodic_memory = {
-            k: MemoryEntry.from_dict(v) 
-            for k, v in state.get("episodic_memory", {}).items()
-        }
+        Returns:
+            True if updated, False if not found
+        """
+        entry = self._adapter.retrieve(memory_id)
+        if not entry:
+            return False
         
-        self.semantic_memory = {
-            k: MemoryEntry.from_dict(v) 
-            for k, v in state.get("semantic_memory", {}).items()
-        }
+        entry.content = new_content
+        if new_importance is not None:
+            entry.importance = new_importance
         
-        self.procedural_memory = {
-            k: MemoryEntry.from_dict(v) 
-            for k, v in state.get("procedural_memory", {}).items()
-        }
-        
-        self.tag_index = state.get("tag_index", {})
+        return self._adapter.update(memory_id, entry)
     
-    def get_stats(self) -> Dict:
-        """Get memory system statistics"""
+    def forget(self, memory_id: str) -> bool:
+        """
+        Delete a memory entry.
+        
+        Args:
+            memory_id: The memory entry ID
+        
+        Returns:
+            True if deleted, False if not found
+        """
+        if memory_id in self._working_memory:
+            self._working_memory.remove(memory_id)
+        return self._adapter.delete(memory_id)
+    
+    def consolidate(self, memory_id: Optional[str] = None) -> List[str]:
+        """
+        Consolidate working memory to long-term episodic memory.
+        
+        Based on research: Working memory has limited capacity and
+        must be consolidated to long-term storage.
+        
+        Args:
+            memory_id: Specific memory to consolidate, or None for all
+        
+        Returns:
+            List of consolidated memory IDs
+        """
+        consolidated = []
+        
+        if memory_id:
+            # Consolidate specific memory
+            entry = self._adapter.retrieve(memory_id)
+            if entry and entry.memory_type == MemoryType.WORKING:
+                entry.memory_type = MemoryType.EPISODIC
+                self._adapter.update(memory_id, entry)
+                if memory_id in self._working_memory:
+                    self._working_memory.remove(memory_id)
+                consolidated.append(memory_id)
+        else:
+            # Consolidate all working memory
+            for mid in list(self._working_memory):
+                entry = self._adapter.retrieve(mid)
+                if entry:
+                    entry.memory_type = MemoryType.EPISODIC
+                    self._adapter.update(mid, entry)
+                    consolidated.append(mid)
+            self._working_memory.clear()
+        
+        return consolidated
+    
+    def get_working_memory(self) -> List[Dict[str, Any]]:
+        """Get all items currently in working memory."""
+        results = []
+        for memory_id in self._working_memory:
+            entry = self._adapter.retrieve(memory_id)
+            if entry:
+                results.append(entry.to_dict())
+        return results
+    
+    def clear(self, memory_type: Optional[MemoryType] = None):
+        """Clear memory, optionally by type."""
+        if memory_type == MemoryType.WORKING or memory_type is None:
+            self._working_memory.clear()
+        self._adapter.clear(memory_type)
+    
+    def _enforce_working_memory_limit(self):
+        """Enforce working memory capacity limit."""
+        while len(self._working_memory) > self.WORKING_MEMORY_CAPACITY:
+            # Remove oldest (FIFO) or least important
+            oldest_id = self._working_memory.pop(0)
+            # Auto-consolidate to episodic
+            entry = self._adapter.retrieve(oldest_id)
+            if entry:
+                entry.memory_type = MemoryType.EPISODIC
+                self._adapter.update(oldest_id, entry)
+    
+    def stats(self) -> Dict[str, Any]:
+        """Get memory system statistics."""
+        all_entries = self._adapter.query(limit=10000)
+        
+        type_counts = {}
+        for entry in all_entries:
+            type_name = entry.memory_type.value
+            type_counts[type_name] = type_counts.get(type_name, 0) + 1
+        
         return {
-            "working_memory_size": len(self.working_memory),
-            "episodic_memory_size": len(self.episodic_memory),
-            "semantic_memory_size": len(self.semantic_memory),
-            "procedural_memory_size": len(self.procedural_memory),
-            "total_tags": len(self.tag_index),
-            "working_capacity": self.working_memory.maxlen
+            "total_entries": len(all_entries),
+            "working_memory_items": len(self._working_memory),
+            "working_memory_capacity": self.WORKING_MEMORY_CAPACITY,
+            "by_type": type_counts,
+            "storage_adapter": self._adapter.__class__.__name__
         }
 
 
-if __name__ == "__main__":
-    # Basic test
-    memory = MemorySystem(working_capacity=5)
+def create_memory(adapter_type: str = "memory", **kwargs) -> Memory:
+    """
+    Factory function to create memory systems.
     
-    # Store some memories
-    memory.store("Current goal: Build AGI", "working", ["goal", "agi"], 0.9)
-    memory.store("Research: ARC-AGI shows test-time adaptation is key", 
-                 "semantic", ["research", "arc-agi"], 0.8)
-    memory.store("Experience: Failed to implement planner", 
-                 "episodic", ["failure", "planner"], 0.9)
+    Args:
+        adapter_type: "memory" or "file"
+        **kwargs: Additional arguments for the adapter
     
-    # Store skill trace
-    memory.store_skill_trace(
-        skill_name="web_search",
-        inputs={"query": "agi research"},
-        outputs={"results": 10},
-        success=True,
-        duration_ms=1500
-    )
+    Returns:
+        Configured Memory instance
+    """
+    if adapter_type == "memory":
+        adapter = InMemoryAdapter()
+    elif adapter_type == "file":
+        adapter = FileAdapter(**kwargs)
+    else:
+        raise ValueError(f"Unknown adapter type: {adapter_type}")
     
-    print("Memory Stats:", memory.get_stats())
-    print("\nWorking Memory:")
-    for m in memory.get_working_memory():
-        print(f"  - {m.content}")
-    
-    print("\nSearch by tags ['research']:")
-    results = memory.search_by_tags(["research"])
-    for r in results:
-        print(f"  - {r.content}")
-    
-    print("\nImportant memories:")
-    for m in memory.get_important_memories(threshold=0.8):
-        print(f"  - [{m.memory_type}] {m.content[:50]}...")
+    return Memory(adapter)
+
+
+# Module-level convenience function
+memory = create_memory

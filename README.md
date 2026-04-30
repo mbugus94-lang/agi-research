@@ -1,75 +1,117 @@
-# AGI Research & Build Project
+# AGI Research & Build
 
-A continuous research and implementation project exploring Artificial General Intelligence through iterative development.
+Continuous research and incremental building toward Artificial General Intelligence.
 
-## Project Structure
+## 🎯 Mission
+
+This repository documents ongoing research into AGI and implements core components incrementally. The approach follows these principles:
+
+- **Incremental progress**: Working code over perfect architecture
+- **Test everything**: All components must be validated
+- **Research-driven**: Implementation informed by latest findings
+- **Safety first**: Self-modifications require review
+- **Daily compounding**: Small, consistent progress
+
+## 📁 Repository Structure
 
 ```
 agi-research/
 ├── README.md                 # This file
-├── CURRENT_RESEARCH.md       # Latest research findings and priorities
-├── ARCHITECTURE.md           # System architecture documentation
-├── core/                     # Core agent components
-│   ├── agent.py              # Base agent implementation
-│   ├── memory.py             # Memory systems (working, episodic, semantic)
-│   ├── planner.py            # Planning and goal decomposition
-│   └── reflection.py         # Self-reflection and improvement
-├── skills/                   # Capability modules
-│   └── [to be implemented]   # Web search, code gen, analysis, etc.
-└── experiments/              # Validation tests and hypotheses
-    └── [to be implemented]   # Experiment notebooks and results
+├── CURRENT_RESEARCH.md       # Latest research findings
+├── ARCHITECTURE.md          # System design documentation
+├── core/                    # Core AGI components
+│   ├── agent.py            # Base agent implementation
+│   ├── memory.py           # Memory systems
+│   ├── planner.py          # Planning and reasoning
+│   └── reflection.py       # Self-reflection capabilities
+├── skills/                 # Capability modules
+│   └── [TBD]
+└── experiments/            # Validation tests
+    └── [TBD]
 ```
 
-## Philosophy
+## 🔄 Continuous Workflow
 
-- **Incremental progress**: Working code over perfect architecture
-- **Test everything**: All components must be validated
-- **Document continuously**: Research findings live in `CURRENT_RESEARCH.md`
-- **Safety first**: Self-modifications require review, never auto-apply
-- **Small daily progress compounds**: Consistency beats intensity
+This project runs on a scheduled agent that executes:
 
-## Current Status
+1. **Research Phase** (~15 min)
+   - Search for latest AGI research
+   - Review arXiv papers
+   - Identify trending frameworks
+   - Document findings
 
-**Research Phase**: Initial research completed on April 24, 2026
-- Analyzed latest AGI papers from arXiv (past 2 weeks)
-- Surveyed trending AI agent frameworks on GitHub
-- Identified key architectural patterns emerging in 2026
+2. **Repo Maintenance**
+   - Ensure structure exists
+   - Update documentation
+   - Review previous changes
 
-**Build Phase**: Beginning implementation of core components
-- Building modular agent architecture
-- Implementing MCP (Model Context Protocol) support
-- Creating self-evolving tool synthesis capability
+3. **Build Phase**
+   - Implement one component
+   - Add one skill
+   - Create one experiment
+   - OR refactor existing code
 
-## Quick Start
+4. **Git Workflow**
+   - Pull latest changes
+   - Commit with timestamp
+   - Push to origin
+
+## 🏗️ Current Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Memory | 🔄 In Progress | Base interface + adapters |
+| Agent Base | ⏳ Planned | Core agent loop |
+| Planner | ⏳ Planned | Task decomposition |
+| Reflection | ⏳ Planned | Self-improvement |
+| Skills | ⏳ Planned | Capability modules |
+| Experiments | ⏳ Planned | Validation suite |
+
+## 📚 Research Sources
+
+- arXiv CS.AI, CS.CL, CS.LG
+- Open-source GitHub repositories
+- AI research newsletters
+- Conference proceedings (NeurIPS, ICML, ICLR)
+
+## 🚀 Getting Started
 
 ```bash
-# Clone and setup
-cd /home/workspace/agi-research
-pip install -r requirements.txt  # (coming soon)
+# Clone the repository
+git clone https://github.com/dave92/agi-research.git
+cd agi-research
 
-# Run tests
-python -m pytest experiments/
+# Install dependencies
+pip install -r requirements.txt
 
-# Start the agent
-python core/agent.py
+# Run experiments
+python -m experiments.test_memory
 ```
 
-## Key Research Themes
+## 📝 Contributing
 
-1. **Self-Evolving Agents**: Hierarchical architectures with tool synthesis
-2. **MCP Integration**: Model Context Protocol for universal tool access
-3. **Multi-Agent Orchestration**: Supervisors, crews, and peer collaboration
-4. **Persistent Memory**: Long-term knowledge and state management
-5. **Benchmark Progress**: ARC-AGI and beyond - tracking AGI milestones
+This is a research project. All changes are:
+1. Research-informed
+2. Incrementally tested
+3. Documented in CURRENT_RESEARCH.md
+4. Committed with descriptive messages
 
-## Contributing
+## 📖 Key Research Insights
 
-This is a personal research project. Changes follow the continuous research & build workflow:
-1. Research latest developments
-2. Document findings
-3. Implement one thing
-4. Test and validate
-5. Commit and push
+See `CURRENT_RESEARCH.md` for detailed findings including:
+- Latest AGI breakthroughs
+- AI agent architecture trends 2026
+- Recent arXiv papers
+- Trending open-source frameworks
+
+## 🔮 Future Directions
+
+Based on current research:
+- SMGI-inspired structural learning
+- GVU (Generator-Verifier-Updater) loops
+- ARC-AGI reasoning benchmarks
+- Multi-agent orchestration
 
 ---
-*Building towards AGI, one commit at a time.*
+
+**Last Updated:** 2026-04-30
