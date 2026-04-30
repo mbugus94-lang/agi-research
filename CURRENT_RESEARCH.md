@@ -1,5 +1,42 @@
 # AGI Research Findings
 
+## Research Summary (April 30, 2026)
+
+### Key Industry News
+- **Microsoft-OpenAI AGI Agreement Dead**: The Verge reports Microsoft and OpenAI renegotiated - Microsoft now retains IP rights even after AGI declaration, revenue share continues through 2030 with caps
+- **OpenAI GPT-5.5 Launched**: April 24, 2026 - Most advanced model with agentic coding, computer use, 1M token context window
+- **Appier AI Self-Awareness Research**: New capabilities for AI self-awareness to unlock enterprise ROI - 80% of risky responses blocked
+- **Google Cloud Next 2026**: New AI agents for enterprises, partnerships with ServiceNow, Nvidia, Virgo Network architecture
+- **Amazon Bio Discovery**: AI agents for drug discovery with specialized biological AI models
+
+### Key arXiv Papers (Past 2 Weeks)
+- **[2603.24621v1] ARC-AGI-3**: New frontier benchmark for agentic intelligence - AI <1%, humans 100%
+- **[2603.28906v1] Category-theoretic Framework**: Unifying AGI architectures under algebraic foundation
+- **[2601.11658v1] Self-Evolving Agent**: Hierarchical framework with CL/RL/GA evolution strategies
+- **[2604.07745v1] The Cartesian Cut in Agentic AI**: Examines control separation between learned core and engineered runtime
+- **[2603.13372] The ARC of Progress**: Living survey showing 2-3x performance drops across ARC-AGI versions
+- **[2604.04347v1] RoboPhD**: Elo tournament selection improved ARC-AGI from 27.8% to 65.8%
+
+### Trending Open Source Agent Repos (April 30, 2026)
+- **DeerFlow 2.0** (xiaonancs/deer-flow) - #1 GitHub Trending, long-horizon super agent with sub-agents, memory, sandboxes
+- **Nanobot** (HKUDS/nanobot) - Lightweight agent with Dream memory, multi-channel support
+- **Agentspan** (agentspan-ai/agentspan) - Durable distributed runtime with crash recovery
+- **Clawith** (dataelement/clawith) - Persistent agent identities with organizational governance
+- **OpenFang** (RightNow-AI/openfang) - Agent OS with "Hands" autonomous capabilities
+- **OpenAkita** (openakita/openakita) - Multi-agent AI "company" with 89+ tools
+- **Ouroboros** (razzant/ouroboros) - Self-modifying AI with 30+ evolution cycles
+- **Open-Sable** (IdeoaLabs/Open-Sable) - Local-first AGI-inspired personal AI
+
+### Key Insights for Implementation
+1. **Microsoft-OpenAI deal changes**: AGI definitions are being renegotiated commercially
+2. **GPT-5.5**: Context windows expanding to 1M tokens enables deeper reasoning
+3. **AI Self-Awareness**: Calibration and confidence estimation becoming critical for enterprise
+4. **Agentic Workflow**: Shift from single-call agents to multi-step autonomous systems
+5. **ARC-AGI-3 Gap**: Compositional reasoning and interactive learning still unsolved
+6. **Category Theory**: Formal frameworks emerging for comparing AGI architectures
+
+---
+
 ## Research Update: April 29, 2026
 
 ### Key arXiv Papers (Past Week)

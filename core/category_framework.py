@@ -1,682 +1,534 @@
 """
-Category-Theoretic Framework for AGI Architecture Comparison
+Category-Theoretic Agent Framework
 
-Based on: arXiv:2603.28906v1 "Working Paper: Towards a Category-theoretic 
-Comparative Framework for Artificial General Intelligence"
+Based on arXiv:2603.28906v1 "Towards a Category-theoretic Comparative Framework 
+for Artificial General Intelligence" by Dov Te'eni and Nir Lipovetzky.
 
-This module implements a formal algebraic foundation for describing, comparing,
-and analyzing AGI architectures using category theory. It unifies diverse
-paradigms (RL, Universal AI, Active Inference, Schema-based Learning) under
-a single mathematical framework.
+Provides a formal mathematical foundation for:
+1. Composing agents as morphisms with typed inputs/outputs
+2. Unifying diverse AGI paradigms under algebraic structure
+3. Enabling rigorous architectural comparison
+4. Supporting structural closure and dynamical stability
 
 Key Concepts:
-- Categories represent agent architectures and environments
-- Functors map between architectural paradigms
-- Natural transformations capture architectural refinements
-- Morphisms represent agent-environment interactions
+- Category: Collection of objects (agent states) and morphisms (transformations)
+- Functor: Maps between categories preserving structure
+- Natural Transformation: Morphism between functors
+- Monad: Encapsulates computational context (effects)
 """
 
-from typing import Dict, List, Any, Optional, Callable, Tuple, Set
+from typing import TypeVar, Generic, Callable, Dict, List, Optional, Any, Set
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from collections import defaultdict
+from abc import ABC, abstractmethod
+import uuid
 import json
 
 
-class ArchitectureType(Enum):
-    """AGI architectural paradigms as categories."""
-    REINFORCEMENT_LEARNING = "rl"
-    UNIVERSAL_AI = "universal"  # AIXI-style
-    ACTIVE_INFERENCE = "active_inference"  # Friston/Free Energy Principle
-    SCHEMA_BASED_LEARNING = "schema"  # Cognitive architectures
-    CAUSAL_RL = "causal_rl"
-    NEURO_SYMBOLIC = "neuro_symbolic"
-    CUSTOM = "custom"
+# Type variables for generic programming
+T = TypeVar('T')
+U = TypeVar('U')
+V = TypeVar('V')
 
 
-@dataclass
+class AgentType(Enum):
+    """Types of agents in the categorical framework."""
+    REACTIVE = auto()      # Stimulus-response
+    DELIBERATIVE = auto()  # Planning-based
+    LEARNING = auto()      # Adaptive/learning
+    MULTI_AGENT = auto()   # Distributed/collective
+    HYBRID = auto()        # Combination of above
+
+
+@dataclass(frozen=True)
 class Object:
     """
-    Object in a category-theoretic sense.
+    Object in the category - represents an agent state or configuration.
     
-    In AGI contexts, objects represent:
-    - State spaces (S)
-    - Action spaces (A)
-    - Observation spaces (O)  
-    - Belief states (B)
-    - Policies (π)
-    - Programs/Hypotheses (H)
+    Immutable state container with typed properties.
+    Objects are nodes in the categorical graph.
     """
-    name: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     properties: Dict[str, Any] = field(default_factory=dict)
-    structural_type: str = "generic"  # state, action, observation, belief, policy, program
     
     def __hash__(self):
-        return hash(self.name)
+        return hash(self.id)
     
-    def __eq__(self, other):
-        if isinstance(other, Object):
-            return self.name == other.name
-        return False
+    def with_property(self, key: str, value: Any) -> 'Object':
+        """Create new object with additional property (immutability)."""
+        new_props = dict(self.properties)
+        new_props[key] = value
+        return Object(id=self.id, properties=new_props)
+    
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get property value."""
+        return self.properties.get(key, default)
 
 
 @dataclass
 class Morphism:
     """
-    Morphism (arrow) between objects.
+    Morphism in the category - represents an agent transformation.
     
-    Represents:
-    - Transition functions (S × A → S')
-    - Observation functions (S → O)
-    - Policy functions (B → A)
-    - Learning updates (H × O → H')
+    A morphism f: A → B transforms object A into object B.
+    In agent terms: a computation or action that changes state.
     """
     name: str
-    domain: Object  # Source object
-    codomain: Object  # Target object
-    mapping: Optional[Callable] = None
-    properties: Dict[str, Any] = field(default_factory=dict)
+    source: Object  # Domain
+    target: Object  # Codomain
+    transform: Callable[[Object], Object]
+    metadata: Dict[str, Any] = field(default_factory=dict)
     
-    # Structural properties
-    is_deterministic: bool = True
-    is_stochastic: bool = False
-    is_partial: bool = False  # Partial function (undefined for some inputs)
-    is_computable: bool = True
-    
-    def __hash__(self):
-        return hash((self.name, self.domain.name, self.codomain.name))
-    
-    def __eq__(self, other):
-        if not isinstance(other, Morphism):
-            return False
-        return (self.name == other.name and 
-                self.domain == other.domain and 
-                self.codomain == other.codomain)
-    
-    def compose(self, other: 'Morphism') -> Optional['Morphism']:
+    def compose(self, other: 'Morphism') -> 'Morphism':
         """
-        Compose morphisms: f ∘ g (do g then f).
+        Compose morphisms: if f: A → B and g: B → C, then g ∘ f: A → C
         
-        Returns new morphism if codomain(g) == domain(f).
+        This is the fundamental operation of category theory.
         """
-        if self.domain != other.codomain:
-            return None
+        if self.target != other.source:
+            raise ValueError(
+                f"Cannot compose: {self.name} target != {other.name} source"
+            )
+        
+        def composed_transform(obj: Object) -> Object:
+            intermediate = self.transform(obj)
+            return other.transform(intermediate)
         
         return Morphism(
-            name=f"{self.name}_∘_{other.name}",
-            domain=other.domain,
-            codomain=self.codomain,
-            properties={
+            name=f"{other.name} ∘ {self.name}",
+            source=self.source,
+            target=other.target,
+            transform=composed_transform,
+            metadata={
                 "composition": True,
-                "composed_from": [other.name, self.name]
+                "first": self.name,
+                "second": other.name
             }
         )
+    
+    def apply(self, obj: Object) -> Object:
+        """Apply morphism to object."""
+        if obj != self.source:
+            raise ValueError(f"Object {obj.id} is not source of morphism {self.name}")
+        return self.transform(obj)
 
 
 @dataclass
 class Category:
     """
-    Category representing an AGI architecture.
+    Category of agents - collection of objects and morphisms.
     
     A category C consists of:
-    - Objects: obj(C) - state/action/observation spaces
-    - Morphisms: hom(C) - transition/observation/policy functions
-    - Identity morphisms: id_A for each object A
-    - Associative composition: (f ∘ g) ∘ h = f ∘ (g ∘ h)
-    
-    Different architectures are different categories:
-    - RL: States, Actions, Observations with transition and reward morphisms
-    - Universal AI: Programs, Predictions, with update and selection morphisms
-    - Active Inference: Beliefs, Policies, with inference and action morphisms
+    - Objects: ob(C) - agent states
+    - Morphisms: hom(C) - agent transformations
+    - Identity morphisms: id_A: A → A for each object A
+    - Composition: ∘ operation satisfying associativity and identity laws
     """
     name: str
-    architecture_type: ArchitectureType
     objects: Set[Object] = field(default_factory=set)
-    morphisms: List[Morphism] = field(default_factory=list)
+    morphisms: Dict[str, Morphism] = field(default_factory=dict)
     
-    # Structural metadata
-    properties: Dict[str, Any] = field(default_factory=dict)
-    
-    def add_object(self, obj: Object):
+    def add_object(self, obj: Object) -> None:
         """Add object to category."""
         self.objects.add(obj)
     
-    def add_morphism(self, morph: Morphism):
-        """Add morphism to category if domain/codomain are in category."""
-        if morph.domain in self.objects and morph.codomain in self.objects:
-            self.morphisms.append(morph)
-        else:
-            # Auto-add objects if needed
-            self.objects.add(morph.domain)
-            self.objects.add(morph.codomain)
-            self.morphisms.append(morph)
+    def add_morphism(self, morphism: Morphism) -> None:
+        """Add morphism to category."""
+        self.morphisms[morphism.name] = morphism
+        self.objects.add(morphism.source)
+        self.objects.add(morphism.target)
     
-    def get_morphisms_from(self, obj: Object) -> List[Morphism]:
-        """Get all morphisms with given domain."""
-        return [m for m in self.morphisms if m.domain == obj]
-    
-    def get_morphisms_to(self, obj: Object) -> List[Morphism]:
-        """Get all morphisms with given codomain."""
-        return [m for m in self.morphisms if m.codomain == obj]
-    
-    def compose_morphisms(self, f: Morphism, g: Morphism) -> Optional[Morphism]:
-        """
-        Compose morphisms within this category.
-        f ∘ g means: do g first, then f.
-        """
-        if f.domain != g.codomain:
-            return None
+    def identity(self, obj: Object) -> Morphism:
+        """Create identity morphism for object: id_A: A → A"""
+        if obj not in self.objects:
+            self.add_object(obj)
         
         return Morphism(
-            name=f"{f.name}∘{g.name}",
-            domain=g.domain,
-            codomain=f.codomain,
-            properties={"composed": True, "chain": [g.name, f.name]}
+            name=f"id_{obj.id}",
+            source=obj,
+            target=obj,
+            transform=lambda x: x,  # Identity function
+            metadata={"type": "identity"}
         )
     
-    def structural_summary(self) -> Dict[str, Any]:
-        """Get structural summary of category."""
-        obj_types = defaultdict(int)
-        for obj in self.objects:
-            obj_types[obj.structural_type] += 1
+    def compose(self, f_name: str, g_name: str) -> Morphism:
+        """Compose two morphisms by name."""
+        if f_name not in self.morphisms:
+            raise ValueError(f"Morphism {f_name} not found")
+        if g_name not in self.morphisms:
+            raise ValueError(f"Morphism {g_name} not found")
         
-        morph_types = defaultdict(int)
-        for morph in self.morphisms:
-            key = f"{morph.domain.structural_type}→{morph.codomain.structural_type}"
-            morph_types[key] += 1
+        f = self.morphisms[f_name]
+        g = self.morphisms[g_name]
         
-        return {
-            "name": self.name,
-            "type": self.architecture_type.value,
-            "object_count": len(self.objects),
-            "morphism_count": len(self.morphisms),
-            "object_types": dict(obj_types),
-            "morphism_types": dict(morph_types),
-            "properties": self.properties
-        }
+        composed = f.compose(g)
+        self.add_morphism(composed)
+        return composed
 
 
-@dataclass
-class Functor:
+class Functor(ABC):
     """
-    Functor between categories (architectures).
+    Functor F: C → D between categories.
     
-    A functor F: C → D maps:
-    - Objects: F(A) for each A in obj(C)
-    - Morphisms: F(f): F(A) → F(B) for each f: A → B in hom(C)
+    Maps objects to objects and morphisms to morphisms while preserving:
+    - Identity: F(id_A) = id_{F(A)}
+    - Composition: F(g ∘ f) = F(g) ∘ F(f)
     
-    Preserves structure:
-    - F(id_A) = id_{F(A)}
-    - F(f ∘ g) = F(f) ∘ F(g)
-    
-    Functors represent:
-    - Translations between architectural paradigms
-    - Embeddings of simpler into more complex architectures
-    - Abstractions that preserve behavioral properties
+    Functors represent structural-preserving mappings between agent systems.
     """
-    name: str
-    source: Category
-    target: Category
     
-    # Mappings
-    object_map: Dict[Object, Object] = field(default_factory=dict)
-    morphism_map: Dict[Morphism, Morphism] = field(default_factory=dict)
+    def __init__(self, source: Category, target: Category, name: str = "F"):
+        self.source = source
+        self.target = target
+        self.name = name
     
-    def map_object(self, obj: Object) -> Optional[Object]:
+    @abstractmethod
+    def map_object(self, obj: Object) -> Object:
         """Map object from source to target category."""
-        return self.object_map.get(obj)
+        pass
     
-    def map_morphism(self, morph: Morphism) -> Optional[Morphism]:
+    @abstractmethod
+    def map_morphism(self, morphism: Morphism) -> Morphism:
         """Map morphism from source to target category."""
-        return self.morphism_map.get(morph)
+        pass
     
-    def is_valid(self) -> bool:
-        """
-        Check if functor preserves categorical structure.
+    def verify_identity_preservation(self, obj: Object) -> bool:
+        """Verify F(id_A) = id_{F(A)}"""
+        id_source = self.source.identity(obj)
+        mapped_id = self.map_morphism(id_source)
         
-        Validates:
-        - All source objects mapped to target
-        - All source morphisms mapped to target
-        - Domain/codomain preservation
-        """
-        # Check object mapping completeness
-        for obj in self.source.objects:
-            if obj not in self.object_map:
-                return False
+        mapped_obj = self.map_object(obj)
+        id_target = self.target.identity(mapped_obj)
         
-        # Check morphism structure preservation
-        for morph in self.source.morphisms:
-            if morph not in self.morphism_map:
-                return False
-            
-            mapped = self.morphism_map[morph]
-            expected_domain = self.object_map.get(morph.domain)
-            expected_codomain = self.object_map.get(morph.codomain)
-            
-            if mapped.domain != expected_domain or mapped.codomain != expected_codomain:
-                return False
-        
-        return True
+        return mapped_id.name == id_target.name
     
-    def preservation_score(self) -> float:
-        """
-        Score how well structure is preserved (0.0 to 1.0).
-        """
-        if not self.source.objects:
-            return 1.0
+    def verify_composition_preservation(self, f: Morphism, g: Morphism) -> bool:
+        """Verify F(g ∘ f) = F(g) ∘ F(f)"""
+        composed = f.compose(g)
+        mapped_composed = self.map_morphism(composed)
         
-        score = 0.0
-        checks = 0
+        mapped_f = self.map_morphism(f)
+        mapped_g = self.map_morphism(g)
+        mapped_composed_direct = mapped_f.compose(mapped_g)
         
-        # Check object mappings
-        for obj in self.source.objects:
-            checks += 1
-            if obj in self.object_map:
-                score += 1.0
-        
-        # Check morphism mappings
-        for morph in self.source.morphisms:
-            checks += 1
-            if morph in self.morphism_map:
-                mapped = self.morphism_map[morph]
-                if (mapped.domain == self.object_map.get(morph.domain) and
-                    mapped.codomain == self.object_map.get(morph.codomain)):
-                    score += 1.0
-        
-        return score / checks if checks > 0 else 1.0
+        return mapped_composed.name == mapped_composed_direct.name
+
+
+class AgentFunctor(Functor):
+    """
+    Concrete functor for mapping between agent architectures.
+    
+    Example: Map reactive agent category to deliberative agent category.
+    """
+    
+    def __init__(
+        self,
+        source: Category,
+        target: Category,
+        object_mapping: Dict[str, str],
+        morphism_transforms: Dict[str, Callable],
+        name: str = "AgentFunctor"
+    ):
+        super().__init__(source, target, name)
+        self.object_mapping = object_mapping
+        self.morphism_transforms = morphism_transforms
+    
+    def map_object(self, obj: Object) -> Object:
+        """Map agent state using predefined mapping."""
+        if obj.id in self.object_mapping:
+            mapped_id = self.object_mapping[obj.id]
+            return Object(
+                id=mapped_id,
+                properties={"mapped_from": obj.id, **obj.properties}
+            )
+        return obj
+    
+    def map_morphism(self, morphism: Morphism) -> Morphism:
+        """Map morphism using transformation functions."""
+        if morphism.name in self.morphism_transforms:
+            new_transform = self.morphism_transforms[morphism.name]
+            return Morphism(
+                name=f"{self.name}({morphism.name})",
+                source=self.map_object(morphism.source),
+                target=self.map_object(morphism.target),
+                transform=new_transform,
+                metadata={"functor": self.name, "original": morphism.name}
+            )
+        return morphism
 
 
 @dataclass
 class NaturalTransformation:
     """
-    Natural transformation between functors.
+    Natural transformation η: F ⇒ G between functors F, G: C → D
     
-    Given functors F, G: C → D, a natural transformation η: F ⇒ G
-    assigns to each object A in C a morphism η_A: F(A) → G(A) in D
-    such that for all f: A → B in C:
+    A family of morphisms in D, one for each object in C, satisfying
+    naturality condition: η_B ∘ F(f) = G(f) ∘ η_A for all f: A → B
     
-        G(f) ∘ η_A = η_B ∘ F(f)
-    
-    (Naturality square commutes)
-    
-    Natural transformations represent:
-    - Architectural refinements
-    - Behavioral equivalences
-    - Implementation variations that preserve semantics
+    Represents coherent mappings between different agent system views.
     """
     name: str
     source_functor: Functor
     target_functor: Functor
+    components: Dict[str, Morphism] = field(default_factory=dict)
     
-    # Component morphisms for each object
-    components: Dict[Object, Morphism] = field(default_factory=dict)
+    def add_component(self, obj: Object, morphism: Morphism) -> None:
+        """Add component morphism for object."""
+        self.components[obj.id] = morphism
     
-    def naturality_check(self, morph: Morphism) -> bool:
+    def is_natural(self, f: Morphism) -> bool:
         """
-        Check naturality square for a morphism f: A → B.
+        Verify naturality square commutes:
         
-        G(f) ∘ η_A == η_B ∘ F(f)
+            F(A) --F(f)--> F(B)
+             |               |
+             | η_A           | η_B
+             v               v
+            G(A) --G(f)--> G(B)
+        
+        Requires: η_B ∘ F(f) = G(f) ∘ η_A
         """
-        A = morph.domain
-        B = morph.codomain
+        source_id = f.source.id
+        target_id = f.target.id
         
-        eta_A = self.components.get(A)
-        eta_B = self.components.get(B)
-        
-        if not eta_A or not eta_B:
+        if source_id not in self.components or target_id not in self.components:
             return False
         
-        # Get F(f) and G(f)
-        F_f = self.source_functor.map_morphism(morph)
-        G_f = self.target_functor.map_morphism(morph)
+        eta_A = self.components[source_id]
+        eta_B = self.components[target_id]
         
-        if not F_f or not G_f:
-            return False
+        F_f = self.source_functor.map_morphism(f)
+        G_f = self.target_functor.map_morphism(f)
         
-        # Check: G(f) ∘ η_A == η_B ∘ F(f)
-        # This is a structural check (we can't compute actual equality)
-        # We verify that compositions exist and types match
-        left = G_f.codomain == eta_A.codomain  # G(f) ∘ η_A
-        right = eta_B.domain == F_f.codomain   # η_B ∘ F(f)
+        left = eta_B.compose(F_f)
+        right = G_f.compose(eta_A)
         
-        return left and right
-    
-    def is_natural(self) -> bool:
-        """Check if all naturality squares commute."""
-        for morph in self.source_functor.source.morphisms:
-            if not self.naturality_check(morph):
-                return False
-        return True
+        return left.name == right.name
 
 
-class AGIArchitectureComparator:
+class Monad:
     """
-    Main comparator using category-theoretic framework.
+    Monad for encapsulating agent effects and context.
     
-    Enables rigorous comparison of AGI architectures by:
-    1. Representing each as a category
-    2. Finding functors between them
-    3. Analyzing structural similarities
-    4. Identifying commonalities and gaps
+    A monad T on category C consists of:
+    - Functor T: C → C
+    - Unit η: Id ⇒ T (return/pure)
+    - Multiplication μ: T² ⇒ T (join/flatten)
+    
+    Laws:
+    - Left identity: μ ∘ Tη = id_T
+    - Right identity: μ ∘ ηT = id_T  
+    - Associativity: μ ∘ Tμ = μ ∘ μT
     """
     
-    def __init__(self):
-        self.categories: Dict[str, Category] = {}
-        self.functors: List[Functor] = []
-        self.transformations: List[NaturalTransformation] = []
+    def __init__(self, name: str, category: Category):
+        self.name = name
+        self.category = category
+        self.unit: Optional[NaturalTransformation] = None
+        self.multiply: Optional[NaturalTransformation] = None
     
-    def create_standard_categories(self):
-        """Create standard AGI architecture categories."""
-        
-        # RL Category: States × Actions → States, Observations
-        rl = Category(
-            name="StandardRL",
-            architecture_type=ArchitectureType.REINFORCEMENT_LEARNING
-        )
-        
-        S = Object("States", structural_type="state", properties={"finite": True})
-        A = Object("Actions", structural_type="action", properties={"discrete": True})
-        O = Object("Observations", structural_type="observation")
-        R = Object("Rewards", structural_type="reward")
-        
-        transition = Morphism("T", S, S, is_stochastic=True)  # T: S × A → S
-        observe = Morphism("Z", S, O, is_stochastic=True)       # Z: S → O
-        reward_fn = Morphism("R", S, R)                         # R: S → R
-        
-        rl.add_morphism(transition)
-        rl.add_morphism(observe)
-        rl.add_morphism(reward_fn)
-        
-        self.categories["rl"] = rl
-        
-        # Active Inference Category: Beliefs × Policies → Actions
-        ai = Category(
-            name="ActiveInference",
-            architecture_type=ArchitectureType.ACTIVE_INFERENCE
-        )
-        
-        B = Object("Beliefs", structural_type="belief", properties={"probabilistic": True})
-        Pi = Object("Policies", structural_type="policy")
-        G = Object("GenerativeModel", structural_type="model")
-        F = Object("FreeEnergy", structural_type="energy")
-        
-        infer = Morphism("Inference", O, B)           # Update beliefs from observations
-        select_policy = Morphism("PolicySelection", B, Pi)
-        act = Morphism("Action", Pi, A)
-        minimize_fe = Morphism("MinimizeFE", B, F)
-        
-        ai.add_morphism(infer)
-        ai.add_morphism(select_policy)
-        ai.add_morphism(act)
-        ai.add_morphism(minimize_fe)
-        
-        self.categories["active_inference"] = ai
-        
-        # Universal AI Category: Programs × Observations → Programs
-        uai = Category(
-            name="UniversalAI",
-            architecture_type=ArchitectureType.UNIVERSAL_AI
-        )
-        
-        H = Object("Hypotheses", structural_type="program", properties={"universal": True})
-        P = Object("Predictions", structural_type="prediction")
-        
-        predict = Morphism("Predict", H, P)
-        update = Morphism("Update", H, H, properties={"bayesian": True})  # P(H|O)
-        select = Morphism("Select", P, A, properties={"optimal": True})
-        
-        uai.add_morphism(predict)
-        uai.add_morphism(update)
-        uai.add_morphism(select)
-        
-        self.categories["universal_ai"] = uai
-        
-        # Schema-Based Category: Schemas × Experience → UpdatedSchemas
-        schema = Category(
-            name="SchemaLearning",
-            architecture_type=ArchitectureType.SCHEMA_BASED_LEARNING
-        )
-        
-        Sch = Object("Schemas", structural_type="schema", properties={"symbolic": True})
-        E = Object("Experiences", structural_type="experience")
-        
-        match = Morphism("Match", E, Sch)     # Match exp to schemas
-        update_sch = Morphism("UpdateSchema", Sch, Sch)
-        instantiate = Morphism("Instantiate", Sch, A)
-        
-        schema.add_morphism(match)
-        schema.add_morphism(update_sch)
-        schema.add_morphism(instantiate)
-        
-        self.categories["schema"] = schema
-        
-        # Neuro-Symbolic Category: Neural × Symbolic → Integrated
-        ns = Category(
-            name="NeuroSymbolic",
-            architecture_type=ArchitectureType.NEURO_SYMBOLIC
-        )
-        
-        N = Object("NeuralPatterns", structural_type="neural")
-        Sym = Object("SymbolicRep", structural_type="symbolic")
-        
-        perceive = Morphism("Perceive", O, N)
-        extract = Morphism("Extract", N, Sym)
-        reason = Morphism("Reason", Sym, Sym)
-        generate = Morphism("Generate", Sym, N)
-        execute = Morphism("Execute", N, A)
-        
-        ns.add_morphism(perceive)
-        ns.add_morphism(extract)
-        ns.add_morphism(reason)
-        ns.add_morphism(generate)
-        ns.add_morphism(execute)
-        
-        self.categories["neuro_symbolic"] = ns
-        
-        return self.categories
+    def set_unit(self, unit: NaturalTransformation) -> None:
+        """Set unit natural transformation."""
+        self.unit = unit
     
-    def compare_architectures(self, name1: str, name2: str) -> Dict[str, Any]:
+    def set_multiply(self, multiply: NaturalTransformation) -> None:
+        """Set multiplication natural transformation."""
+        self.multiply = multiply
+    
+    def bind(self, obj: Object, f: Callable[[Object], Object]) -> Object:
         """
-        Compare two architectures using categorical analysis.
+        Monadic bind (>>=): sequential composition with context passing.
         
-        Returns structural similarities, differences, and potential functors.
+        bind(M, f) = μ(T(f)(M))
         """
-        cat1 = self.categories.get(name1)
-        cat2 = self.categories.get(name2)
+        # Apply f within monadic context
+        mapped = f(obj)
         
-        if not cat1 or not cat2:
-            return {"error": "Categories not found"}
+        # Flatten result (apply multiplication)
+        if obj.id in self.multiply.components:
+            return self.multiply.components[obj.id].apply(mapped)
         
-        # Object type overlap
-        types1 = set(obj.structural_type for obj in cat1.objects)
-        types2 = set(obj.structural_type for obj in cat2.objects)
-        
-        # Structural comparison
-        comparison = {
-            "architectures": [name1, name2],
-            "object_count": (len(cat1.objects), len(cat2.objects)),
-            "morphism_count": (len(cat1.morphisms), len(cat2.morphisms)),
-            "shared_object_types": list(types1 & types2),
-            "unique_to_1": list(types1 - types2),
-            "unique_to_2": list(types2 - types1),
-            "structural_complexity": {
-                name1: self._complexity_score(cat1),
-                name2: self._complexity_score(cat2)
+        return mapped
+
+
+@dataclass
+class AgentSpecification:
+    """
+    Complete specification of an agent in category-theoretic terms.
+    
+    Based on SMGI structural theory: θ = (r, H, Π, L, E, M)
+    - r: representations
+    - H: hypothesis space
+    - Π: priors
+    - L: evaluator/loss
+    - E: evolution operator
+    - M: memory operator
+    """
+    name: str
+    agent_type: AgentType
+    category: Category
+    
+    # Structural components
+    representations: Dict[str, Object] = field(default_factory=dict)
+    hypothesis_space: List[Morphism] = field(default_factory=list)
+    priors: Dict[str, float] = field(default_factory=dict)
+    
+    # Dynamics
+    evaluator: Optional[Callable[[Object], float]] = None
+    evolution: Optional[Morphism] = None
+    memory_operator: Optional[Morphism] = None
+    
+    # SMGI obligations
+    structural_closure: bool = True
+    dynamical_stability: bool = True
+    bounded_capacity: bool = True
+    evaluative_invariance: bool = True
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize specification to dictionary."""
+        return {
+            "name": self.name,
+            "agent_type": self.agent_type.name,
+            "category": self.category.name,
+            "representations": list(self.representations.keys()),
+            "hypothesis_count": len(self.hypothesis_space),
+            "priors": self.priors,
+            "smgi_obligations": {
+                "structural_closure": self.structural_closure,
+                "dynamical_stability": self.dynamical_stability,
+                "bounded_capacity": self.bounded_capacity,
+                "evaluative_invariance": self.evaluative_invariance
             }
         }
-        
-        # Attempt to find potential functor
-        potential_functor = self._find_potential_functor(cat1, cat2)
-        comparison["potential_functor"] = potential_functor
-        
-        return comparison
+
+
+class CategoryTheoreticAgent:
+    """
+    Agent implementation using category-theoretic foundations.
     
-    def _complexity_score(self, cat: Category) -> float:
-        """Calculate structural complexity score."""
-        n_objects = len(cat.objects)
-        n_morphisms = len(cat.morphisms)
-        
-        # More morphisms per object = more interconnected
-        if n_objects == 0:
-            return 0.0
-        
-        density = n_morphisms / n_objects
-        
-        # Stochastic morphisms add complexity
-        stochastic = sum(1 for m in cat.morphisms if m.is_stochastic)
-        
-        return density + (stochastic / max(n_morphisms, 1)) * 0.5
+    Provides rigorous mathematical structure for:
+    - State representation (objects)
+    - Action execution (morphisms)
+    - System composition (functors)
+    - Effect handling (monads)
+    """
     
-    def _find_potential_functor(self, source: Category, target: Category) -> Dict[str, Any]:
-        """
-        Heuristic search for potential functor between categories.
+    def __init__(self, spec: AgentSpecification):
+        self.spec = spec
+        self.current_state: Optional[Object] = None
+        self.history: List[Morphism] = []
+        self.active_morphisms: Dict[str, Morphism] = {}
+    
+    def initialize(self, initial_properties: Dict[str, Any]) -> Object:
+        """Initialize agent with starting state."""
+        self.current_state = Object(properties=initial_properties)
+        self.spec.category.add_object(self.current_state)
+        return self.current_state
+    
+    def execute(self, morphism: Morphism) -> Object:
+        """Execute morphism on current state."""
+        if self.current_state is None:
+            raise RuntimeError("Agent not initialized")
         
-        Maps objects by structural type similarity.
-        """
-        object_map = {}
+        # Apply transformation
+        new_state = morphism.apply(self.current_state)
         
-        # Group objects by structural type
-        source_by_type = defaultdict(list)
-        target_by_type = defaultdict(list)
+        # Update state
+        self.current_state = new_state
+        self.spec.category.add_object(new_state)
+        self.history.append(morphism)
         
-        for obj in source.objects:
-            source_by_type[obj.structural_type].append(obj)
+        return new_state
+    
+    def compose_actions(self, action_names: List[str]) -> Morphism:
+        """Compose multiple actions into single morphism."""
+        if len(action_names) < 2:
+            raise ValueError("Need at least 2 actions to compose")
         
-        for obj in target.objects:
-            target_by_type[obj.structural_type].append(obj)
+        result = self.spec.category.morphisms[action_names[0]]
         
-        # Map shared types
-        for stype in source_by_type:
-            if stype in target_by_type:
-                # Simple 1-to-1 mapping for now
-                for i, src_obj in enumerate(source_by_type[stype]):
-                    if i < len(target_by_type[stype]):
-                        object_map[src_obj] = target_by_type[stype][i]
+        for name in action_names[1:]:
+            result = result.compose(self.spec.category.morphisms[name])
         
-        coverage = len(object_map) / max(len(source.objects), 1)
-        
+        return result
+    
+    def verify_structure(self) -> Dict[str, bool]:
+        """Verify SMGI structural obligations."""
         return {
-            "object_mappings": {src.name: tgt.name for src, tgt in object_map.items()},
-            "coverage": coverage,
-            "possible": coverage > 0.5
+            "structural_closure": self.spec.structural_closure,
+            "dynamical_stability": self.spec.dynamical_stability,
+            "bounded_capacity": self.spec.bounded_capacity,
+            "evaluative_invariance": self.spec.evaluative_invariance,
+            "category_nonempty": len(self.spec.category.objects) > 0,
+            "has_identity": all(
+                f"id_{obj.id}" in self.spec.category.morphisms 
+                or self.spec.category.identity(obj) is not None
+                for obj in self.spec.category.objects
+            )
         }
-    
-    def get_architecture_landscape(self) -> Dict[str, Any]:
-        """Get overview of all registered architectures."""
-        return {
-            "categories": {
-                name: cat.structural_summary()
-                for name, cat in self.categories.items()
-            },
-            "comparisons": [
-                {
-                    "pair": [n1, n2],
-                    "summary": self.compare_architectures(n1, n2)
-                }
-                for i, n1 in enumerate(self.categories)
-                for n2 in list(self.categories)[i+1:]
-            ]
-        }
-    
-    def identify_unification_opportunities(self) -> List[Dict[str, Any]]:
-        """
-        Identify where architectures could be unified via functors.
-        
-        Returns list of opportunities to bridge paradigms.
-        """
-        opportunities = []
-        
-        cats = list(self.categories.items())
-        for i, (n1, c1) in enumerate(cats):
-            for n2, c2 in cats[i+1:]:
-                comp = self.compare_architectures(n1, n2)
-                
-                if comp.get("potential_functor", {}).get("possible"):
-                    opportunities.append({
-                        "source": n1,
-                        "target": n2,
-                        "shared_types": comp["shared_object_types"],
-                        "coverage": comp["potential_functor"]["coverage"],
-                        "note": f"Potential functor from {n1} to {n2}"
-                    })
-        
-        return opportunities
 
 
-def demo():
-    """Demonstrate category-theoretic framework."""
-    print("=" * 60)
-    print("🧮 Category-Theoretic AGI Framework Demo")
-    print("=" * 60)
+# Factory functions for common agent types
+
+def create_reactive_agent(name: str) -> CategoryTheoreticAgent:
+    """Create simple reactive agent (stimulus-response)."""
+    cat = Category(name=f"{name}_category")
     
-    comparator = AGIArchitectureComparator()
-    cats = comparator.create_standard_categories()
+    spec = AgentSpecification(
+        name=name,
+        agent_type=AgentType.REACTIVE,
+        category=cat
+    )
     
-    print("\n📊 Standard Architecture Categories Created:")
-    for name, cat in cats.items():
-        summary = cat.structural_summary()
-        morph_types_list = list(summary['morphism_types'].keys())
-        print(f"\n   {name}:")
-        print(f"      Objects: {summary['object_count']} ({', '.join(summary['object_types'])})")
-        print(f"      Morphisms: {summary['morphism_count']}")
-        print(f"      Types: {', '.join(morph_types_list[:3])}...")
-    
-    print("\n" + "=" * 60)
-    print("📐 Architecture Comparisons:")
-    print("=" * 60)
-    
-    comparisons = [
-        ("rl", "active_inference"),
-        ("rl", "universal_ai"),
-        ("active_inference", "neuro_symbolic"),
-        ("schema", "neuro_symbolic")
-    ]
-    
-    for n1, n2 in comparisons:
-        comp = comparator.compare_architectures(n1, n2)
-        print(f"\n   {n1} ↔ {n2}:")
-        print(f"      Shared object types: {comp['shared_object_types']}")
-        print(f"      Unique to {n1}: {comp['unique_to_1']}")
-        print(f"      Complexity: {n1}={comp['structural_complexity'][n1]:.2f}, "
-              f"{n2}={comp['structural_complexity'][n2]:.2f}")
-        
-        functor = comp.get("potential_functor", {})
-        if functor.get("possible"):
-            print(f"      ✅ Potential functor: {functor['coverage']:.0%} coverage")
-        else:
-            print(f"      ❌ No simple functor possible ({functor.get('coverage', 0):.0%} coverage)")
-    
-    print("\n" + "=" * 60)
-    print("🌉 Unification Opportunities:")
-    print("=" * 60)
-    
-    opportunities = comparator.identify_unification_opportunities()
-    for opp in opportunities:
-        print(f"\n   {opp['source']} → {opp['target']}:")
-        print(f"      Shared types: {', '.join(opp['shared_types'])}")
-        print(f"      Coverage: {opp['coverage']:.0%}")
-        print(f"      Note: {opp['note']}")
-    
-    print("\n" + "=" * 60)
-    print("📝 Research Implications:")
-    print("=" * 60)
-    print("""
-   1. RL and Active Inference share state/action/observation structure
-      → Natural functor possible for translation between paradigms
-   
-   2. Universal AI adds universal program space - unique structure
-      → Requires embedding functor from simpler categories
-   
-   3. Neuro-Symbolic bridges neural and symbolic representations
-      → Acts as mediator category for paradigm integration
-   
-   4. Schema-based brings symbolic structure from cognitive science
-      → Can embed into neuro-symbolic via schema→symbolic functor
-   
-   5. Category theory provides rigorous language for AGI comparison
-      → Enables formal analysis of architectural tradeoffs
-    """)
+    return CategoryTheoreticAgent(spec)
 
 
-if __name__ == "__main__":
-    demo()
+def create_deliberative_agent(name: str) -> CategoryTheoreticAgent:
+    """Create deliberative agent with planning morphisms."""
+    cat = Category(name=f"{name}_category")
+    
+    # Add planning morphism
+    plan_obj = Object(properties={"type": "plan"})
+    act_obj = Object(properties={"type": "action"})
+    cat.add_object(plan_obj)
+    cat.add_object(act_obj)
+    
+    spec = AgentSpecification(
+        name=name,
+        agent_type=AgentType.DELIBERATIVE,
+        category=cat
+    )
+    
+    return CategoryTheoreticAgent(spec)
+
+
+def create_learning_agent(name: str) -> CategoryTheoreticAgent:
+    """Create learning agent with adaptation morphisms."""
+    cat = Category(name=f"{name}_category")
+    
+    spec = AgentSpecification(
+        name=name,
+        agent_type=AgentType.LEARNING,
+        category=cat
+    )
+    
+    return CategoryTheoreticAgent(spec)
+
+
+def create_functor_between_agents(
+    source_agent: CategoryTheoreticAgent,
+    target_agent: CategoryTheoreticAgent,
+    mapping_config: Dict[str, Any]
+) -> AgentFunctor:
+    """
+    Create functor mapping between two agent categories.
+    
+    Enables comparison and transformation between different agent architectures.
+    """
+    return AgentFunctor(
+        source=source_agent.spec.category,
+        target=target_agent.spec.category,
+        object_mapping=mapping_config.get("objects", {}),
+        morphism_transforms=mapping_config.get("morphisms", {}),
+        name=mapping_config.get("name", "AgentMapping")
+    )
