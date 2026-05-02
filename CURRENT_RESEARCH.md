@@ -1,5 +1,96 @@
 # AGI Research - Current Findings
 
+## Research Log
+
+### May 1, 2026 - Latest Research Findings
+
+**Key Industry News (May 1, 2026)**:
+- **AI Futures Project Revises AGI Timeline**: February 2026 update estimates progress at roughly two-thirds of the pace implied by the 2025 scenario, shifting AGI timeline
+- **Standard Intelligence Raises $75M**: From Sequoia and Spark Capital to scale AGI research
+- **AGI, Inc. advances on-device agentic AI strategy**: Targeting cross-platform automation
+
+**AI Agent Architecture Trends 2026**:
+- **MCP (Model Context Protocol)** + **A2A (Agent-to-Agent)** becoming standard patterns
+- **Three architectural paradigms**: Graph-based (LangGraph), Role-based (CrewAI), Code-execution (Smolagents)
+- **Enterprise patterns**: Pipeline, Hierarchical, Peer-to-peer architectures
+- **LangGraph State Management**: StateGraph with MessagesState, conditional edges, mandatory compilation step
+
+**Key arXiv Papers (Past 2 Weeks)**:
+- **[2603.24621v1] ARC-AGI-3**: New frontier benchmark - Frontier AI scores below 1% vs humans at 100%. Tests goal inference without explicit instructions
+- **[2603.28906v1] Category-theoretic Framework**: Unifying AGI architectures under algebraic foundation, formal comparison of RL, CRL, SBL approaches
+- **[2603.07896v1] SMGI**: Structural theory with θ = (r, H, Π, L, E, M) meta-model, four obligations for AGI systems
+- **[2601.11658v1] Self-Evolving Agent**: Hierarchical framework with CL/RL/GA evolution paradigms, tool synthesis capability
+- **[2602.23242v1] AIQI**: First model-free universal AI with proven asymptotic epsilon-optimality
+- **[2604.18292v1] Agent-World**: Scalable training paradigm coupling self-evolving environments with multi-environment RL
+- **[2604.09911] The Rise and Fall of G in AGI**: LLM benchmarks show PC1 explaining 90% variance (2021-2023), dropping to 64% with reasoning-specialized models
+
+**Trending Open Source Agent Repos (May 2026)**:
+- **OpenAI Agents SDK** (openai/openai-agents-python): 25k+ stars, 260+ contributors, provider-agnostic with sandbox agents
+- **Microsoft Agent Framework**: Multi-language (Python/.NET), graph-based workflows, 71 releases
+- **CrewAI**: 49k+ stars, enterprise multi-agent orchestration, role-based crews
+- **Hive** (aden-hive/hive): Graph-based execution, role-based memory, production-ready with self-healing
+- **Agency Swarm** (VRSEN/agency-swarm): OpenAI Agents SDK extension, structured multi-agent workflows
+- **SuperAgentX**: Human-in-the-loop governance, 100+ LLMs, 10,000+ MCP tools
+- **Mission Control** (builderz-labs/mission-control): Self-hosted dashboard for AI agent orchestration
+- **AgentEra/Agently**: TriggerFlow orchestration, multi-agent coordination, Apache 2.0
+
+---
+
+### 2026-05-02 - Scheduled Run: Agent-Memory Integration
+
+**Research Summary (May 2, 2026)**:
+
+**Key Industry News**:
+- **Meta acquires ARI (Assured Robot Intelligence)** for humanoid AI ambitions - belief that AGI requires physical world training through robots
+- **Pentagon's GenAI.mil** now has 100,000+ AI agents built, using Google's Gemini 3.1 Pro and Agent Designer
+- **Cybersecurity agencies worldwide** (USA, UK, Australia) warning about agentic AI risks - each component widens attack surface
+- **Clink launches** world's first fiat Agentic Payment Skill letting AI agents pay merchants with real credit cards
+- **Google Cloud showcases** agentic AI in travel industry with Virgin Voyages' Rovey assistant
+- **Time Magazine 100 Most Influential AI Companies 2026**: OpenAI, Anthropic, Google, Mistral leading
+
+**Key arXiv Papers (Past 2 Weeks)**:
+- **[2603.28906v1] Category-theoretic Comparative Framework** - Unifying RL, Causal RL, Schema-based Learning under algebraic foundation
+- **[2603.07896v1] SMGI: Structural Theory of General AI** - θ = (r, H, Π, L, E, M) meta-model with four obligations
+- **[2601.11658v1] Self-Evolving Agent** - Hierarchical LLM with CL/RL/GA evolution, autonomous tool synthesis
+- **[2603.24621v1] ARC-AGI-3** - New frontier benchmark: AI <1%, humans 100%. Tests exploration, goal inference, planning
+- **[2604.07745v1] The Cartesian Cut in Agentic AI** - Control separation between learned core and runtime
+- **[2604.04347v1] RoboPhD** - Elo tournament selection improved ARC-AGI from 27.8% to 65.8%
+
+**Trending Open Source Agent Repos**:
+- **AG2 (formerly AutoGen)** - 440+ contributors, AgentOS framework, multi-agent workflows
+- **Microsoft Agent Framework** - Graph-based, Python + .NET, 71 releases
+- **Upsonic** - Production-ready with safety policies, OCR, memory, 10000+ MCP tools
+- **BeeAI Framework** - Python + TypeScript, ACP and MCP protocol support
+- **Swarms** - Enterprise-grade orchestration, hierarchical swarms, parallel workflows
+- **Yao** - Go-based runtime, no Python/Node required, GraphRAG built-in
+- **CAMEL** - Agent societies, scaling laws research, world simulation
+- **SuperAgentX** - Human-in-the-loop governance, 100+ LLMs, auditability
+
+**Research Synthesis**:
+- 2026 is "Deployment Year One" for embodied AI
+- Physical world interaction seen as path to AGI (Meta, robotics startups)
+- Category theory emerging as unifying formalism for AGI architectures
+- ARC-AGI-3 exposes fundamental gap in compositional reasoning (AI <1% vs humans 100%)
+- Security becoming critical concern as agents gain autonomous capabilities
+- Agentic payment systems emerging as new infrastructure layer
+
+**Build Task**: Agent-Memory System Integration
+
+Core Insight: While we have `core/memory.py` (foundational interface), `core/enhanced_memory.py` (vector search), and `tiered_memory.py` (L0/L1/L2), the BaseAgent in `core/agent.py` still uses a simple dict for memory. Integration is needed for:
+- Persistent memory across agent sessions
+- Working memory capacity management (Miller's Law: 7±2 items)
+- Automatic memory consolidation from working → episodic
+- Memory-aware planning and reflection
+
+**Next Priority**: Implement embodied AI simulation layer
+- Create virtual environment for agent interaction
+- Test ARC-AGI-3 style goal inference
+- Physical reasoning capabilities
+
+---
+
+---
+
 **Research Date:** 2026-04-30  
 **Session:** AGI Continuous Research & Build Agent
 
