@@ -157,6 +157,44 @@ class Reflection:
     def recognize_patterns(self, history) -> Patterns
 ```
 
+### 5. Multi-Agent Diversity Framework (`core/multi_agent_diversity.py`)
+
+**Purpose**: Epistemic diversity in multi-agent systems - diverse teams outperform single agents.
+
+**Design Inspired By**:
+- "Many Agents, Not One" (arXiv:2603.29075): Diverse collaboration beats single superintelligence [^18]
+- Agent-World: Collaborative agents broaden search space [^16]
+- Cordum: Governance control plane for agent fleets [^19]
+
+**Key Features**:
+- Six reasoning styles: Symbolic, Neural, Evolutionary, Analogical, Causal, Probabilistic
+- A2A (Agent-to-Agent) communication protocol
+- Collaborative problem solving with diversity weighting
+- Consensus mechanisms preserving epistemic diversity
+- Shannon entropy-based diversity metrics
+
+```python
+class ReasoningStyle(Enum):
+    SYMBOLIC = "symbolic"
+    NEURAL = "neural"
+    EVOLUTIONARY = "evolutionary"
+    ANALOGICAL = "analogical"
+    CAUSAL = "causal"
+    PROBABILISTIC = "probabilistic"
+
+class MultiAgentDiversityFramework:
+    def create_diverse_population(self, size: int) -> List[str]
+    def collaborative_problem_solving(self, problem: Any) -> Dict
+    def calculate_diversity_metrics(self) -> DiversityMetrics
+    def simulate_debate(self, topic: str) -> Dict
+```
+
+**Diversity Metrics**:
+- Reasoning diversity: Shannon entropy of reasoning styles
+- Opinion diversity: Variance in agent votes
+- Consensus strength: Level of agreement
+- Coverage breadth: Solution space coverage
+
 ---
 
 ## 🛠️ Skills System

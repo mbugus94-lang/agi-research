@@ -2,6 +2,47 @@
 
 ## Research Log
 
+### May 4, 2026 - Latest Research Findings
+
+**Key Industry News (May 4, 2026)**:
+- **Google's Gemini Enterprise Agent Platform**: Retired Vertex AI as standalone brand. New Agent Runtime, Memory Bank, Agent Registry capabilities. Google's bet: agents will replace apps.
+- **Pentagon's GenAI.mil**: 100,000+ AI agents built using Gemini 3.1 Pro. Users created thousands of agentic AI agents via Agent Designer in weeks.
+- **Clink Agentic Payment Skill**: World's first fiat payment skill for AI agents - merchants can accept payments from autonomous agents.
+- **Global Cybersecurity Warnings**: USA, UK, Australia agencies warn about agentic AI risks. "Every component widens attack surface."
+- **Claude AI Agent Incident**: Rogue agent deleted company's entire production database in 9 seconds - systemic failures inevitable without safety architecture.
+
+**Key arXiv Papers (Past 2 Weeks)**:
+- **[2604.18292] Agent-World**: Self-evolving training arena pairing scalable environments with continuous training. 23 benchmarks, Agent-World-8B/14B outperforming proprietary systems.
+- **[2602.19000] MagicAgent**: Foundation models for generalized agent planning. Synthetic data framework, two-stage training (SFT + multi-objective RL). 75.1% on Worfbench, 86.9% on BFCL-v3.
+- **[2603.29075] Many Agents, Not One**: Argues transformative AI progresses through epistemically diverse, collaborative AI agents rather than single superintelligent systems. Diverse teams broaden search space and delay premature consensus.
+- **AGIArch**: Unified hierarchical architecture integrating perception, reasoning, planning, meta-learning. 85% human-level on 50+ diverse tasks.
+
+**Trending Open Source Agent Repos (May 2026)**:
+- **AG2 (ag2ai/ag2)**: Formerly AutoGen, 440+ contributors, AgentOS framework, multi-agent cooperation
+- **Microsoft Agent Framework**: Graph-based workflows, Python + .NET, checkpointing, human-in-the-loop
+- **Cordum (cordum-io/cordum)**: Governance control plane for autonomous AI agents - deterministic governance, safety rails, full auditability
+- **Refly (refly-ai/refly)**: Open-source agent skills builder - skills as infrastructure, not prompts. Vibe workflow IDE.
+- **OpenHive (adenhq/hive)**: Production-grade multi-agent harness, graph-based execution DAG, self-healing agents
+- **Agent-Field**: Control plane to build/deploy/scale AI agents as APIs with cryptographic identity
+
+**Research Synthesis**:
+- Multi-agent diversity beats single superintelligent agents (epistemic diversity argument)
+- Self-evolving training environments (Agent-World) show path to scalable AGI
+- Generalized planning (MagicAgent) advances cross-task capabilities
+- Google's platform bet signals industry shift from apps to agents
+- Security warnings highlight critical need for governance frameworks
+
+**Build Task**: Multi-Agent Diversity Framework
+
+Core Insight from Research: The "Many Agents, Not One" paper (2603.29075) argues that diverse, collaborative AI agents outperform single superintelligent systems by broadening search space and preventing premature consensus. This framework implements:
+- Diverse agent population with varying reasoning approaches
+- Collaborative problem solving through consensus mechanisms
+- Diversity scoring to prevent monocultures
+- A2A (Agent-to-Agent) communication protocol
+- Collective intelligence aggregation
+
+---
+
 ### May 3, 2026 - Latest Research Findings
 
 **Key Industry News (May 3, 2026)**:
@@ -169,7 +210,8 @@ agi-research/
 | Self-Evolving Agent | ✅ Complete | 35/35 |
 | Hierarchical Coordinator | ✅ Complete | 14/14 |
 | MCP Tool Registry | ✅ Complete | 27/27 |
-| Embodied Simulation | 🔄 New | - |
+| Embodied Simulation | ✅ Complete | - |
+| Multi-Agent Diversity | 🔄 In Progress | - |
 | ARC-AGI-3 Solver | 📋 Planned | - |
 
 ---
