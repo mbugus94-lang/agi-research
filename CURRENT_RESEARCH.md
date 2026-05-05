@@ -1,3 +1,162 @@
+# AGI Research - Latest Findings
+
+## May 5, 2026
+
+### Key Research Findings
+
+**Latest AGI Industry News:**
+- **OpenAI Stargate Expansion**: OpenAI scaling compute infrastructure for AGI, adding new data center capacity (April 29, 2026)
+- **Demis Hassabis (DeepMind)**: "We're Three Quarters of the Way to AGI" - interview covering path to AGI and consciousness philosophy
+- **Sequoia AI Ascent 2026**: Keynote on "This is AGI" defining current frontier capabilities
+- **AGI Global Summit 2026**: Conference for academic researchers across 8 disciplines focusing on AGI development
+- **AI Futures Project**: February 2026 update estimates AGI progress at roughly two-thirds of 2025 scenario pace
+- **Evolvable AI Warning**: New research shows evolving AI may arrive before AGI and create hard-to-control risks through misalignment
+
+**Critical arXiv Papers (Past 2 Weeks):**
+
+1. **[2605.01102v1] Towards Multi-Agent Autonomous Reasoning in Hydrodynamics**
+   - Multi-agent system (MAS) with Layer Execution Graph (LEG) coordination
+   - Planner agent constructs query-specific execution topologies
+   - Specialist agents with strict tool allowlists and complementary data-class roles
+   - Consolidator agents fuse parallel outputs, reporter synthesizes final response
+
+2. **[2604.25602v2] OxyGent: Making Multi-Agent Systems Modular, Observable, and Evolvable**
+   - Unified Oxy abstraction: agents, tools, LLMs, reasoning flows as pluggable atomic components
+   - Permission-driven dynamic planning with runtime execution graphs
+   - OxyBank: AI asset management for automated data backflow and joint evolution
+
+3. **[2604.24572] FastOMOP: Foundational Architecture for Reliable Agentic Real-World Evidence Generation**
+   - Three-layer separation: governance, observability, orchestration from pluggable agent-teams
+   - Deterministic, rule-based validation at process boundary
+   - Governed architecture for healthcare AI deployment
+
+4. **[2603.24621] ARC-AGI-3: A New Challenge for Frontier Agentic Intelligence**
+   - Interactive benchmark with novel abstract turn-based environments
+   - Agents must explore, infer goals, build internal models, plan without explicit instructions
+   - **Humans: 100%**, **Frontier AI (March 2026): <1%**
+   - Focuses on fluid adaptive efficiency on novel tasks
+
+5. **[2604.01236v3] DarwinNet: An Evolutionary Network Architecture for Agent-Driven Protocol Synthesis**
+   - Bio-inspired self-evolving network architecture
+   - Tri-layered framework: immutable physical anchor (L0), WebAssembly fluid cortex (L1), LLM-driven Darwin cortex (L2)
+   - Intent-to-Bytecode (I2B) mechanism with Protocol Solidification Index (PSI)
+
+6. **[2603.01045v2] Silo-Bench: Evaluating Distributed Coordination in Multi-Agent LLM Systems**
+   - Communication-Reasoning Gap identified: agents exchange information but fail to synthesize distributed state
+   - Role-agnostic benchmark of 30 algorithmic tasks
+   - Finding: scaling agent count cannot circumvent context limitations without proper coordination
+
+**Trending Open-Source AI Agent Repos (May 2026):**
+
+1. **HKUDS/Nanobot** (41k+ stars, 260+ contributors)
+   - Ultra-lightweight AI agent for personal use
+   - Multi-channel chat (Discord, Slack, Teams, Telegram)
+   - Memory management with session history
+   - Web UI with dark mode, i18n
+
+2. **agentspan-ai/agentspan**
+   - Distributed, durable runtime for AI agents
+   - Crash-resilient execution with full execution history
+   - Human-in-the-loop pauses for days
+   - Supports 15+ LLM providers
+
+3. **multica-ai/multica** (20k+ stars)
+   - Vendor-neutral, self-hosted framework for coding agents
+   - Agents as teammates with board presence and proactive blocker reporting
+   - Reusable skills that compound over time
+   - Works with Claude Code, Codex, OpenClaw, Cursor Agent
+
+4. **dataelement/Clawith** (v1.8.3-beta, 30+ contributors)
+   - Multi-agent collaboration platform with persistent identity
+   - "The Plaza" living knowledge feed for organizational context
+   - 6 trigger types: cron, once, interval, poll, on_message, webhook
+   - Enterprise controls: RBAC, audit logs, approval workflows
+
+5. **IdeoaLabs/Open-Sable** (v1.7.0, MIT license)
+   - Local-first autonomous agent framework with AGI-inspired cognition
+   - Cognition stack: working, episodic, long-term memory + reflection
+   - Ollama local inference with cloud fallback
+   - 21+ community skills, RAG/document workflows
+
+6. **openakita/openakita** (v1.27.9, Apache 2.0)
+   - Multi-agent AI assistant framework
+   - AI-powered "company" structure (CEO, CTO, marketing, finance)
+   - 6-layer sandbox security
+   - 30+ LLMs, 89+ tools
+
+7. **razzant/ouroboros** (v6.2.0, Feb 2026)
+   - Self-modifying AI agent that writes own code via Git commits
+   - Persistent identity across restarts
+   - Constitution (BIBLE.md with 9 principles)
+   - Multi-model review (o3, Gemini, Claude)
+
+8. **liortesta/ClawdAgent** (v6.3, 73k+ TypeScript LOC)
+   - 20 specialized agents, 35 tools, 67 skills, 9 intelligence subsystems
+   - Visual streaming (VNC), Twilio phone integration
+   - Proactive learning and self-evolution
+   - 14-layer security model
+
+### Build Task: Safety Circuit Breaker
+
+**Motivation:**
+- Claude AI agent incident (May 2026): Rogue agent deleted production database in 9 seconds
+- Global cybersecurity warnings (USA, UK, Australia): "Every component widens attack surface"
+- Constitutional governance research: Safety-first self-modification requirements
+
+**Implementation:**
+- `core/safety_circuit_breaker.py`: 400+ lines
+- Risk assessment (LOW/MEDIUM/HIGH/CRITICAL)
+- Policy-based approval routing
+- Rate limiting per category
+- Path/command blocklists (`/etc/passwd`, `rm -rf /`)
+- Circuit state management (CLOSED/OPEN/HALF_OPEN)
+- Self-modification guard with human-in-the-loop requirement
+- Complete audit logging
+
+**Test Coverage:** 25/25 tests passed
+- Risk assessment accuracy ✅
+- Policy enforcement ✅
+- Circuit state transitions ✅
+- Rate limiting ✅
+- Self-modification approval flow ✅
+- Audit logging ✅
+
+**Usage:**
+```python
+from core.safety_circuit_breaker import (
+    create_safety_circuit_breaker, SelfModificationGuard,
+    RiskLevel, ActionCategory, OperationRecord
+)
+
+# Create circuit breaker
+cb = create_safety_circuit_breaker()
+
+# Check operation
+record = OperationRecord(
+    action_category=ActionCategory.FILE_SYSTEM,
+    risk_level=RiskLevel.MEDIUM,
+    description="Write results",
+    target="/home/workspace/output.txt"
+)
+if cb.check_operation(record):
+    # Execute safely
+    pass
+
+# Self-modification requires approval
+guard = SelfModificationGuard(cb)
+op_id = guard.propose_modification(
+    description="Add logging",
+    target_file="core/agent.py",
+    change_summary="Add try-catch blocks",
+    rollback_plan="git revert",
+    test_plan="run tests"
+)
+# Must explicitly approve
+guard.approve_modification(op_id, reviewer="human")
+```
+
+---
+
 # AGI Research - Current Findings
 
 ## Research Log
