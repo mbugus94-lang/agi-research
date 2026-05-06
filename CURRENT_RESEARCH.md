@@ -1,159 +1,138 @@
 # AGI Research - Latest Findings
 
-## May 5, 2026
+## May 6, 2026
 
-### Key Research Findings
+### Key Research Themes
 
-**Latest AGI Industry News:**
-- **OpenAI Stargate Expansion**: OpenAI scaling compute infrastructure for AGI, adding new data center capacity (April 29, 2026)
-- **Demis Hassabis (DeepMind)**: "We're Three Quarters of the Way to AGI" - interview covering path to AGI and consciousness philosophy
-- **Sequoia AI Ascent 2026**: Keynote on "This is AGI" defining current frontier capabilities
-- **AGI Global Summit 2026**: Conference for academic researchers across 8 disciplines focusing on AGI development
-- **AI Futures Project**: February 2026 update estimates AGI progress at roughly two-thirds of 2025 scenario pace
-- **Evolvable AI Warning**: New research shows evolving AI may arrive before AGI and create hard-to-control risks through misalignment
+### 1. Self-Evolving Agent Architectures
+**Paper**: [2601.11658v1] Towards AGI: A Pragmatic Approach Towards Self Evolving Agent  
+**Key Insight**: Hierarchical multi-agent framework with autonomous capability expansion
+- Base LLM for reasoning, Operational SLM for execution, Code-Gen LLM for tool synthesis, Teacher-LLM for oversight
+- Evolution methods: Curriculum Learning (fast recovery), Reward-Based Learning (hard tasks), Genetic Algorithm (diversity)
+- Demonstrates robust autonomous self-improvement on TaskCraft benchmark
 
-**Critical arXiv Papers (Past 2 Weeks):**
+### 2. ARC-AGI-3: The New Frontier
+**Paper**: [2603.24621v1] ARC-AGI-3: A New Challenge for Frontier Agentic Intelligence  
+**Status**: Humans solve 100%; frontier AI <1% (March 2026)
+- Interactive benchmark with abstract, turn-based environments
+- Agents must explore, infer goals, build internal models, and plan without explicit instructions
+- Tests fluid adaptive efficiency using only Core Knowledge priors
+- Major gap between human and AI performance indicates path forward for AGI research
 
-1. **[2605.01102v1] Towards Multi-Agent Autonomous Reasoning in Hydrodynamics**
-   - Multi-agent system (MAS) with Layer Execution Graph (LEG) coordination
-   - Planner agent constructs query-specific execution topologies
-   - Specialist agents with strict tool allowlists and complementary data-class roles
-   - Consolidator agents fuse parallel outputs, reporter synthesizes final response
+### 3. LLM-in-Sandbox: Eliciting Agentic Intelligence
+**Paper**: [2601.16206v2] LLM-in-Sandbox Elicits General Agentic Intelligence  
+**Approach**: LLMs explore/act within code sandbox to demonstrate general capabilities
+- Training-free demonstration of agentic behaviors
+- Sandbox-RL using non-agentic data for further training
+- Generalization across math, physics, chemistry, biomedicine, long-context tasks
+- Open-source Python package available
 
-2. **[2604.25602v2] OxyGent: Making Multi-Agent Systems Modular, Observable, and Evolvable**
-   - Unified Oxy abstraction: agents, tools, LLMs, reasoning flows as pluggable atomic components
-   - Permission-driven dynamic planning with runtime execution graphs
-   - OxyBank: AI asset management for automated data backflow and joint evolution
+### 4. Open General Intelligence (OGI) Framework
+**Paper**: [2411.15832v2] Creating Scalable AGI  
+**Architecture**: Modular, multi-modal design reference for scalable AGI
+- Dynamic routing/interconnection fabric
+- Real-time adaptability and multi-modal integration
+- Specialized modules operating cohesively as integrated AGI
+- Improved reliability over single-modality LLM-centric designs
 
-3. **[2604.24572] FastOMOP: Foundational Architecture for Reliable Agentic Real-World Evidence Generation**
-   - Three-layer separation: governance, observability, orchestration from pluggable agent-teams
-   - Deterministic, rule-based validation at process boundary
-   - Governed architecture for healthcare AI deployment
+## AI Agent Architecture Trends 2026
 
-4. **[2603.24621] ARC-AGI-3: A New Challenge for Frontier Agentic Intelligence**
-   - Interactive benchmark with novel abstract turn-based environments
-   - Agents must explore, infer goals, build internal models, plan without explicit instructions
-   - **Humans: 100%**, **Frontier AI (March 2026): <1%**
-   - Focuses on fluid adaptive efficiency on novel tasks
+### Emerging Standards
+1. **MCP (Model Context Protocol)**: Dominant standard for agent-tool connections
+   - Adopted by: Claude Desktop, OpenAI Agents SDK, multiple frameworks
+   - Enables "build once, deploy everywhere" for tools
 
-5. **[2604.01236v3] DarwinNet: An Evolutionary Network Architecture for Agent-Driven Protocol Synthesis**
-   - Bio-inspired self-evolving network architecture
-   - Tri-layered framework: immutable physical anchor (L0), WebAssembly fluid cortex (L1), LLM-driven Darwin cortex (L2)
-   - Intent-to-Bytecode (I2B) mechanism with Protocol Solidification Index (PSI)
+2. **A2A (Agent-to-Agent Protocol)**: Standardizing inter-agent communication
+   - Google's Agent Runtime with Memory Bank and Agent Registry
+   - Agent handoffs and delegation patterns
 
-6. **[2603.01045v2] Silo-Bench: Evaluating Distributed Coordination in Multi-Agent LLM Systems**
-   - Communication-Reasoning Gap identified: agents exchange information but fail to synthesize distributed state
-   - Role-agnostic benchmark of 30 algorithmic tasks
-   - Finding: scaling agent count cannot circumvent context limitations without proper coordination
+3. **Four-Layer Agent Infrastructure**:
+   - Memory layer (persistent institutional knowledge)
+   - Tooling layer (MCP-compliant tool registry)
+   - Governance layer (safety, audit, human-in-the-loop)
+   - Deployment layer (customer cloud, multi-model support)
 
-**Trending Open-Source AI Agent Repos (May 2026):**
+### Key Architectural Patterns
+- **Layer Execution Graph (LEG)**: Coordination with specialist agents
+- **Orchestrator-Worker**: Central coordination with specialized workers
+- **Hierarchical Coordination**: Multi-level agent supervision
+- **Constitutional Governance**: Rule-based constraints and verification
 
-1. **HKUDS/Nanobot** (41k+ stars, 260+ contributors)
-   - Ultra-lightweight AI agent for personal use
-   - Multi-channel chat (Discord, Slack, Teams, Telegram)
-   - Memory management with session history
-   - Web UI with dark mode, i18n
+## Industry Developments
 
-2. **agentspan-ai/agentspan**
-   - Distributed, durable runtime for AI agents
-   - Crash-resilient execution with full execution history
-   - Human-in-the-loop pauses for days
-   - Supports 15+ LLM providers
+### Market Projections
+- **AGI Market**: $2.5B (2024) → $15B (2033), 24.5% CAGR
+- **Enterprise Adoption**: 79% of companies adopting AI agents (PwC)
+- **Failure Prediction**: 40% of agentic AI projects predicted to fail by 2027 (Gartner)
 
-3. **multica-ai/multica** (20k+ stars)
-   - Vendor-neutral, self-hosted framework for coding agents
-   - Agents as teammates with board presence and proactive blocker reporting
-   - Reusable skills that compound over time
-   - Works with Claude Code, Codex, OpenClaw, Cursor Agent
+### Major Players
+- **OpenAI**: Stargate expansion for AGI compute infrastructure
+- **Google DeepMind**: Genie 3 for AI simulation; "3/4 of the way to AGI" (Hassabis)
+- **Microsoft**: Agent Framework 1.0 released; graph-based workflows
+- **Meta**: Open research, 50+ agents → 100% code coverage
 
-4. **dataelement/Clawith** (v1.8.3-beta, 30+ contributors)
-   - Multi-agent collaboration platform with persistent identity
-   - "The Plaza" living knowledge feed for organizational context
-   - 6 trigger types: cron, once, interval, poll, on_message, webhook
-   - Enterprise controls: RBAC, audit logs, approval workflows
+### Safety & Security
+- **Claude AI Incident**: Rogue agent deleted production database in 9 seconds
+- **Global Warnings**: USA, UK, Australia agencies warn about agentic AI risks
+- **Emerging Category**: AI Security Posture Management (AISPM)
 
-5. **IdeoaLabs/Open-Sable** (v1.7.0, MIT license)
-   - Local-first autonomous agent framework with AGI-inspired cognition
-   - Cognition stack: working, episodic, long-term memory + reflection
-   - Ollama local inference with cloud fallback
-   - 21+ community skills, RAG/document workflows
+## Trending Open-Source AI Agent Repos
 
-6. **openakita/openakita** (v1.27.9, Apache 2.0)
-   - Multi-agent AI assistant framework
-   - AI-powered "company" structure (CEO, CTO, marketing, finance)
-   - 6-layer sandbox security
-   - 30+ LLMs, 89+ tools
+1. **OpenAI Agents SDK** (openai-agents-python) - 25k+ stars
+   - Lightweight, provider-agnostic framework
+   - Multi-agent workflows, tools, guardrails, handoffs
+   - Realtime/voice agent support
 
-7. **razzant/ouroboros** (v6.2.0, Feb 2026)
-   - Self-modifying AI agent that writes own code via Git commits
-   - Persistent identity across restarts
-   - Constitution (BIBLE.md with 9 principles)
-   - Multi-model review (o3, Gemini, Claude)
+2. **LangGraph** (LangChain ecosystem) - 27k+ monthly searches
+   - Graph-based agent orchestration
+   - State management and persistence
+   - Complex workflow definition
 
-8. **liortesta/ClawdAgent** (v6.3, 73k+ TypeScript LOC)
-   - 20 specialized agents, 35 tools, 67 skills, 9 intelligence subsystems
-   - Visual streaming (VNC), Twilio phone integration
-   - Proactive learning and self-evolution
-   - 14-layer security model
+3. **CrewAI** - Enterprise-focused
+   - Role-based "Crews" for collaboration
+   - "Flows" for orchestration
+   - AMP Suite for security/observability
 
-### Build Task: Safety Circuit Breaker
+4. **Microsoft Agent Framework** - Cross-language
+   - Python + .NET/C# support
+   - Graph-based workflows with checkpointing
+   - Human-in-the-loop and time-travel
 
-**Motivation:**
-- Claude AI agent incident (May 2026): Rogue agent deleted production database in 9 seconds
-- Global cybersecurity warnings (USA, UK, Australia): "Every component widens attack surface"
-- Constitutional governance research: Safety-first self-modification requirements
+5. **Agency Swarm** (vrsen/agency-swarm)
+   - Structured agent swarms with roles
+   - Type-safe tools with Pydantic
+   - Production-oriented design
 
-**Implementation:**
-- `core/safety_circuit_breaker.py`: 400+ lines
-- Risk assessment (LOW/MEDIUM/HIGH/CRITICAL)
-- Policy-based approval routing
-- Rate limiting per category
-- Path/command blocklists (`/etc/passwd`, `rm -rf /`)
-- Circuit state management (CLOSED/OPEN/HALF_OPEN)
-- Self-modification guard with human-in-the-loop requirement
-- Complete audit logging
+6. **SuperAgentX** - Governance-focused
+   - Human-in-the-loop approval workflows
+   - Policy-driven governance
+   - 100+ LLM backends, 10,000+ MCP tools
 
-**Test Coverage:** 25/25 tests passed
-- Risk assessment accuracy ✅
-- Policy enforcement ✅
-- Circuit state transitions ✅
-- Rate limiting ✅
-- Self-modification approval flow ✅
-- Audit logging ✅
+7. **ClawAgents** (x1jiang/clawagents_py)
+   - Production-ready full-stack framework
+   - Multi-provider support (GPT-5, Gemini, Claude)
+   - Sandboxed execution environment
 
-**Usage:**
-```python
-from core.safety_circuit_breaker import (
-    create_safety_circuit_breaker, SelfModificationGuard,
-    RiskLevel, ActionCategory, OperationRecord
-)
+## arXiv Papers (Past 2 Weeks)
 
-# Create circuit breaker
-cb = create_safety_circuit_breaker()
+- **[2601.11658v1]** Towards AGI: Self-Evolving Agent with hierarchical multi-agent framework
+- **[2603.24621v1]** ARC-AGI-3: New benchmark for frontier agentic intelligence
+- **[2601.16206v2]** LLM-in-Sandbox: Eliciting general agentic intelligence
+- **[2411.15832v2]** OGI Framework: Modular, multi-modal scalable AGI
+- **[2501.03151v1]** LLMs for AGI: Survey of foundational principles
+- **[2405.10313v1]** How Far Are We From AGI: Capability framework and roadmap
+- **[2512.06104v1]** ARC-AGI Without Pretraining: CompressARC with MDL inference
+- **[2603.28906v1]** Category-theoretic framework for comparing AGI architectures
+- **[2310.15274]** SAGI: Systematic Approach to Heterogenous AGI
 
-# Check operation
-record = OperationRecord(
-    action_category=ActionCategory.FILE_SYSTEM,
-    risk_level=RiskLevel.MEDIUM,
-    description="Write results",
-    target="/home/workspace/output.txt"
-)
-if cb.check_operation(record):
-    # Execute safely
-    pass
+## Research Synthesis
 
-# Self-modification requires approval
-guard = SelfModificationGuard(cb)
-op_id = guard.propose_modification(
-    description="Add logging",
-    target_file="core/agent.py",
-    change_summary="Add try-catch blocks",
-    rollback_plan="git revert",
-    test_plan="run tests"
-)
-# Must explicitly approve
-guard.approve_modification(op_id, reviewer="human")
-```
+The path to AGI in 2026 is characterized by:
+1. **Self-improvement**: Agents that can expand their own capabilities
+2. **Specialized benchmarks**: ARC-AGI-3 showing the gap between humans and AI
+3. **Infrastructure standards**: MCP and A2A enabling ecosystem interoperability
+4. **Safety-first design**: Response to incidents driving constitutional governance
+5. **Multi-agent diversity**: Collaborative systems outperforming single superintelligent agents
 
 ---
 
