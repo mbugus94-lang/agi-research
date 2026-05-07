@@ -1,5 +1,48 @@
 # AGI Research - Latest Findings
 
+## May 7, 2026
+
+### Industry News & Breakthroughs
+- **NVIDIA GTC 2026**: Physical AI adoption accelerating - physics-informed data-driven reasoning becoming mainstream
+- **OpenAI 70-80% to AGI**: Greg Brockman reports AI tools now write 80% of OpenAI's code
+- **xAI Grok Timeline**: Predictions of Grok 5.0 achieving AGI by end of 2026, Grok 6.0 → ASI by 2030-2031
+- **Meta Humanoid Hardware**: Building humanoid robots for physical AGI embodiment
+- **US Government AGI Initiative**: Manhattan Project-style initiative for AGI development launched
+
+### Key arXiv Papers (Past 2 Weeks)
+- **[2601.03151v1] LLMs for AGI - A Survey**: Reviews foundational principles for AGI via LLMs. Key requirements: embodiment, symbol grounding, causality, and memory. Argues current LLMs are superficial and brittle.
+- **[2601.11658v1] Self-Evolving Agent**: Multi-agent framework with Base LLM, SLM, Code-Gen LLM, Teacher-LLM. Uses curriculum learning, RL, and genetic algorithms for evolution.
+- **[2603.28906v1] Category-Theoretic AGI Framework**: Unifies RL, Universal AI, Active Inference under categorical "Machines" - enables formal comparison of architectures.
+- **[2603.07896v1] SMGI: Structural Theory of AGI**: Typed meta-model separating structural ontology from behavior. Shows classical ERM, RL, Solomonoff models are structurally restricted instances.
+- **[2603.13372v1] ARC-AGI Living Survey**: 82 approaches analyzed. All paradigms show 2-3x performance decline across ARC versions. Cost improved 390x YoY via test-time parallelism reduction.
+
+### Trending Open Source Agent Repos (May 2026)
+1. **OpenAI Agents SDK** (25k+ stars) - Provider-agnostic multi-agent framework with sandbox agents, guardrails, handoffs
+2. **LangChain/LangGraph** - Dominant orchestration with 40+ provider integrations
+3. **Mastra** (TypeScript) - End-to-end AI apps with workflows, memory, observability
+4. **CrewAI** - Enterprise AMP suite with role-based crews, 50k+ stars
+5. **Microsoft Agent Framework** - Cross-language (Python + .NET) with checkpointing, time-travel
+6. **Agency Swarm** - Structured agent roles with type-safe Pydantic tools
+7. **ClawAgents_py** - Production-ready ~2,500 LOC with multi-provider support
+8. **LightAgent** (~1,000 LOC) - Lightweight with Tree-of-Thought, MCP support
+9. **Miyabi** - GitHub Issue → PR automation with 7 specialized agents
+10. **Ouroboros** - Self-modifying AI with constitutional governance
+
+### AI Agent Architecture Trends 2026
+- **MCP (Model Context Protocol)**: Now THE dominant standard - adopted by Claude Desktop, OpenAI SDK, Mastra
+- **A2A (Agent-to-Agent Protocol)**: Google's emerging standard for inter-agent communication
+- **Four-Layer Infrastructure**: Memory → Tooling → Governance → Deployment
+- **Test-Time Training (TTT)**: LoRA adaptation enabling task specialization without pretraining
+- **Symmetry-Aware Encoding**: Critical for ARC-AGI pattern recognition
+
+### Critical Research Insights
+- **ARC-AGI-3**: New benchmark where frontier AI scores <1%, humans 100% - tests fluid adaptive efficiency
+- **The Relativity of AGI**: No distribution-independent AGI exists (arXiv:2601.17335) - undecidability via Gödel-Tarski
+- **Constitutional AI as Holographic Principle**: Anthropic's approach mirrors AdS/CFT correspondence - low-dimensional boundary projecting constraints into volumetric bulk
+- **Bottom-Up vs Top-Down**: DeepMind (biological binding) + Anthropic (physical projection) = potential Grand Synthesis for true AGI
+
+---
+
 ## May 6, 2026
 
 ### Key Research Themes
