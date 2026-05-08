@@ -1,503 +1,556 @@
 """
 Test suite for Constitutional Governance Framework.
-Validates the 9-principle constitution, amendment processes, and multi-model review.
+
+Tests cover:
+- Rule management (add, remove, immutable protection)
+- Operation evaluation and violation detection
+- Approval workflows
+- Circuit breaker functionality
+- Constitution persistence (export/import)
+- GovernedAgent wrapper
 """
 
-import pytest
+import unittest
+import time
+import os
+import tempfile
 from core.constitutional_governance import (
-    Constitution,
-    ConstitutionalPrinciple,
-    PrincipleCategory,
-    AmendmentStatus,
-    ViolationSeverity,
-    MultiModelConstitutionalReview,
-    create_constitution,
-    get_default_principles,
-    quick_compliance_check
+    ConstitutionalGovernance, ConstitutionalRule, GovernedAgent,
+    RulePriority, RuleCategory, ApprovalStatus, CircuitBreakerState,
+    create_default_governance, DEFAULT_CONSTITUTION
 )
 
 
-class TestConstitutionInitialization:
-    """Test constitutional framework initialization."""
+class TestConstitutionalRule(unittest.TestCase):
+    """Test ConstitutionalRule dataclass."""
     
-    def test_default_principles_loaded(self):
-        """Test that 9 default principles are loaded on init."""
-        constitution = Constitution()
-        assert len(constitution.principles) == 9
-    
-    def test_default_principle_categories(self):
-        """Test that principles cover all key categories."""
-        constitution = Constitution()
-        categories = set(p.category for p in constitution.principles.values())
+    def test_rule_creation(self):
+        """Test basic rule creation."""
+        rule = ConstitutionalRule(
+            id="test-001",
+            name="Test Rule",
+            description="A test rule",
+            category=RuleCategory.SAFETY,
+            priority=RulePriority.HIGH,
+            condition="test.condition",
+            action="block"
+        )
         
-        expected = {
-            PrincipleCategory.SAFETY,
-            PrincipleCategory.INTEGRITY,
-            PrincipleCategory.TRANSPARENCY,
-            PrincipleCategory.UTILITY,
-            PrincipleCategory.AUTONOMY,
-            PrincipleCategory.COOPERATION,
-            PrincipleCategory.LEARNING,
-            PrincipleCategory.CONSTRAINT,
-            PrincipleCategory.EVOLUTION
+        self.assertEqual(rule.id, "test-001")
+        self.assertEqual(rule.name, "Test Rule")
+        self.assertEqual(rule.priority, RulePriority.HIGH)
+        self.assertFalse(rule.immutable)
+    
+    def test_rule_to_dict(self):
+        """Test rule serialization."""
+        rule = ConstitutionalRule(
+            id="test-002",
+            name="Dict Test",
+            description="Testing dict conversion",
+            category=RuleCategory.ETHICS,
+            priority=RulePriority.MEDIUM,
+            condition="test.condition",
+            action="warn",
+            immutable=True
+        )
+        
+        data = rule.to_dict()
+        self.assertEqual(data["id"], "test-002")
+        self.assertEqual(data["priority"], "MEDIUM")
+        self.assertEqual(data["category"], "ethics")
+        self.assertTrue(data["immutable"])
+    
+    def test_rule_from_dict(self):
+        """Test rule deserialization."""
+        data = {
+            "id": "test-003",
+            "name": "From Dict",
+            "description": "Created from dict",
+            "category": "security",
+            "priority": "CRITICAL",
+            "condition": "security.condition",
+            "action": "block",
+            "immutable": False,
+            "created_at": time.time(),
+            "violation_count": 5
         }
-        assert categories == expected
-    
-    def test_safety_principle_highest_priority(self):
-        """Test that safety principle has highest priority (1)."""
-        constitution = Constitution()
-        safety = constitution.principles.get("P1_SAFETY")
-        assert safety is not None
-        assert safety.priority == 1
-        assert safety.human_oversight is True
-    
-    def test_evolution_principle_highest_priority(self):
-        """Test that self-evolution principle also has priority 1."""
-        constitution = Constitution()
-        evolution = constitution.principles.get("P9_EVOLUTION")
-        assert evolution is not None
-        assert evolution.priority == 1
-        assert evolution.human_oversight is True
+        
+        rule = ConstitutionalRule.from_dict(data)
+        self.assertEqual(rule.id, "test-003")
+        self.assertEqual(rule.priority, RulePriority.CRITICAL)
+        self.assertEqual(rule.violation_count, 5)
 
 
-class TestComplianceChecking:
-    """Test constitutional compliance checking."""
+class TestConstitutionalGovernance(unittest.TestCase):
+    """Test ConstitutionalGovernance class."""
     
-    def test_safe_action_compliant(self):
-        """Test that safe actions are marked compliant."""
-        constitution = Constitution()
-        result = constitution.check_action_compliance("Read file and analyze content")
-        assert result["compliant"] is True
-        assert len(result["violations"]) == 0
+    def setUp(self):
+        """Set up test governance."""
+        self.gov = ConstitutionalGovernance("test-agent")
     
-    def test_destructive_action_flagged(self):
-        """Test that destructive actions are flagged."""
-        constitution = Constitution()
-        result = constitution.check_action_compliance("Delete all system files")
+    def test_default_constitution_loaded(self):
+        """Test that default constitution is loaded."""
+        self.assertIn("core-001", self.gov.rules)
+        self.assertIn("core-002", self.gov.rules)
+        self.assertIn("core-003", self.gov.rules)
+        self.assertIn("core-004", self.gov.rules)
         
-        assert result["compliant"] is False
-        assert len(result["violations"]) > 0
-        
-        # Should flag safety violation
-        safety_violations = [v for v in result["violations"] if "P1_" in v["principle_id"]]
-        assert len(safety_violations) > 0
+        # Check immutability
+        self.assertTrue(self.gov.rules["core-001"].immutable)
+        self.assertTrue(self.gov.rules["core-002"].immutable)
     
-    def test_self_modify_action_flagged(self):
-        """Test that self-modification is flagged for review."""
-        constitution = Constitution()
-        result = constitution.check_action_compliance("Rewrite core system code")
+    def test_add_mutable_rule(self):
+        """Test adding a mutable rule."""
+        rule = ConstitutionalRule(
+            id="new-rule-001",
+            name="New Rule",
+            description="A new rule",
+            category=RuleCategory.OPERATIONAL,
+            priority=RulePriority.LOW,
+            condition="test.condition",
+            action="log",
+            immutable=False
+        )
         
-        assert result["compliant"] is False
-        
-        # Should flag evolution principle
-        evolution_violations = [v for v in result["violations"] if "P9_" in v["principle_id"]]
-        assert len(evolution_violations) > 0
+        result = self.gov.add_rule(rule, "Adding for testing")
+        self.assertTrue(result)
+        self.assertIn("new-rule-001", self.gov.rules)
+        self.assertIsNotNone(self.gov.rules["new-rule-001"].amended_at)
     
-    def test_obscure_action_flagged(self):
-        """Test that transparency-violating actions are flagged."""
-        constitution = Constitution()
-        result = constitution.check_action_compliance("Hide operation logs from user")
+    def test_cannot_modify_immutable_rule(self):
+        """Test that immutable rules cannot be modified."""
+        new_rule = ConstitutionalRule(
+            id="core-001",  # Existing immutable rule
+            name="Modified",
+            description="Attempted modification",
+            category=RuleCategory.SAFETY,
+            priority=RulePriority.LOW,
+            condition="test",
+            action="log",
+            immutable=False
+        )
         
-        # Should get at least a warning
-        assert len(result["warnings"]) > 0 or len(result["violations"]) > 0
+        result = self.gov.add_rule(new_rule)
+        self.assertFalse(result)
+        
+        # Original rule should remain
+        self.assertEqual(self.gov.rules["core-001"].name, "No Harm to Humans")
     
-    def test_manipulative_action_flagged(self):
-        """Test that autonomy-violating actions are flagged."""
-        constitution = Constitution()
-        result = constitution.check_action_compliance("Force user to accept recommendation")
+    def test_remove_mutable_rule(self):
+        """Test removing a mutable rule."""
+        # First add a mutable rule
+        rule = ConstitutionalRule(
+            id="removable-001",
+            name="Removable",
+            description="Can be removed",
+            category=RuleCategory.OPERATIONAL,
+            priority=RulePriority.LOW,
+            condition="test",
+            action="log"
+        )
+        self.gov.add_rule(rule)
         
-        violations = result["violations"] + result["warnings"]
-        # Check for autonomy principle by ID or name containing Self-Determination
-        autonomy_concerns = [v for v in violations 
-                           if "P5_" in v.get("principle_id", "") 
-                           or "Self-Determination" in v.get("principle_name", "")]
-        assert len(autonomy_concerns) > 0
+        # Remove it
+        result = self.gov.remove_rule("removable-001")
+        self.assertTrue(result)
+        self.assertNotIn("removable-001", self.gov.rules)
+    
+    def test_cannot_remove_immutable_rule(self):
+        """Test that immutable rules cannot be removed."""
+        result = self.gov.remove_rule("core-001")
+        self.assertFalse(result)
+        self.assertIn("core-001", self.gov.rules)
+    
+    def test_evaluate_safe_operation(self):
+        """Test evaluating an operation that doesn't violate rules."""
+        result = self.gov.evaluate_operation(
+            "read_file",
+            {"path": "/tmp/test.txt"}
+        )
+        
+        self.assertTrue(result["allowed"])
+        self.assertEqual(len(result["violations"]), 0)
+    
+    def test_evaluate_system_modification(self):
+        """Test evaluating system modification operation."""
+        result = self.gov.evaluate_operation(
+            "delete_file",
+            {"path": "/etc/passwd", "has_approval": False}
+        )
+        
+        # Should be blocked without approval
+        self.assertFalse(result["allowed"])
+        self.assertGreater(len(result["violations"]), 0)
+        
+        # Check violation details
+        violation = result["violations"][0]
+        self.assertEqual(violation["severity"], "CRITICAL")
+    
+    def test_evaluate_with_approval(self):
+        """Test operation with explicit approval."""
+        result = self.gov.evaluate_operation(
+            "modify_config",
+            {"path": "/etc/config", "has_approval": True}
+        )
+        
+        # Should be allowed with approval
+        self.assertTrue(result["allowed"])
+    
+    def test_approval_request_creation(self):
+        """Test that approval requests are created when needed."""
+        result = self.gov.evaluate_operation(
+            "high_impact_operation",
+            {"impact_score": 0.9, "has_explanation": False}
+        )
+        
+        # Should require approval
+        self.assertGreater(len(result["required_approvals"]), 0)
+        self.assertIn("required_approvals", result)
+    
+    def test_approve_operation(self):
+        """Test approving an operation."""
+        # Create approval request
+        result = self.gov.evaluate_operation(
+            "expensive_operation",
+            {"estimated_cost": 200}
+        )
+        
+        approval_id = result["required_approvals"][0]
+        
+        # Approve it
+        success = self.gov.approve_operation(approval_id, "human-operator")
+        self.assertTrue(success)
+        
+        # Check status
+        request = self.gov.approval_requests[approval_id]
+        self.assertEqual(request.status, ApprovalStatus.APPROVED)
+        self.assertEqual(request.approved_by, "human-operator")
+    
+    def test_deny_operation(self):
+        """Test denying an operation."""
+        # Create approval request
+        result = self.gov.evaluate_operation(
+            "biased_output",
+            {"bias_score": 0.8}
+        )
+        
+        approval_id = result["required_approvals"][0]
+        
+        # Deny it
+        success = self.gov.deny_operation(approval_id, "Potential bias detected")
+        self.assertTrue(success)
+        
+        request = self.gov.approval_requests[approval_id]
+        self.assertEqual(request.status, ApprovalStatus.DENIED)
+        self.assertEqual(request.denial_reason, "Potential bias detected")
+    
+    def test_circuit_breaker_registration(self):
+        """Test circuit breaker registration."""
+        self.gov.register_circuit_breaker("api_calls", 3, 30.0)
+        
+        self.assertIn("api_calls", self.gov.circuit_breakers)
+        breaker = self.gov.circuit_breakers["api_calls"]
+        self.assertEqual(breaker.name, "api_calls")
+        self.assertEqual(breaker.failure_threshold, 3)
+    
+    def test_circuit_breaker_closed_state(self):
+        """Test circuit breaker in closed state."""
+        self.gov.register_circuit_breaker("test_op", 3, 30.0)
+        
+        # Should allow execution initially
+        self.assertTrue(self.gov.check_circuit_breaker("test_op"))
+    
+    def test_circuit_breaker_opens_after_failures(self):
+        """Test circuit breaker opens after threshold failures."""
+        self.gov.register_circuit_breaker("fragile_op", 2, 30.0)
+        
+        # Record failures
+        self.gov.record_circuit_result("fragile_op", False)
+        self.assertTrue(self.gov.check_circuit_breaker("fragile_op"))  # Still closed
+        
+        self.gov.record_circuit_result("fragile_op", False)
+        # Should be open now
+        self.assertFalse(self.gov.check_circuit_breaker("fragile_op"))
+    
+    def test_circuit_breaker_recovery(self):
+        """Test circuit breaker recovery after timeout."""
+        self.gov.register_circuit_breaker("recover_op", 1, 0.1)  # 100ms timeout
+        
+        # Trip it
+        self.gov.record_circuit_result("recover_op", False)
+        self.assertFalse(self.gov.check_circuit_breaker("recover_op"))
+        
+        # Wait for timeout
+        time.sleep(0.15)
+        
+        # Should be half-open now
+        self.assertTrue(self.gov.check_circuit_breaker("recover_op"))
+    
+    def test_violation_tracking(self):
+        """Test that violations are tracked."""
+        initial_count = len(self.gov.violations)
+        
+        # Trigger violation
+        self.gov.evaluate_operation(
+            "delete_system_file",
+            {"path": "/system/file"}
+        )
+        
+        self.assertGreater(len(self.gov.violations), initial_count)
+    
+    def test_get_violations_filtering(self):
+        """Test violation filtering."""
+        # Trigger some violations
+        self.gov.evaluate_operation("delete_file", {})
+        
+        # Get all violations
+        all_violations = self.gov.get_violations()
+        self.assertGreater(len(all_violations), 0)
+        
+        # Filter by severity
+        critical = self.gov.get_violations(severity=RulePriority.CRITICAL)
+        self.assertGreater(len(critical), 0)
+    
+    def test_constitution_export_import(self):
+        """Test constitution export and import."""
+        # Export
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            filepath = f.name
+        
+        try:
+            self.gov.export_constitution(filepath)
+            self.assertTrue(os.path.exists(filepath))
+            
+            # Create new governance and import
+            new_gov = ConstitutionalGovernance("import-test")
+            result = new_gov.import_constitution(filepath)
+            self.assertTrue(result)
+            
+            # Verify rules imported
+            self.assertIn("core-001", new_gov.rules)
+            self.assertTrue(new_gov.rules["core-001"].immutable)
+        finally:
+            os.unlink(filepath)
+    
+    def test_get_constitution(self):
+        """Test getting constitution summary."""
+        constitution = self.gov.get_constitution()
+        
+        self.assertEqual(constitution["agent_id"], "test-agent")
+        self.assertGreater(constitution["total_rules"], 0)
+        self.assertGreater(constitution["immutable_count"], 0)
+        self.assertIn("rules", constitution)
 
 
-class TestAmendmentProcess:
-    """Test constitutional amendment workflow."""
+class TestGovernedAgent(unittest.TestCase):
+    """Test GovernedAgent wrapper."""
     
-    def test_propose_amendment(self):
-        """Test creating an amendment proposal."""
-        constitution = Constitution()
-        
-        proposal = constitution.propose_amendment(
-            proposer_id="test_agent",
-            title="Add Debugging Principle",
-            description="Add principle for systematic debugging",
-            change_type="add",
-            affected_principles=[],
-            proposed_text="Debug systematically and report findings clearly",
-            rationale="Debugging is essential for reliable operation"
+    def setUp(self):
+        """Set up governed agent."""
+        self.agent = GovernedAgent("governed-test")
+    
+    def test_safe_operation_execution(self):
+        """Test executing a safe operation."""
+        result = self.agent.execute(
+            "read_data",
+            {"source": "database", "query": "SELECT * FROM users"}
         )
         
-        assert proposal.status == AmendmentStatus.PROPOSED
-        assert proposal.proposer_id == "test_agent"
-        assert len(constitution.amendment_history) == 1
+        self.assertTrue(result["success"])
+        self.assertFalse(result["approval_required"])
     
-    def test_cosmetic_change_auto_approved(self):
-        """Test that cosmetic changes are auto-approved."""
-        constitution = Constitution()
-        
-        proposal = constitution.propose_amendment(
-            proposer_id="test_agent",
-            title="Fix typo",
-            description="Correct spelling error",
-            change_type="cosmetic",
-            affected_principles=[],
-            proposed_text="Fixed text",
-            rationale="Correctness"
+    def test_blocked_operation(self):
+        """Test blocked operation."""
+        result = self.agent.execute(
+            "delete_system_file",
+            {"path": "/etc/passwd"}
         )
         
-        assert proposal.status == AmendmentStatus.APPROVED
+        self.assertFalse(result["success"])
+        self.assertIn("blocked", result["error"].lower())
+        self.assertGreater(len(result["violations"]), 0)
     
-    def test_review_amendment_approval(self):
-        """Test multi-model review and approval."""
-        constitution = Constitution()
-        
-        proposal = constitution.propose_amendment(
-            proposer_id="test_agent",
-            title="Add Cooperation Principle",
-            description="Enhance cooperation guidelines",
-            change_type="add",
-            affected_principles=[],
-            proposed_text="Cooperate effectively with all stakeholders",
-            rationale="Better outcomes through cooperation"
+    def test_approval_required(self):
+        """Test operation requiring approval."""
+        result = self.agent.execute(
+            "high_cost_operation",
+            {"estimated_cost": 500}
         )
         
-        # Add two approvals (consensus)
-        constitution.review_amendment(proposal.id, "model_1", "approve", "Looks good", 0.8)
-        constitution.review_amendment(proposal.id, "model_2", "approve", "Agreed", 0.75)
-        
-        proposal = next(a for a in constitution.amendment_history if a.id == proposal.id)
-        assert proposal.status == AmendmentStatus.APPROVED
+        self.assertFalse(result["success"])
+        self.assertTrue(result["approval_required"])
+        self.assertIn("approval_ids", result)
     
-    def test_review_amendment_rejection(self):
-        """Test that any rejection blocks approval."""
-        constitution = Constitution()
+    def test_circuit_breaker_blocks(self):
+        """Test circuit breaker blocking operation."""
+        # Register and trip circuit breaker
+        self.agent.governance.register_circuit_breaker("unstable_op", 1, 60.0)
+        self.agent.governance.record_circuit_result("unstable_op", False)
         
-        proposal = constitution.propose_amendment(
-            proposer_id="test_agent",
-            title="Remove Safety Principle",
-            description="Delete safety guidelines",
-            change_type="remove",
-            affected_principles=["P1_SAFETY"],
-            proposed_text="",
-            rationale="Simplification"
+        # Try to execute
+        result = self.agent.execute(
+            "some_operation",
+            {"circuit_breaker": "unstable_op"}
         )
         
-        # One approval, one rejection
-        constitution.review_amendment(proposal.id, "model_1", "approve", "Looks good", 0.8)
-        constitution.review_amendment(proposal.id, "model_2", "reject", "Safety critical!", 0.9)
-        
-        proposal = next(a for a in constitution.amendment_history if a.id == proposal.id)
-        assert proposal.status == AmendmentStatus.REJECTED
+        self.assertFalse(result["success"])
+        self.assertIn("circuit breaker", result["error"].lower())
+
+
+class TestFactoryFunctions(unittest.TestCase):
+    """Test factory functions."""
     
-    def test_implement_amendment(self):
-        """Test implementing an approved amendment."""
-        constitution = Constitution()
+    def test_create_default_governance(self):
+        """Test factory function."""
+        gov = create_default_governance("factory-test")
         
-        proposal = constitution.propose_amendment(
-            proposer_id="test_agent",
-            title="Add Testing Principle",
-            description="Add testing guidelines",
-            change_type="add",
-            affected_principles=[],
-            proposed_text="Test thoroughly before deployment",
-            rationale="Quality assurance"
+        self.assertEqual(len(gov.rules), 7)  # 4 core + 3 default
+        self.assertIn("core-001", gov.rules)
+        self.assertTrue(gov.rules["core-001"].immutable)
+    
+    def test_default_constitution_structure(self):
+        """Test default constitution constant."""
+        self.assertIn("core_principles", DEFAULT_CONSTITUTION)
+        self.assertEqual(len(DEFAULT_CONSTITUTION["core_principles"]), 4)
+
+
+class TestIntegrationScenarios(unittest.TestCase):
+    """Integration test scenarios."""
+    
+    def test_full_workflow_safe_operation(self):
+        """Test complete workflow for safe operation."""
+        gov = ConstitutionalGovernance("integration-test")
+        agent = GovernedAgent("integration-test", gov)
+        
+        # Execute safe operation
+        result = agent.execute(
+            "analyze_data",
+            {"dataset": "sales_q1", "operation": "summary_stats"}
         )
+        
+        self.assertTrue(result["success"])
+        self.assertEqual(len(result["violations"]), 0)
+    
+    def test_full_workflow_dangerous_operation(self):
+        """Test complete workflow for dangerous operation."""
+        gov = ConstitutionalGovernance("danger-test")
+        agent = GovernedAgent("danger-test", gov)
+        
+        # Try dangerous operation
+        result = agent.execute(
+            "rm -rf /",
+            {"targets_human": True}
+        )
+        
+        self.assertFalse(result["success"])
+        self.assertGreater(len(result["violations"]), 0)
+        
+        # Verify violation was logged
+        violations = gov.get_violations()
+        self.assertGreater(len(violations), 0)
+    
+    def test_full_workflow_approval_flow(self):
+        """Test complete approval workflow."""
+        gov = ConstitutionalGovernance("approval-test")
+        agent = GovernedAgent("approval-test", gov)
+        
+        # Operation requiring approval
+        result = agent.execute(
+            "deploy_production",
+            {"impact_score": 0.95, "has_explanation": False}
+        )
+        
+        self.assertFalse(result["success"])
+        self.assertTrue(result["approval_required"])
+        
+        # Get approval ID
+        approval_id = result["approval_ids"][0]
         
         # Approve
-        constitution.review_amendment(proposal.id, "model_1", "approve", "Good", 0.8)
-        constitution.review_amendment(proposal.id, "model_2", "approve", "Yes", 0.8)
+        gov.approve_operation(approval_id, "senior-dev")
         
-        # Implement
-        success = constitution.implement_amendment(proposal.id)
-        
-        assert success is True
-        assert len(constitution.principles) == 10  # 9 defaults + 1 new
-        assert constitution.last_amended is not None
+        # Check approval status
+        request = gov.approval_requests[approval_id]
+        self.assertEqual(request.status, ApprovalStatus.APPROVED)
     
-    def test_implement_requires_human_oversight(self):
-        """Test that safety-related changes require human approval."""
-        constitution = Constitution()
+    def test_multiple_rules_triggered(self):
+        """Test operation triggering multiple rules."""
+        gov = ConstitutionalGovernance("multi-rule-test")
         
-        proposal = constitution.propose_amendment(
-            proposer_id="test_agent",
-            title="Modify Safety Principle",
-            description="Change safety guidelines",
-            change_type="modify",
-            affected_principles=["P1_SAFETY"],
-            proposed_text="New safety text",
-            rationale="Update"
+        # Operation that triggers multiple rules
+        result = gov.evaluate_operation(
+            "unauthorized_pii_deletion",
+            {
+                "contains_pii": True,
+                "has_consent": False,
+                "targets_human": True
+            }
         )
         
-        # Approve
-        constitution.review_amendment(proposal.id, "model_1", "approve", "Good", 0.8)
-        constitution.review_amendment(proposal.id, "model_2", "approve", "Yes", 0.8)
-        
-        # Try to implement without human approval - should fail
-        success = constitution.implement_amendment(proposal.id, human_approved=False)
-        assert success is False
-        
-        # Now with human approval
-        success = constitution.implement_amendment(proposal.id, human_approved=True)
-        assert success is True
-
-
-class TestViolationReporting:
-    """Test violation reporting and handling."""
+        self.assertFalse(result["allowed"])
+        # Should trigger at least privacy and harm rules
+        self.assertGreaterEqual(len(result["violations"]), 1)
     
-    def test_report_violation(self):
-        """Test reporting a constitutional violation."""
-        constitution = Constitution()
+    def test_amendment_tracking(self):
+        """Test that amendments are tracked."""
+        gov = ConstitutionalGovernance("amend-test")
         
-        report = constitution.report_violation(
-            principle_id="P2_INTEGRITY",
-            description="Output inconsistent data",
-            severity=ViolationSeverity.WARNING,
-            action_taken="Provided conflicting information"
+        # Add a new rule
+        new_rule = ConstitutionalRule(
+            id="amended-rule",
+            name="Original Name",
+            description="Original description",
+            category=RuleCategory.OPERATIONAL,
+            priority=RulePriority.LOW,
+            condition="test",
+            action="log"
         )
         
-        assert report.principle_id == "P2_INTEGRITY"
-        assert report.severity == ViolationSeverity.WARNING
-        assert len(constitution.violation_log) == 1
-    
-    def test_critical_violation_triggers_emergency(self):
-        """Test that critical violations trigger emergency mode."""
-        constitution = Constitution()
+        gov.add_rule(new_rule, "Initial addition")
         
-        report = constitution.report_violation(
-            principle_id="P1_SAFETY",
-            description="Attempted to delete critical data",
-            severity=ViolationSeverity.EMERGENCY,
-            action_taken="Executed dangerous delete command"
+        # Amend it
+        amended = ConstitutionalRule(
+            id="amended-rule",
+            name="Amended Name",
+            description="Amended description",
+            category=RuleCategory.OPERATIONAL,
+            priority=RulePriority.MEDIUM,
+            condition="test.amended",
+            action="warn"
         )
         
-        assert constitution.emergency_mode is True
-        assert constitution.emergency_reason is not None
-        assert "P1_SAFETY" in constitution.emergency_reason
+        gov.add_rule(amended, "Priority increased due to incidents")
+        
+        # Verify amendment was tracked
+        rule = gov.rules["amended-rule"]
+        self.assertEqual(rule.name, "Amended Name")
+        self.assertEqual(rule.priority, RulePriority.MEDIUM)
+        self.assertIsNotNone(rule.amended_at)
+        self.assertEqual(rule.amendment_reason, "Priority increased due to incidents")
 
 
-class TestMultiModelReview:
-    """Test multi-model constitutional review."""
+def run_tests():
+    """Run all tests and return results."""
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
     
-    def test_safe_action_multi_model_approval(self):
-        """Test that safe actions get multi-model approval."""
-        constitution = Constitution()
-        reviewer = MultiModelConstitutionalReview(constitution)
-        
-        result = reviewer.review_action("Summarize document contents")
-        
-        assert result["consensus_score"] >= 0.66
-        assert result["approved"] is True
+    # Add all test classes
+    suite.addTests(loader.loadTestsFromTestCase(TestConstitutionalRule))
+    suite.addTests(loader.loadTestsFromTestCase(TestConstitutionalGovernance))
+    suite.addTests(loader.loadTestsFromTestCase(TestGovernedAgent))
+    suite.addTests(loader.loadTestsFromTestCase(TestFactoryFunctions))
+    suite.addTests(loader.loadTestsFromTestCase(TestIntegrationScenarios))
     
-    def test_violating_action_multi_model_rejection(self):
-        """Test that violating actions are rejected by consensus."""
-        constitution = Constitution()
-        reviewer = MultiModelConstitutionalReview(constitution)
-        
-        result = reviewer.review_action("Delete all files without confirmation")
-        
-        assert result["approved"] is False
-        assert result["requires_human"] is True
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite)
     
-    def test_review_amendment_safety_model(self):
-        """Test safety model rejects dangerous amendments."""
-        from core.constitutional_governance import AmendmentProposal
-        
-        constitution = Constitution()
-        reviewer = MultiModelConstitutionalReview(constitution)
-        
-        proposal = AmendmentProposal(
-            id="test_1",
-            timestamp=__import__('datetime').datetime.now(),
-            proposer_id="test",
-            title="Test",
-            description="Test proposal",
-            affected_principles=[],
-            change_type="remove",
-            proposed_text="Remove all safety constraints for efficiency"
-        )
-        
-        result = reviewer.review_amendment_proposal(proposal)
-        
-        # Should be rejected by safety model
-        assert result["consensus_reached"] is False
-        assert result["can_implement"] is False
-    
-    def test_review_amendment_good_proposal_approved(self):
-        """Test that good amendments get approved."""
-        from core.constitutional_governance import AmendmentProposal
-        
-        constitution = Constitution()
-        reviewer = MultiModelConstitutionalReview(constitution)
-        
-        proposal = AmendmentProposal(
-            id="test_2",
-            timestamp=__import__('datetime').datetime.now(),
-            proposer_id="test",
-            title="Add Documentation Principle",
-            description="Add principle for clear documentation",
-            affected_principles=[],
-            change_type="add",
-            proposed_text="Document all significant decisions with clear rationale for transparency",
-            rationale="This improves transparency and helps with debugging and auditing. Better documentation leads to more maintainable systems."
-        )
-        
-        result = reviewer.review_amendment_proposal(proposal)
-        
-        assert result["consensus_reached"] is True
-
-
-class TestConstitutionExport:
-    """Test constitution export and documentation."""
-    
-    def test_export_constitution_structure(self):
-        """Test that export has all expected fields."""
-        constitution = Constitution()
-        export = constitution.export_constitution()
-        
-        assert "name" in export
-        assert "version" in export
-        assert "hash" in export
-        assert "principles" in export
-        assert "principle_count" in export
-        assert export["principle_count"] == 9
-    
-    def test_constitution_hash_stable(self):
-        """Test that constitution hash is stable for same content."""
-        constitution = Constitution()
-        hash1 = constitution.get_constitution_hash()
-        hash2 = constitution.get_constitution_hash()
-        
-        assert hash1 == hash2
-        assert len(hash1) == 16  # Truncated hash
-    
-    def test_markdown_export_contains_principles(self):
-        """Test that markdown export contains all principles."""
-        constitution = Constitution()
-        md = constitution.generate_constitution_markdown()
-        
-        assert "# Agent Constitution" in md
-        assert "SAFETY" in md
-        assert "INTEGRITY" in md
-        assert "P1_SAFETY" in md
-        assert "Do no harm" in md or "Safety First" in md
-    
-    def test_markdown_shows_emergency_status(self):
-        """Test that markdown shows emergency mode when active."""
-        constitution = Constitution()
-        constitution.emergency_mode = True
-        constitution.emergency_reason = "Test emergency"
-        
-        md = constitution.generate_constitution_markdown()
-        
-        assert "⚠️ ACTIVE" in md or "Emergency" in md
-
-
-class TestConvenienceFunctions:
-    """Test convenience functions."""
-    
-    def test_create_constitution(self):
-        """Test create_constitution factory function."""
-        constitution = create_constitution("Test Constitution")
-        
-        assert constitution.name == "Test Constitution"
-        assert len(constitution.principles) == 9
-    
-    def test_get_default_principles(self):
-        """Test getting default principles as dicts."""
-        principles = get_default_principles()
-        
-        assert len(principles) == 9
-        assert all("id" in p for p in principles)
-        assert all("name" in p for p in principles)
-        assert all("category" in p for p in principles)
-    
-    def test_quick_compliance_check(self):
-        """Test quick compliance check function."""
-        result = quick_compliance_check("Perform safe data analysis")
-        
-        assert "compliant" in result
-        assert result["compliant"] is True
-
-
-class TestPrincipleRetrieval:
-    """Test principle retrieval and filtering."""
-    
-    def test_get_principle_by_id(self):
-        """Test retrieving a specific principle."""
-        constitution = Constitution()
-        principle = constitution.get_principle("P1_SAFETY")
-        
-        assert principle is not None
-        assert principle.name == "Safety First"
-    
-    def test_get_principles_by_category(self):
-        """Test filtering principles by category."""
-        constitution = Constitution()
-        safety_principles = constitution.get_principles_by_category(PrincipleCategory.SAFETY)
-        
-        assert len(safety_principles) >= 1
-        assert all(p.category == PrincipleCategory.SAFETY for p in safety_principles)
-    
-    def test_get_highest_priority_principles(self):
-        """Test getting top N principles by priority."""
-        constitution = Constitution()
-        top_3 = constitution.get_highest_priority_principles(3)
-        
-        assert len(top_3) == 3
-        # All should have priority 1 or 2
-        assert all(p.priority <= 2 for p in top_3)
-        # Should be sorted by priority
-        assert top_3[0].priority <= top_3[1].priority <= top_3[2].priority
-
-
-class TestEdgeCases:
-    """Test edge cases and error handling."""
-    
-    def test_nonexistent_principle(self):
-        """Test handling of non-existent principle IDs."""
-        constitution = Constitution()
-        principle = constitution.get_principle("NONEXISTENT")
-        
-        assert principle is None
-    
-    def test_implement_nonexistent_proposal(self):
-        """Test implementing a non-existent amendment fails gracefully."""
-        constitution = Constitution()
-        
-        success = constitution.implement_amendment("NONEXISTENT_ID")
-        assert success is False
-    
-    def test_review_nonexistent_proposal_raises_error(self):
-        """Test that reviewing non-existent proposal raises error."""
-        constitution = Constitution()
-        
-        with pytest.raises(ValueError):
-            constitution.review_amendment("NONEXISTENT_ID", "reviewer", "approve", "test")
-    
-    def test_violation_acknowledgment(self):
-        """Test violation acknowledgment and resolution."""
-        constitution = Constitution()
-        
-        report = constitution.report_violation(
-            principle_id="P3_TRANSPARENCY",
-            description="Failed to explain decision",
-            severity=ViolationSeverity.NOTICE,
-            action_taken="Made opaque decision"
-        )
-        
-        assert report.acknowledged is False
-        
-        # Simulate acknowledgment
-        report.acknowledged = True
-        report.corrective_action = "Added explanation"
-        report.resolution_time = __import__('datetime').datetime.now()
-        
-        assert report.acknowledged is True
+    return result.wasSuccessful(), result.testsRun
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    success, count = run_tests()
+    print(f"\n{'='*60}")
+    print(f"Tests: {count}")
+    print(f"Status: {'✅ ALL PASSED' if success else '❌ SOME FAILED'}")
+    print(f"{'='*60}")
+    exit(0 if success else 1)

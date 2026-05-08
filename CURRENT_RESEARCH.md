@@ -1,5 +1,49 @@
 # AGI Research - Latest Findings
 
+## May 8, 2026
+
+### Industry News & Breakthroughs
+- **AGI-26 Conference**: Karl Friston (neuroscience-inspired models) and Gary Marcus confirmed as keynote speakers
+- **DeepMind AGI Warning**: New paper warns AGI could emerge as soon as 2030 with significant risks
+- **OpenAI Code Generation**: AI tools now write 80% of OpenAI's internal code (Greg Brockman)
+- **xAI Grok Predictions**: Grok 5.0 → AGI by end of 2026, Grok 6.0 → ASI by 2030-2031
+- **US Government AGI Initiative**: Manhattan Project-style national initiative launched
+- **Meta Humanoid Investment**: Building humanoid robots for physical AGI embodiment
+
+### Key arXiv Papers (Past 2 Weeks)
+- **[2601.03151v1] LLMs for AGI - A Survey**: Four foundational requirements for AGI: embodiment, symbol grounding, causality, memory
+- **[2603.13372v1] ARC of Progress towards AGI**: Living survey of 82 approaches across ARC-AGI 1-3. Cost declined 390× YoY ($4,500/task → $12/task)
+- **[2603.24621v1] ARC-AGI-3**: Frontier AI scores <1%, humans 100%. Tests fluid adaptive efficiency using Core Knowledge priors
+- **[2603.28906v1] Category-Theoretic AGI Framework**: Unifies RL, Universal AI, Active Inference under categorical "Machines"
+- **[2411.15832] OGI Framework**: Modular, multi-modal architecture for scalable AGI with dynamic processing fabric
+
+### Trending Open Source Agent Repos (May 2026)
+1. **GenericAgent** (lsdefine/GenericAgent) - Self-evolving agent (~3K LOC) that crystallizes tasks into reusable skills
+2. **Nanobot** (HKUDS/Nanobot) - Ultra-lightweight personal AI agent with multi-channel support
+3. **Multica** (multica-ai/multica) - Managed agents platform turning coding agents into autonomous teammates (20k+ stars)
+4. **Agentspan** (agentspan-ai/agentspan) - Distributed runtime with crash recovery and durability
+5. **OpenAkita** (openakita/openakita) - Multi-agent AI assistant framework with 89+ tools, 6-layer sandbox
+6. **Ouroboros** (razzant/ouroboros) - Self-modifying AI with constitutional governance (BIBLE.md pattern)
+7. **Clawith** (dataelement/Clawith) - Persistent agent identity with org-level governance and RBAC
+8. **OpenClaw Ecosystem** - 500+ issues/PRs in 24h showing massive activity (OpenClaw, NanoBot, Hermes, etc.)
+
+### AI Agent Architecture Trends 2026
+- **Four-Layer Infrastructure**: Memory → Tooling → Governance → Deployment becoming standard
+- **MCP (Model Context Protocol)**: Now dominant standard - Claude Desktop, OpenAI SDK, Mastra all adopting
+- **A2A (Agent-to-Agent Protocol)**: Google's emerging standard for inter-agent communication
+- **Constitutional Governance**: Self-modifying agents need rule-based constraints (Ouroboros pattern)
+- **Test-Time Training (TTT)**: LoRA adaptation for task specialization showing strong results
+- **Circuit Breakers**: Safety-critical pattern for preventing cascading failures in agent systems
+
+### Critical Research Insights
+- **The "Many Agents, Not One" thesis**: Diverse collaborative agents outperform single superintelligent systems
+- **ARC-AGI-3 gap**: AI <1% vs humans 100% indicates fundamental reasoning limitations
+- **Compositional generalization**: 2-3x performance decline across ARC versions shows persistent challenge
+- **Cost efficiency**: 390× cost reduction in one year via test-time parallelism optimization
+- **Constitutional AI necessity**: Self-modifying systems require immutable core principles + amendable operational rules
+
+---
+
 ## May 7, 2026
 
 ### Industry News & Breakthroughs

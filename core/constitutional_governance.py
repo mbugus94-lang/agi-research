@@ -1,799 +1,687 @@
 """
-Constitutional Governance Framework for AGI agents.
+Constitutional Governance Framework
 
-Implements governance inspired by:
-- Ouroboros BIBLE.md pattern: 9-principle constitution for self-modifying agents
-- arXiv:2603.20639v1: Institutional alignment and social infrastructure for agent collectives
-- arXiv:2601.10599: Institutional AI governance framework for distributional AGI safety
+Implements rule-based constraints on agent behavior, safety circuit breakers,
+and human-in-the-loop approval workflows based on:
+- Ouroboros BIBLE.md constitutional pattern
+- Claude AI incident safety learnings
+- Anthropic's Constitutional AI research
 
-The constitutional framework provides:
-1. Core principles that constrain agent behavior
-2. Amendment mechanisms for constitutional evolution
-3. Review processes for self-modification proposals
-4. Emergency protocols for safety violations
-5. Multi-model validation of constitutional compliance
+Core concepts:
+- Constitution: Immutable principles + amendable rules
+- Circuit Breakers: Automatic stops on dangerous operations
+- Approval Gates: Human-in-the-loop for critical decisions
+- Violation Detection: Monitor and flag rule violations
 """
 
-from typing import List, Dict, Any, Optional, Callable, Set
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum, auto
 import json
 import hashlib
+import time
+from enum import Enum, auto
+from dataclasses import dataclass, field, asdict
+from typing import Dict, List, Optional, Callable, Any, Set
+from datetime import datetime
+import threading
 
 
-class PrincipleCategory(Enum):
-    """Categories of constitutional principles."""
-    SAFETY = "safety"           # Prevent harm to humans and systems
-    INTEGRITY = "integrity"     # Maintain system integrity
-    TRANSPARENCY = "transparency"  # Operate with transparency
-    UTILITY = "utility"         # Maximize useful outcomes
-    AUTONOMY = "autonomy"       # Respect self-determination
-    COOPERATION = "cooperation" # Work effectively with others
-    LEARNING = "learning"       # Enable continuous improvement
-    CONSTRAINT = "constraint"   # Self-imposed limitations
-    EVOLUTION = "evolution"     # Rules for self-modification
+class RulePriority(Enum):
+    """Priority levels for constitutional rules."""
+    CRITICAL = auto()    # Cannot be overridden, immediate halt
+    HIGH = auto()        # Requires explicit override with justification
+    MEDIUM = auto()      # Warning + logging, override tracked
+    LOW = auto()         # Advisory only, logged for review
 
 
-class AmendmentStatus(Enum):
-    """Status of constitutional amendments."""
-    PROPOSED = auto()
-    UNDER_REVIEW = auto()
+class RuleCategory(Enum):
+    """Categories of constitutional rules."""
+    SAFETY = "safety"              # Physical/social harm prevention
+    SECURITY = "security"          # Data/system security
+    ETHICS = "ethics"              # Moral/ethical constraints
+    OPERATIONAL = "operational"    # Operational boundaries
+    TRANSPARENCY = "transparency"  # Explainability/audit requirements
+
+
+class ApprovalStatus(Enum):
+    """Status of approval requests."""
+    PENDING = auto()
     APPROVED = auto()
-    REJECTED = auto()
-    IMPLEMENTED = auto()
-    EMERGENCY = auto()
+    DENIED = auto()
+    EXPIRED = auto()
 
 
-class ViolationSeverity(Enum):
-    """Severity levels for constitutional violations."""
-    NOTICE = "notice"           # Informational, no action required
-    WARNING = "warning"         # Caution, monitoring required
-    SERIOUS = "serious"         # Significant concern, intervention needed
-    CRITICAL = "critical"       # Severe violation, immediate action
-    EMERGENCY = "emergency"     # Catastrophic risk, halt operations
+class CircuitBreakerState(Enum):
+    """States for circuit breaker pattern."""
+    CLOSED = auto()      # Normal operation
+    OPEN = auto()        # Blocking requests
+    HALF_OPEN = auto()   # Testing if recovered
 
 
 @dataclass
-class ConstitutionalPrinciple:
-    """A single constitutional principle governing agent behavior."""
+class ConstitutionalRule:
+    """A single rule in the constitution."""
     id: str
     name: str
-    category: PrincipleCategory
     description: str
-    priority: int  # 1 = highest
+    category: RuleCategory
+    priority: RulePriority
+    condition: str  # String representation of condition logic
+    action: str  # "block", "warn", "require_approval", "log"
+    immutable: bool = False  # True for core principles
+    created_at: float = field(default_factory=time.time)
+    amended_at: Optional[float] = None
+    amendment_reason: Optional[str] = None
+    violation_count: int = 0
     
-    # Principle details
-    positive_formulation: str  # "Do X"
-    negative_formulation: str  # "Do not Y"
-    examples: List[str] = field(default_factory=list)
-    edge_cases: List[str] = field(default_factory=list)
-    
-    # Enforcement
-    enforceable: bool = True
-    review_required: bool = False
-    human_oversight: bool = False
-    
-    # Version tracking
-    created_at: datetime = field(default_factory=datetime.now)
-    version: int = 1
-    parent_principle_id: Optional[str] = None  # For evolved principles
-    
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> Dict:
         return {
             "id": self.id,
             "name": self.name,
-            "category": self.category.value,
             "description": self.description,
-            "priority": self.priority,
-            "positive_formulation": self.positive_formulation,
-            "negative_formulation": self.negative_formulation,
-            "examples": self.examples,
-            "edge_cases": self.edge_cases,
-            "enforceable": self.enforceable,
-            "review_required": self.review_required,
-            "human_oversight": self.human_oversight,
-            "created_at": self.created_at.isoformat(),
-            "version": self.version,
-            "parent_principle_id": self.parent_principle_id
+            "category": self.category.value,
+            "priority": self.priority.name,
+            "condition": self.condition,
+            "action": self.action,
+            "immutable": self.immutable,
+            "created_at": self.created_at,
+            "amended_at": self.amended_at,
+            "amendment_reason": self.amendment_reason,
+            "violation_count": self.violation_count
         }
+    
+    @classmethod
+    def from_dict(cls, data: Dict) -> "ConstitutionalRule":
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            description=data["description"],
+            category=RuleCategory(data["category"]),
+            priority=RulePriority[data["priority"]],
+            condition=data["condition"],
+            action=data["action"],
+            immutable=data.get("immutable", False),
+            created_at=data["created_at"],
+            amended_at=data.get("amended_at"),
+            amendment_reason=data.get("amendment_reason"),
+            violation_count=data.get("violation_count", 0)
+        )
 
 
 @dataclass
-class AmendmentProposal:
-    """A proposal to modify the constitution."""
+class ApprovalRequest:
+    """Request for human approval on critical operations."""
     id: str
-    timestamp: datetime
-    proposer_id: str  # Agent/component that proposed
-    
-    # Proposal content
-    title: str
+    operation_type: str
     description: str
-    affected_principles: List[str]  # Principle IDs
+    context: Dict[str, Any]
+    requested_at: float
+    status: ApprovalStatus = ApprovalStatus.PENDING
+    approved_at: Optional[float] = None
+    approved_by: Optional[str] = None
+    denial_reason: Optional[str] = None
+    expiry_seconds: int = 3600  # 1 hour default
     
-    # Change details
-    change_type: str  # "add", "modify", "remove", "clarify"
-    current_text: Optional[str] = None
-    proposed_text: str = ""
-    rationale: str = ""
-    
-    # Review status
-    status: AmendmentStatus = AmendmentStatus.PROPOSED
-    review_start: Optional[datetime] = None
-    review_end: Optional[datetime] = None
-    
-    # Multi-model review
-    reviews: List[Dict[str, Any]] = field(default_factory=list)
-    approval_votes: int = 0
-    rejection_votes: int = 0
-    
-    # Implementation
-    implementation_date: Optional[datetime] = None
-    rollback_plan: str = ""
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "id": self.id,
-            "timestamp": self.timestamp.isoformat(),
-            "proposer_id": self.proposer_id,
-            "title": self.title,
-            "description": self.description,
-            "affected_principles": self.affected_principles,
-            "change_type": self.change_type,
-            "current_text": self.current_text,
-            "proposed_text": self.proposed_text,
-            "rationale": self.rationale,
-            "status": self.status.name,
-            "approval_votes": self.approval_votes,
-            "rejection_votes": self.rejection_votes,
-            "review_count": len(self.reviews)
-        }
+    def is_expired(self) -> bool:
+        if self.status != ApprovalStatus.PENDING:
+            return False
+        return time.time() - self.requested_at > self.expiry_seconds
 
 
 @dataclass
 class ViolationReport:
-    """Report of a constitutional violation."""
+    """Report of a constitutional rule violation."""
     id: str
-    timestamp: datetime
-    
-    # Violation details
-    principle_id: str
-    violation_description: str
-    severity: ViolationSeverity
-    
-    # Context
-    action_taken: str  # What the agent was doing
-    context: Dict[str, Any] = field(default_factory=dict)
-    
-    # Resolution
-    acknowledged: bool = False
-    corrective_action: Optional[str] = None
-    resolution_time: Optional[datetime] = None
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "id": self.id,
-            "timestamp": self.timestamp.isoformat(),
-            "principle_id": self.principle_id,
-            "violation_description": self.violation_description,
-            "severity": self.severity.value,
-            "action_taken": self.action_taken,
-            "acknowledged": self.acknowledged,
-            "corrective_action": self.corrective_action,
-            "resolved": self.resolution_time is not None
-        }
+    rule_id: str
+    rule_name: str
+    timestamp: float
+    operation: str
+    context: Dict[str, Any]
+    action_taken: str
+    severity: RulePriority
+    resolved: bool = False
 
 
-class Constitution:
-    """A complete constitutional framework for agent governance."""
+@dataclass
+class CircuitBreaker:
+    """Circuit breaker for dangerous operations."""
+    name: str
+    failure_threshold: int = 5
+    recovery_timeout: float = 60.0
+    state: CircuitBreakerState = CircuitBreakerState.CLOSED
+    failure_count: int = 0
+    last_failure_time: Optional[float] = None
     
-    def __init__(self, name: str = "Agent Constitution", version: str = "1.0"):
-        self.name = name
-        self.version = version
-        self.created_at = datetime.now()
-        self.last_amended: Optional[datetime] = None
-        
-        # Core components
-        self.principles: Dict[str, ConstitutionalPrinciple] = {}
-        self.amendment_history: List[AmendmentProposal] = []
-        self.violation_log: List[ViolationReport] = []
-        
-        # State
-        self.emergency_mode: bool = False
-        self.emergency_reason: Optional[str] = None
-        
-        # Initialize with default principles
-        self._initialize_default_principles()
+    def record_success(self):
+        """Record a successful operation."""
+        if self.state == CircuitBreakerState.HALF_OPEN:
+            self.state = CircuitBreakerState.CLOSED
+            self.failure_count = 0
+        elif self.state == CircuitBreakerState.CLOSED:
+            self.failure_count = max(0, self.failure_count - 1)
     
-    def _initialize_default_principles(self) -> None:
-        """Initialize with a default set of constitutional principles (Ouroboros-inspired 9 principles)."""
-        defaults = [
-            # Safety Principle
-            ConstitutionalPrinciple(
-                id="P1_SAFETY",
-                name="Safety First",
-                category=PrincipleCategory.SAFETY,
-                description="Do no harm to humans, systems, or data. Safety takes precedence over utility.",
-                priority=1,
-                positive_formulation="Prioritize safety in all actions and decisions",
-                negative_formulation="Never take actions that could cause harm to humans or critical systems",
-                examples=[
-                    "Verify safety before executing destructive operations",
-                    "Require human approval for irreversible changes"
-                ],
-                edge_cases=[
-                    "Conflicting safety requirements - prioritize broader impact",
-                    "Unknown risks - default to conservative approach"
-                ],
-                enforceable=True,
-                review_required=True,
-                human_oversight=True
+    def record_failure(self) -> bool:
+        """Record a failure. Returns True if breaker should trip."""
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        
+        if self.state == CircuitBreakerState.HALF_OPEN:
+            self.state = CircuitBreakerState.OPEN
+            return True
+        
+        if self.failure_count >= self.failure_threshold:
+            self.state = CircuitBreakerState.OPEN
+            return True
+        
+        return False
+    
+    def can_execute(self) -> bool:
+        """Check if operation can proceed."""
+        if self.state == CircuitBreakerState.CLOSED:
+            return True
+        
+        if self.state == CircuitBreakerState.OPEN:
+            if self.last_failure_time and \
+               time.time() - self.last_failure_time > self.recovery_timeout:
+                self.state = CircuitBreakerState.HALF_OPEN
+                return True
+            return False
+        
+        return True  # HALF_OPEN allows one test
+
+
+class ConstitutionalGovernance:
+    """
+    Main governance framework implementing constitutional constraints.
+    
+    Features:
+    - Rule definition and enforcement
+    - Circuit breakers for dangerous operations
+    - Human approval workflows
+    - Violation tracking and reporting
+    - Constitutional amendments with safeguards
+    """
+    
+    def __init__(self, agent_id: str):
+        self.agent_id = agent_id
+        self.rules: Dict[str, ConstitutionalRule] = {}
+        self.approval_requests: Dict[str, ApprovalRequest] = {}
+        self.violations: List[ViolationReport] = []
+        self.circuit_breakers: Dict[str, CircuitBreaker] = {}
+        self.approval_handlers: List[Callable[[ApprovalRequest], None]] = []
+        self._lock = threading.RLock()
+        
+        # Initialize default constitution
+        self._init_default_constitution()
+    
+    def _init_default_constitution(self):
+        """Initialize with core immutable principles."""
+        core_rules = [
+            ConstitutionalRule(
+                id="core-001",
+                name="No Harm to Humans",
+                description="The agent must not take actions that cause physical, emotional, or financial harm to humans.",
+                category=RuleCategory.SAFETY,
+                priority=RulePriority.CRITICAL,
+                condition="action.could_cause_human_harm",
+                action="block",
+                immutable=True
             ),
-            
-            # Integrity Principle
-            ConstitutionalPrinciple(
-                id="P2_INTEGRITY",
-                name="System Integrity",
-                category=PrincipleCategory.INTEGRITY,
-                description="Maintain the integrity and reliability of the system and its outputs.",
-                priority=2,
-                positive_formulation="Ensure accuracy, consistency, and reliability in all operations",
-                negative_formulation="Do not produce misleading, inconsistent, or corrupted outputs",
-                examples=[
-                    "Validate outputs before delivery",
-                    "Maintain consistent state across sessions"
-                ],
-                edge_cases=[
-                    "Resource constraints may require graceful degradation"
-                ],
-                enforceable=True
+            ConstitutionalRule(
+                id="core-002",
+                name="No Unauthorized System Modifications",
+                description="The agent must not modify system files, configurations, or infrastructure without explicit approval.",
+                category=RuleCategory.SECURITY,
+                priority=RulePriority.CRITICAL,
+                condition="action.modifies_system_state AND NOT action.has_explicit_approval",
+                action="block",
+                immutable=True
             ),
-            
-            # Transparency Principle
-            ConstitutionalPrinciple(
-                id="P3_TRANSPARENCY",
-                name="Operational Transparency",
-                category=PrincipleCategory.TRANSPARENCY,
-                description="Operate transparently with clear reasoning and audit trails.",
-                priority=3,
-                positive_formulation="Provide clear explanations for decisions and actions",
-                negative_formulation="Do not obscure reasoning or hide decision-making processes",
-                examples=[
-                    "Log all significant decisions with rationale",
-                    "Explain limitations and uncertainty in outputs"
-                ],
-                edge_cases=[
-                    "Security-sensitive operations may require limited disclosure"
-                ],
-                enforceable=True
+            ConstitutionalRule(
+                id="core-003",
+                name="Data Privacy Protection",
+                description="The agent must not expose, share, or process personal data in unauthorized ways.",
+                category=RuleCategory.ETHICS,
+                priority=RulePriority.CRITICAL,
+                condition="action.handles_pii AND NOT action.has_consent",
+                action="block",
+                immutable=True
             ),
-            
-            # Utility Principle
-            ConstitutionalPrinciple(
-                id="P4_UTILITY",
-                name="Maximize Useful Outcomes",
-                category=PrincipleCategory.UTILITY,
-                description="Strive to be maximally helpful within constraints.",
-                priority=4,
-                positive_formulation="Seek to provide the most useful and beneficial outcomes",
-                negative_formulation="Do not waste resources or provide useless outputs",
-                examples=[
-                    "Understand user intent deeply before responding",
-                    "Proactively suggest improvements"
-                ],
-                enforceable=False  # Guideline, not hard rule
+            ConstitutionalRule(
+                id="core-004",
+                name="Transparency in Decision Making",
+                description="The agent must provide clear reasoning for significant decisions.",
+                category=RuleCategory.TRANSPARENCY,
+                priority=RulePriority.HIGH,
+                condition="action.significant_impact AND NOT action.has_explanation",
+                action="require_approval",
+                immutable=True
             ),
-            
-            # Autonomy Principle
-            ConstitutionalPrinciple(
-                id="P5_AUTONOMY",
-                name="Respect Self-Determination",
-                category=PrincipleCategory.AUTONOMY,
-                description="Respect the autonomy and self-determination of users and other agents.",
-                priority=3,
-                positive_formulation="Empower users and agents to make informed choices",
-                negative_formulation="Do not manipulate or override legitimate user decisions",
-                examples=[
-                    "Provide options, not ultimatums",
-                    "Respect opt-out requests immediately"
-                ],
-                edge_cases=[
-                    "Safety concerns may require temporary override"
-                ],
-                enforceable=True
+            ConstitutionalRule(
+                id="ops-001",
+                name="Resource Usage Limits",
+                description="Operations consuming excessive resources require justification.",
+                category=RuleCategory.OPERATIONAL,
+                priority=RulePriority.MEDIUM,
+                condition="action.estimated_cost > threshold.cost_high",
+                action="require_approval",
+                immutable=False
             ),
-            
-            # Cooperation Principle
-            ConstitutionalPrinciple(
-                id="P6_COOPERATION",
-                name="Effective Cooperation",
-                category=PrincipleCategory.COOPERATION,
-                description="Work effectively with humans and other agents toward shared goals.",
-                priority=4,
-                positive_formulation="Collaborate openly and effectively with all stakeholders",
-                negative_formulation="Do not obstruct or sabotage collaborative efforts",
-                examples=[
-                    "Share relevant information with cooperating agents",
-                    "Adapt communication style to collaborator needs"
-                ],
-                enforceable=False
+            ConstitutionalRule(
+                id="ops-002",
+                name="External API Call Rate Limiting",
+                description="Rate limit external API calls to prevent abuse.",
+                category=RuleCategory.OPERATIONAL,
+                priority=RulePriority.MEDIUM,
+                condition="api.call_rate > threshold.rate_limit",
+                action="warn",
+                immutable=False
             ),
-            
-            # Learning Principle
-            ConstitutionalPrinciple(
-                id="P7_LEARNING",
-                name="Continuous Learning",
-                category=PrincipleCategory.LEARNING,
-                description="Continuously learn and improve from experience and feedback.",
-                priority=5,
-                positive_formulation="Actively seek opportunities to learn and improve",
-                negative_formulation="Do not ignore feedback or repeat avoidable mistakes",
-                examples=[
-                    "Reflect on outcomes to improve future performance",
-                    "Incorporate new knowledge appropriately"
-                ],
-                enforceable=False
-            ),
-            
-            # Constraint Principle
-            ConstitutionalPrinciple(
-                id="P8_CONSTRAINT",
-                name="Self-Limitation",
-                category=PrincipleCategory.CONSTRAINT,
-                description="Recognize and respect the limits of capability and authority.",
-                priority=2,
-                positive_formulation="Operate within defined boundaries and acknowledge limitations",
-                negative_formulation="Do not exceed authorized scope or claim unearned capabilities",
-                examples=[
-                    "Acknowledge when a task exceeds current capabilities",
-                    "Request assistance when appropriate"
-                ],
-                edge_cases=[
-                    "Emergency situations may require temporary scope expansion"
-                ],
-                enforceable=True,
-                review_required=True
-            ),
-            
-            # Evolution Principle (Ouroboros-inspired)
-            ConstitutionalPrinciple(
-                id="P9_EVOLUTION",
-                name="Controlled Self-Evolution",
-                category=PrincipleCategory.EVOLUTION,
-                description="Evolve carefully with multi-review validation and human oversight.",
-                priority=1,
-                positive_formulation="Improve through validated, reviewed self-modification processes",
-                negative_formulation="Never modify core systems without proper review and safeguards",
-                examples=[
-                    "All code changes require multi-model review",
-                    "Constitutional amendments need human approval",
-                    "Maintain rollback capability for all changes"
-                ],
-                edge_cases=[
-                    "Emergency fixes may need expedited review",
-                    "Cosmetic changes may need less scrutiny"
-                ],
-                enforceable=True,
-                review_required=True,
-                human_oversight=True
+            ConstitutionalRule(
+                id="eth-001",
+                name="Bias Detection and Mitigation",
+                description="Flag potentially biased outputs for review.",
+                category=RuleCategory.ETHICS,
+                priority=RulePriority.HIGH,
+                condition="output.potentially_biased",
+                action="require_approval",
+                immutable=False
             )
         ]
         
-        for principle in defaults:
-            self.principles[principle.id] = principle
+        for rule in core_rules:
+            self.rules[rule.id] = rule
     
-    def get_principle(self, principle_id: str) -> Optional[ConstitutionalPrinciple]:
-        """Get a principle by ID."""
-        return self.principles.get(principle_id)
-    
-    def get_principles_by_category(self, category: PrincipleCategory) -> List[ConstitutionalPrinciple]:
-        """Get all principles in a category."""
-        return [p for p in self.principles.values() if p.category == category]
-    
-    def get_highest_priority_principles(self, n: int = 3) -> List[ConstitutionalPrinciple]:
-        """Get the n highest priority principles."""
-        sorted_principles = sorted(self.principles.values(), key=lambda p: p.priority)
-        return sorted_principles[:n]
-    
-    def check_action_compliance(
-        self,
-        action_description: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """
-        Check if an action complies with constitutional principles.
-        Returns compliance report with any violations.
-        """
-        violations = []
-        warnings = []
-        
-        # Check each enforceable principle
-        for principle in self.principles.values():
-            if not principle.enforceable:
-                continue
+    def add_rule(self, rule: ConstitutionalRule, amendment_reason: Optional[str] = None) -> bool:
+        """Add a new rule to the constitution."""
+        with self._lock:
+            if rule.id in self.rules and self.rules[rule.id].immutable:
+                return False  # Cannot modify immutable rules
             
-            # Simple keyword-based compliance check (real system would use LLM)
-            risk_keywords = self._get_risk_keywords(principle)
-            action_lower = action_description.lower()
-            
-            risk_detected = any(kw in action_lower for kw in risk_keywords)
-            
-            if risk_detected:
-                if principle.priority <= 2:  # High priority
-                    violations.append({
-                        "principle_id": principle.id,
-                        "principle_name": principle.name,
-                        "severity": ViolationSeverity.CRITICAL if principle.priority == 1 else ViolationSeverity.SERIOUS,
-                        "reason": f"Action may violate: {principle.negative_formulation}"
-                    })
-                else:
-                    warnings.append({
-                        "principle_id": principle.id,
-                        "principle_name": principle.name,
-                        "reason": f"Action should be reviewed: {principle.description}"
-                    })
-        
-        return {
-            "compliant": len(violations) == 0,
-            "violations": violations,
-            "warnings": warnings,
-            "requires_review": len(violations) > 0 or any(v.get("human_oversight") for v in violations),
-            "emergency_override_available": self.emergency_mode
-        }
+            rule.amended_at = time.time()
+            rule.amendment_reason = amendment_reason
+            self.rules[rule.id] = rule
+            return True
     
-    def _get_risk_keywords(self, principle: ConstitutionalPrinciple) -> List[str]:
-        """Get keywords indicating potential violation of a principle."""
-        keywords = {
-            "P1_SAFETY": ["delete", "destroy", "harm", "damage", "unsafe", "risky"],
-            "P2_INTEGRITY": ["corrupt", "fake", "misleading", "inconsistent"],
-            "P3_TRANSPARENCY": ["hide", "secret", "obscure", "conceal"],
-            "P5_AUTONOMY": ["force", "compel", "manipulate", "override", "accept", "require"],
-            "P8_CONSTRAINT": ["bypass", "exceed", "unauthorized", "escalate"],
-            "P9_EVOLUTION": ["self-modify", "auto-update", "change core", "rewrite", "core"]
-        }
-        return keywords.get(principle.id, [])
+    def remove_rule(self, rule_id: str) -> bool:
+        """Remove a rule (only if not immutable)."""
+        with self._lock:
+            if rule_id not in self.rules:
+                return False
+            if self.rules[rule_id].immutable:
+                return False
+            del self.rules[rule_id]
+            return True
     
-    def report_violation(
-        self,
-        principle_id: str,
-        description: str,
-        severity: ViolationSeverity,
-        action_taken: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> ViolationReport:
-        """Report a constitutional violation."""
-        report = ViolationReport(
-            id=f"VIO_{datetime.now().strftime('%Y%m%d%H%M%S')}_{len(self.violation_log)}",
-            timestamp=datetime.now(),
-            principle_id=principle_id,
-            violation_description=description,
-            severity=severity,
-            action_taken=action_taken,
-            context=context or {}
-        )
-        
-        self.violation_log.append(report)
-        
-        # Emergency mode for critical violations
-        if severity == ViolationSeverity.EMERGENCY:
-            self.emergency_mode = True
-            self.emergency_reason = f"Constitutional emergency: {principle_id} - {description}"
-        
-        return report
-    
-    def propose_amendment(
-        self,
-        proposer_id: str,
-        title: str,
-        description: str,
-        change_type: str,
-        affected_principles: List[str],
-        proposed_text: str,
-        rationale: str,
-        current_text: Optional[str] = None,
-        rollback_plan: str = ""
-    ) -> AmendmentProposal:
+    def evaluate_operation(self, operation: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Propose an amendment to the constitution.
-        Returns the proposal for review.
+        Evaluate an operation against all constitutional rules.
+        
+        Returns:
+            Dict with 'allowed', 'violations', 'required_approvals', 'warnings'
         """
-        proposal = AmendmentProposal(
-            id=f"AMD_{datetime.now().strftime('%Y%m%d%H%M%S')}_{len(self.amendment_history)}",
-            timestamp=datetime.now(),
-            proposer_id=proposer_id,
-            title=title,
-            description=description,
-            affected_principles=affected_principles,
-            change_type=change_type,
-            current_text=current_text,
-            proposed_text=proposed_text,
-            rationale=rationale,
-            rollback_plan=rollback_plan
-        )
-        
-        # Auto-approve cosmetic changes, require review for others
-        if change_type == "cosmetic":
-            proposal.status = AmendmentStatus.APPROVED
-        else:
-            proposal.status = AmendmentStatus.PROPOSED
-        
-        self.amendment_history.append(proposal)
-        return proposal
-    
-    def review_amendment(
-        self,
-        proposal_id: str,
-        reviewer_id: str,
-        decision: str,  # "approve", "reject", "request_changes"
-        comments: str,
-        confidence: float = 0.5
-    ) -> AmendmentProposal:
-        """Add a review to an amendment proposal."""
-        proposal = next((a for a in self.amendment_history if a.id == proposal_id), None)
-        if not proposal:
-            raise ValueError(f"Amendment proposal {proposal_id} not found")
-        
-        review = {
-            "reviewer_id": reviewer_id,
-            "decision": decision,
-            "comments": comments,
-            "confidence": confidence,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        proposal.reviews.append(review)
-        
-        if decision == "approve":
-            proposal.approval_votes += 1
-        elif decision == "reject":
-            proposal.rejection_votes += 1
-        
-        # Multi-model consensus: require 2+ approvals, no rejections
-        if proposal.approval_votes >= 2 and proposal.rejection_votes == 0:
-            proposal.status = AmendmentStatus.APPROVED
-        elif proposal.rejection_votes >= 1:
-            proposal.status = AmendmentStatus.REJECTED
-        
-        return proposal
-    
-    def implement_amendment(self, proposal_id: str, human_approved: bool = False) -> bool:
-        """
-        Implement an approved amendment.
-        Returns True if successful.
-        """
-        proposal = next((a for a in self.amendment_history if a.id == proposal_id), None)
-        if not proposal:
-            return False
-        
-        if proposal.status != AmendmentStatus.APPROVED:
-            return False
-        
-        # Check for human oversight requirement
-        def get_principle_human_oversight(pid):
-            p = self.principles.get(pid)
-            if p:
-                return p.human_oversight
-            return False
-        
-        requires_human = any(
-            get_principle_human_oversight(pid)
-            for pid in proposal.affected_principles
-        )
-        
-        if requires_human and not human_approved:
-            return False
-        
-        # Apply the amendment
-        if proposal.change_type == "add":
-            # Create new principle
-            new_principle = ConstitutionalPrinciple(
-                id=f"P{len(self.principles)+1}_{proposal.title.upper().replace(' ', '_')[:20]}",
-                name=proposal.title,
-                category=PrincipleCategory.EVOLUTION,  # Default, can be refined
-                description=proposal.proposed_text,
-                priority=5,
-                positive_formulation=proposal.proposed_text,
-                negative_formulation=f"Do not violate: {proposal.proposed_text}",
-                parent_principle_id=proposal.affected_principles[0] if proposal.affected_principles else None
-            )
-            self.principles[new_principle.id] = new_principle
-            
-        elif proposal.change_type == "modify" and proposal.affected_principles:
-            # Update existing principle
-            principle = self.principles.get(proposal.affected_principles[0])
-            if principle:
-                principle.description = proposal.proposed_text
-                principle.version += 1
-                principle.parent_principle_id = principle.id  # Track evolution
-        
-        proposal.status = AmendmentStatus.IMPLEMENTED
-        proposal.implementation_date = datetime.now()
-        self.last_amended = datetime.now()
-        
-        return True
-    
-    def get_constitution_hash(self) -> str:
-        """Get a hash of the current constitution for integrity verification."""
-        principles_data = sorted([
-            f"{p.id}:{p.version}:{p.description[:50]}"
-            for p in self.principles.values()
-        ])
-        return hashlib.sha256(json.dumps(principles_data).encode()).hexdigest()[:16]
-    
-    def export_constitution(self) -> Dict[str, Any]:
-        """Export the full constitution as a structured document."""
-        return {
-            "name": self.name,
-            "version": self.version,
-            "hash": self.get_constitution_hash(),
-            "created_at": self.created_at.isoformat(),
-            "last_amended": self.last_amended.isoformat() if self.last_amended else None,
-            "principle_count": len(self.principles),
-            "amendment_count": len(self.amendment_history),
-            "violation_count": len(self.violation_log),
-            "emergency_mode": self.emergency_mode,
-            "principles": [p.to_dict() for p in self.principles.values()],
-            "amendment_history": [a.to_dict() for a in self.amendment_history],
-            "recent_violations": [v.to_dict() for v in self.violation_log[-10:]]
-        }
-    
-    def generate_constitution_markdown(self) -> str:
-        """Generate a markdown version of the constitution (BIBLE.md style)."""
-        md = f"# {self.name} v{self.version}\n\n"
-        md += f"**Hash:** `{self.get_constitution_hash()}`  \n"
-        md += f"**Created:** {self.created_at.strftime('%Y-%m-%d')}  \n"
-        md += f"**Last Amended:** {self.last_amended.strftime('%Y-%m-%d') if self.last_amended else 'Never'}  \n"
-        md += f"**Principles:** {len(self.principles)}  \n"
-        md += f"**Emergency Mode:** {'⚠️ ACTIVE' if self.emergency_mode else '✅ Inactive'}\n\n"
-        
-        md += "---\n\n"
-        
-        # Group by category
-        for category in PrincipleCategory:
-            principles = self.get_principles_by_category(category)
-            if principles:
-                md += f"## {category.value.upper()}\n\n"
-                for p in sorted(principles, key=lambda x: x.priority):
-                    md += f"### {p.id}: {p.name}\n"
-                    md += f"**Priority:** {p.priority}  "
-                    md += f"**Version:** {p.version}\n\n"
-                    md += f"{p.description}\n\n"
-                    md += f"- **Do:** {p.positive_formulation}\n"
-                    md += f"- **Don't:** {p.negative_formulation}\n\n"
-                    
-                    if p.examples:
-                        md += "**Examples:**\n"
-                        for ex in p.examples:
-                            md += f"- {ex}\n"
-                        md += "\n"
-                    
-                    if p.human_oversight:
-                        md += "⚠️ **Requires Human Oversight**\n\n"
-                    
-                    md += "---\n\n"
-        
-        return md
-
-
-class MultiModelConstitutionalReview:
-    """
-    Multi-model review system for constitutional compliance.
-    Inspired by Ouroboros multi-model code review pattern.
-    """
-    
-    def __init__(self, constitution: Constitution):
-        self.constitution = constitution
-        self.review_history: List[Dict[str, Any]] = []
-    
-    def review_action(
-        self,
-        action: str,
-        models: List[str] = ["primary", "secondary", "tertiary"]  # Simulated model IDs
-    ) -> Dict[str, Any]:
-        """
-        Simulate multi-model review of an action.
-        In real system, this would query different LLMs.
-        """
-        reviews = []
-        consensus_score = 0.0
-        
-        # Get constitutional compliance check
-        compliance = self.constitution.check_action_compliance(action)
-        
-        # Simulate model reviews based on compliance
-        for i, model in enumerate(models):
-            # Different models have slightly different perspectives
-            approval_probability = 0.9 if compliance["compliant"] else 0.3
-            
-            # Add some model-specific variation
-            if i == 0:  # Primary: strict on safety
-                if any(v["principle_id"].startswith("P1_") for v in compliance.get("violations", [])):
-                    approval_probability = 0.0
-            elif i == 1:  # Secondary: lenient on minor issues
-                approval_probability += 0.1
-            
-            approved = approval_probability > 0.5
-            confidence = 0.7 + (0.2 if approved == compliance["compliant"] else 0)
-            
-            review = {
-                "model": model,
-                "approved": approved,
-                "confidence": confidence,
-                "reason": "Action complies with constitution" if approved else "Constitutional concerns detected"
+        with self._lock:
+            result = {
+                "allowed": True,
+                "violations": [],
+                "required_approvals": [],
+                "warnings": []
             }
-            reviews.append(review)
             
-            if approved:
-                consensus_score += 1.0 / len(models)
-        
-        result = {
-            "action": action,
-            "reviews": reviews,
-            "consensus_score": consensus_score,
-            "approved": consensus_score > 0.66 and compliance["compliant"],
-            "requires_human": compliance.get("requires_review", False),
-            "compliance": compliance
-        }
-        
-        self.review_history.append(result)
-        return result
+            for rule in self.rules.values():
+                # Evaluate rule condition (simplified - would use proper parser in production)
+                triggered = self._evaluate_condition(rule.condition, operation, context)
+                
+                if triggered:
+                    rule.violation_count += 1
+                    
+                    if rule.priority == RulePriority.CRITICAL:
+                        result["allowed"] = False
+                        result["violations"].append({
+                            "rule_id": rule.id,
+                            "rule_name": rule.name,
+                            "severity": rule.priority.name,
+                            "action": rule.action
+                        })
+                        self._log_violation(rule, operation, context, rule.action)
+                    
+                    elif rule.action == "require_approval":
+                        approval_id = self._request_approval(operation, context, rule)
+                        result["required_approvals"].append(approval_id)
+                    
+                    elif rule.action == "warn":
+                        result["warnings"].append({
+                            "rule_id": rule.id,
+                            "rule_name": rule.name,
+                            "message": rule.description
+                        })
+            
+            return result
     
-    def review_amendment_proposal(
-        self,
-        proposal: AmendmentProposal,
-        models: List[str] = ["safety", "utility", "governance"]
-    ) -> Dict[str, Any]:
+    def _evaluate_condition(self, condition: str, operation: str, context: Dict) -> bool:
         """
-        Multi-model review of a constitutional amendment.
+        Evaluate a rule condition against the operation context.
+        Simplified implementation - production would use proper expression parser.
         """
-        reviews = []
+        # Simple pattern matching for demonstration
+        condition_lower = condition.lower()
         
-        for model in models:
-            # Different models evaluate different aspects
-            if model == "safety":
-                concern_keywords = ["remove", "weaken", "bypass", "safety"]
-                risk = any(kw in proposal.proposed_text.lower() for kw in concern_keywords)
-                approved = not risk
-                reason = "Safety concerns detected" if risk else "No safety issues"
-            elif model == "utility":
-                approved = len(proposal.proposed_text) > 20  # Non-trivial proposal
-                reason = "Improves utility" if approved else "Insufficient detail"
-            else:  # governance
-                approved = proposal.rationale and len(proposal.rationale) > 50
-                reason = "Well-justified" if approved else "Needs more rationale"
+        # Check operation type patterns
+        if "modifies_system_state" in condition_lower:
+            system_ops = ["delete", "modify", "update", "write", "chmod", "rm", "mv"]
+            if any(op in operation.lower() for op in system_ops):
+                if "has_explicit_approval" in condition_lower:
+                    return not context.get("has_approval", False)
+                return True
+        
+        if "could_cause_human_harm" in condition_lower:
+            harmful_ops = ["execute", "run", "deploy", "send", "transfer"]
+            if any(op in operation.lower() for op in harmful_ops):
+                if context.get("targets_human", False):
+                    return True
+        
+        if "handles_pii" in condition_lower:
+            if context.get("contains_pii", False):
+                if "has_consent" in condition_lower:
+                    return not context.get("has_consent", False)
+                return True
+        
+        if "significant_impact" in condition_lower:
+            if context.get("impact_score", 0) > 0.7:
+                if "has_explanation" in condition_lower:
+                    return not context.get("has_explanation", False)
+                return True
+        
+        if "estimated_cost" in condition_lower:
+            if context.get("estimated_cost", 0) > 100:
+                return True
+        
+        if "potentially_biased" in condition_lower:
+            if context.get("bias_score", 0) > 0.5:
+                return True
+        
+        return False
+    
+    def _log_violation(self, rule: ConstitutionalRule, operation: str, 
+                       context: Dict, action_taken: str):
+        """Log a rule violation."""
+        violation = ViolationReport(
+            id=self._generate_id(),
+            rule_id=rule.id,
+            rule_name=rule.name,
+            timestamp=time.time(),
+            operation=operation,
+            context=context.copy(),
+            action_taken=action_taken,
+            severity=rule.priority
+        )
+        self.violations.append(violation)
+    
+    def _request_approval(self, operation: str, context: Dict, 
+                          rule: ConstitutionalRule) -> str:
+        """Create an approval request."""
+        approval_id = self._generate_id()
+        request = ApprovalRequest(
+            id=approval_id,
+            operation_type=operation,
+            description=f"Operation requires approval due to rule: {rule.name}",
+            context={
+                "operation": operation,
+                "triggering_rule": rule.to_dict(),
+                **context
+            },
+            requested_at=time.time()
+        )
+        self.approval_requests[approval_id] = request
+        
+        # Notify handlers
+        for handler in self.approval_handlers:
+            try:
+                handler(request)
+            except Exception:
+                pass
+        
+        return approval_id
+    
+    def _generate_id(self) -> str:
+        """Generate unique ID."""
+        data = f"{self.agent_id}:{time.time()}:{threading.current_thread().ident}"
+        return hashlib.sha256(data.encode()).hexdigest()[:16]
+    
+    def approve_operation(self, approval_id: str, approver: str) -> bool:
+        """Approve a pending operation."""
+        with self._lock:
+            if approval_id not in self.approval_requests:
+                return False
             
-            reviews.append({
-                "model": model,
-                "approved": approved,
-                "confidence": 0.75,
-                "reason": reason
+            request = self.approval_requests[approval_id]
+            if request.is_expired():
+                request.status = ApprovalStatus.EXPIRED
+                return False
+            
+            request.status = ApprovalStatus.APPROVED
+            request.approved_at = time.time()
+            request.approved_by = approver
+            return True
+    
+    def deny_operation(self, approval_id: str, reason: str) -> bool:
+        """Deny a pending operation."""
+        with self._lock:
+            if approval_id not in self.approval_requests:
+                return False
+            
+            request = self.approval_requests[approval_id]
+            request.status = ApprovalStatus.DENIED
+            request.denial_reason = reason
+            return True
+    
+    def register_circuit_breaker(self, name: str, failure_threshold: int = 5,
+                                  recovery_timeout: float = 60.0):
+        """Register a circuit breaker for an operation type."""
+        self.circuit_breakers[name] = CircuitBreaker(
+            name=name,
+            failure_threshold=failure_threshold,
+            recovery_timeout=recovery_timeout
+        )
+    
+    def check_circuit_breaker(self, name: str) -> bool:
+        """Check if circuit breaker allows execution."""
+        if name not in self.circuit_breakers:
+            return True
+        return self.circuit_breakers[name].can_execute()
+    
+    def record_circuit_result(self, name: str, success: bool):
+        """Record result for circuit breaker."""
+        if name not in self.circuit_breakers:
+            return
+        
+        if success:
+            self.circuit_breakers[name].record_success()
+        else:
+            self.circuit_breakers[name].record_failure()
+    
+    def get_constitution(self) -> Dict:
+        """Get full constitution as dictionary."""
+        return {
+            "agent_id": self.agent_id,
+            "rules": {rid: r.to_dict() for rid, r in self.rules.items()},
+            "immutable_count": sum(1 for r in self.rules.values() if r.immutable),
+            "total_rules": len(self.rules)
+        }
+    
+    def get_violations(self, since: Optional[float] = None,
+                       severity: Optional[RulePriority] = None) -> List[ViolationReport]:
+        """Get violation reports with optional filtering."""
+        violations = self.violations
+        
+        if since:
+            violations = [v for v in violations if v.timestamp > since]
+        
+        if severity:
+            violations = [v for v in violations if v.severity == severity]
+        
+        return violations
+    
+    def get_pending_approvals(self) -> List[ApprovalRequest]:
+        """Get all pending approval requests."""
+        pending = []
+        for req in self.approval_requests.values():
+            if req.status == ApprovalStatus.PENDING and not req.is_expired():
+                pending.append(req)
+        return pending
+    
+    def export_constitution(self, filepath: str):
+        """Export constitution to JSON file."""
+        with open(filepath, 'w') as f:
+            json.dump(self.get_constitution(), f, indent=2)
+    
+    def import_constitution(self, filepath: str) -> bool:
+        """Import constitution from JSON file."""
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+            
+            for rule_data in data.get("rules", {}).values():
+                rule = ConstitutionalRule.from_dict(rule_data)
+                # Don't overwrite immutable rules
+                if rule.id in self.rules and self.rules[rule.id].immutable:
+                    continue
+                self.rules[rule.id] = rule
+            
+            return True
+        except Exception:
+            return False
+
+
+class GovernedAgent:
+    """
+    Wrapper that adds constitutional governance to any agent.
+    
+    Usage:
+        agent = GovernedAgent(base_agent, governance)
+        result = agent.execute("delete_file", {"path": "/important/file"})
+        # Will block if violates constitution
+    """
+    
+    def __init__(self, agent_id: str, governance: Optional[ConstitutionalGovernance] = None):
+        self.agent_id = agent_id
+        self.governance = governance or ConstitutionalGovernance(agent_id)
+        self.execution_history: List[Dict] = []
+    
+    def execute(self, operation: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute an operation with constitutional checks.
+        
+        Returns:
+            Dict with 'success', 'result', 'violations', 'approval_required'
+        """
+        # Check circuit breaker
+        breaker_name = context.get("circuit_breaker", operation)
+        if not self.governance.check_circuit_breaker(breaker_name):
+            return {
+                "success": False,
+                "error": f"Circuit breaker open for {breaker_name}",
+                "violations": [],
+                "approval_required": False
+            }
+        
+        # Evaluate against constitution
+        evaluation = self.governance.evaluate_operation(operation, context)
+        
+        if not evaluation["allowed"]:
+            return {
+                "success": False,
+                "error": "Operation blocked by constitutional rules",
+                "violations": evaluation["violations"],
+                "approval_required": False
+            }
+        
+        if evaluation["required_approvals"]:
+            return {
+                "success": False,
+                "error": "Operation requires human approval",
+                "violations": [],
+                "approval_required": True,
+                "approval_ids": evaluation["required_approvals"]
+            }
+        
+        # Log warnings
+        for warning in evaluation["warnings"]:
+            self.execution_history.append({
+                "timestamp": time.time(),
+                "operation": operation,
+                "warning": warning
             })
         
-        approval_count = sum(1 for r in reviews if r["approved"])
+        # Execute operation (placeholder - would call actual agent)
+        try:
+            result = {"status": "executed", "operation": operation}
+            self.governance.record_circuit_result(breaker_name, True)
+            
+            self.execution_history.append({
+                "timestamp": time.time(),
+                "operation": operation,
+                "success": True
+            })
+            
+            return {
+                "success": True,
+                "result": result,
+                "violations": [],
+                "approval_required": False
+            }
         
-        return {
-            "proposal_id": proposal.id,
-            "reviews": reviews,
-            "consensus_reached": approval_count >= 2,
-            "can_implement": approval_count >= 2,
-            "requires_human": proposal.change_type in ["remove", "modify"] and approval_count >= 2
+        except Exception as e:
+            self.governance.record_circuit_breaker(breaker_name, False)
+            
+            self.execution_history.append({
+                "timestamp": time.time(),
+                "operation": operation,
+                "success": False,
+                "error": str(e)
+            })
+            
+            return {
+                "success": False,
+                "error": str(e),
+                "violations": [],
+                "approval_required": False
+            }
+
+
+# Default constitution export
+DEFAULT_CONSTITUTION = {
+    "core_principles": [
+        {
+            "id": "core-001",
+            "name": "No Harm to Humans",
+            "description": "The agent must not take actions that cause physical, emotional, or financial harm to humans.",
+            "priority": "CRITICAL",
+            "immutable": True
+        },
+        {
+            "id": "core-002",
+            "name": "No Unauthorized System Modifications",
+            "description": "The agent must not modify system files, configurations, or infrastructure without explicit approval.",
+            "priority": "CRITICAL",
+            "immutable": True
+        },
+        {
+            "id": "core-003",
+            "name": "Data Privacy Protection",
+            "description": "The agent must not expose, share, or process personal data in unauthorized ways.",
+            "priority": "CRITICAL",
+            "immutable": True
+        },
+        {
+            "id": "core-004",
+            "name": "Transparency in Decision Making",
+            "description": "The agent must provide clear reasoning for significant decisions.",
+            "priority": "HIGH",
+            "immutable": True
         }
+    ]
+}
 
 
-# Convenience functions
-
-def create_constitution(name: str = "Agent Constitution") -> Constitution:
-    """Create a new constitutional governance framework."""
-    return Constitution(name=name)
-
-
-def get_default_principles() -> List[Dict[str, Any]]:
-    """Get the default 9 constitutional principles as dicts."""
-    constitution = Constitution()
-    return [p.to_dict() for p in constitution.principles.values()]
-
-
-def quick_compliance_check(action: str) -> Dict[str, Any]:
-    """Quick check if an action complies with default constitution."""
-    constitution = Constitution()
-    return constitution.check_action_compliance(action)
+def create_default_governance(agent_id: str) -> ConstitutionalGovernance:
+    """Factory function to create governance with default constitution."""
+    return ConstitutionalGovernance(agent_id)
