@@ -1,5 +1,54 @@
 # AGI Research - Latest Findings
 
+## May 9, 2026
+
+### Industry News & Breakthroughs
+- **Forbes - Transformer Architecture & AGI** (May 3, 2026): Analysis suggests we're very close to artificial general intelligence, with transformers showing super-human pattern recognition capabilities
+- **Agentic AI: Navigating The Evolving Frontier** (May 8, 2026): AI systems with machine agency that can read intent, plan multi-step activities, use tools, and execute tasks independently. Characterized by operational autonomy and "Security by Design" requirements
+- **Genesis AI Robotics** (May 6, 2026): Khosla-backed startup unveiled GENE-26.5 model with data collection gloves for real-world training. Former Mistral AI researcher leading development
+- **SoundHound AI OASYS** (May 5, 2026): World's first self-learning orchestrated agentic AI platform where "AI builds AI." Enables businesses to deploy fleets of orchestrated agents across touchpoints
+- **OpenMythos** (May 2, 2026): 22-year-old developer Kye Gomez reverse-engineered Claude Mythos architecture and published OpenMythos in days, demonstrating proprietary moats may be weakening
+- **Coder Agents Beta** (May 6, 2026): Self-hosted, AI model-agnostic coder agents with full governance over infrastructure, data, and models. Native agent architecture for enterprises
+- **MongoDB Enterprise AI** (May 7, 2026): Production-ready AI with LangGraph.js Long-Term Memory Store, Automated Voyage AI Embeddings in Vector Search
+- **GetDandy Autonomous Workforce** (May 7, 2026): AI workforce for local businesses handling all customer interactions across phone, SMS, web chat, email, social media with no setup required
+
+### Key arXiv Papers (Past 2 Weeks)
+- **[2605.05138v1] Executable World Models for ARC-AGI-3**: Revolutionary approach using executable Python world models with generate-and-verify loops. Agent maintains simulator that is executable, testable, and refactorable toward simpler abstractions. Results: 7 games fully solved, mean RHAE 32.58%, fully game-agnostic with no hand-coded logic
+- **[2603.19461] HyperAgents**: Self-referential agents that jointly host task solver and editable meta-solver. DGM-Hyperagents (DGM-H) demonstrate cross-domain self-improvement in coding, paper review, robotics reward design, and math grading. Meta-improvement procedure is itself editable, enabling open-ended progress
+- **[2604.02434] Compositional Neuro-Symbolic Reasoning**: ARC-AGI-2 performance improvements from 16% to 24.4% (base) and 30.8% (with meta-classifier). Key innovation: separates perception (object extraction), neural transformation proposals, and symbolic consistency filtering
+- **[2604.18292] Agent-World**: Self-evolving training arena pairing scalable environments with continuous training. Evaluated on 23 challenging benchmarks, Agent-World-8B and Agent-World-14B consistently outperform proprietary models. Performance correlates with environment diversity
+- **[2603.24621v1] ARC-AGI-3: A New Challenge for Frontier Agentic Intelligence**: Interactive benchmark where humans score 100%, frontier AI <1%. Tests fluid adaptive efficiency using Core Knowledge priors without language cues
+- **[2603.13372v1] The ARC of Progress towards AGI**: Living survey of 82 approaches across ARC-AGI 1-3. Consistent 2-3x performance decline across versions. Cost declined 390x YoY ($4,500 → $12/task). Kaggle-constrained models (0.66B-8B) perform competitively with trillion-scale models
+- **[2604.09911] The Rise and Fall of G in AGI**: Examines whether general intelligence factor (g) emerges in AI models. Strong positive manifold among benchmarks with PC1 explaining ~90% of variance, but signal weakens for reasoning-heavy tasks as models increasingly outsource to tools
+
+### Trending Open Source Agent Repos (May 2026)
+1. **VoltAgent** (voltagent/voltagent) - TypeScript framework with memory, tools, multi-agent coordination, MCP integration, 70+ contributors, 682 releases
+2. **CrewAI** (crewaiinc/crewai) - Python framework with crews, flows, enterprise AMP suite, 290+ contributors, 48k+ stars
+3. **Agency Swarm** (VRSEN/agency-swarm) - Structured multi-agent with type-safe Pydantic tools, OpenAI Agents SDK extension
+4. **SuperAgentX** (superagentxai/superagentx) - Human-in-the-loop governance, 100+ LLMs, 10,000+ MCP tools, policy-driven
+5. **Microsoft Agent Framework** - Cross-language Python/.NET with checkpointing, time-travel, graph-based workflows, 10k+ stars
+6. **LightAgent** (~1,000 LOC) - Lightweight with Tree-of-Thought, MCP support, multi-model compatibility, mem0 memory
+7. **KohakuTerrarium** - Python framework with "creatures" (standalone agents) and "terrarium" (orchestration layer), persistent sessions, TUI and web UI
+8. **Multica** (multica-ai/multica) - Managed agents platform treating coding agents as teammates, full lifecycle management, skill reuse
+
+### AI Agent Architecture Trends 2026
+- **Executable World Models**: ARC-AGI-3 solvers using Python simulators with verification and refactoring toward MDL-like simplicity
+- **Self-Learning Orchestration**: OASYS-style platforms where AI builds AI, enabling fleets of orchestrated agents
+- **Neuro-Symbolic Hybrid**: Separating perception (neural) from reasoning (symbolic) showing strong results on ARC benchmarks
+- **Test-Time Adaptation**: LoRA and lightweight updates for task specialization without pretraining
+- **Model Context Protocol (MCP)**: Dominant standard for tool integration adopted by Claude Desktop, OpenAI SDK, Mastra
+- **Autonomous Workforce**: End-to-end business automation without setup, self-training from website and customer data
+- **Self-Referential Meta-Learning**: HyperAgents-style editable meta-solvers enabling open-ended improvement
+
+### Critical Research Insights
+- **Executable models beat static reasoning**: ARC-AGI-3 results show agents that build and verify executable world models significantly outperform pure neural approaches
+- **Neuro-symbolic separation works**: Compositional reasoning with separate perception, proposal, and filtering stages shows consistent gains
+- **Meta-learning is editable**: HyperAgents demonstrate that making the meta-improvement procedure itself editable unlocks faster cross-domain progress
+- **Diverse environments scale**: Agent-World shows performance correlates with environment diversity, supporting the "Many Agents, Not One" thesis
+- **Cost efficiency continues**: 390x cost reduction in one year via test-time optimization, but compositional generalization remains the key challenge
+
+---
+
 ## May 8, 2026
 
 ### Industry News & Breakthroughs
