@@ -1,6 +1,6 @@
 # AGI Research Summary
 
-**Last Updated**: 2026-05-10
+**Last Updated**: 2026-05-11
 
 ---
 
@@ -194,3 +194,77 @@
 - Integration with DSL for compositional program construction
 - Search-based program induction with neural guidance
 - Target: ARC-AGI-3 performance improvement
+
+---
+
+# AGI Research & Development - Current Findings
+
+## Research Summary (May 11, 2026)
+
+### Industry News & Breakthroughs
+- **AI Pentesting Agents 2026**: 39+ open-source AI pentesting agents tested across 6 distinct architecture patterns
+  - Categories: single-agent, multi-agent planner-executor, specialized roles
+  - Security-focused agents becoming production-ready
+- **AI Agents Driving API-First Architecture**: Software vendors redesigning products for AI agent consumption
+  - Headless architectures becoming standard
+  - Agents no longer just reactive - they think, plan, and act independently
+- **Arm Holdings AGI CPU**: Strategic shift into chip design for AGI workloads
+  - $1 billion revenue target, addressing supply chain challenges
+- **DeepMind CEO AGI Test Proposal**: Most honest AGI test suggested - today's systems still far from passing
+  - Musk predicts AGI by end of 2026, Hassabis estimates around 2030
+- **Forbes AGI Analysis**: Suggests we're very close to AGI with transformers showing super-human pattern recognition
+- **SoundHound AI OASYS**: World's first self-learning orchestrated agentic AI platform where "AI builds AI"
+
+### Key arXiv Papers (Past 2 Weeks)
+- **[2605.05138v1] Executable World Models for ARC-AGI-3**: Revolutionary approach using executable Python world models with generate-and-verify loops
+  - 7 games fully solved, mean RHAE 32.58%
+  - Key innovation: simulator is executable, testable, refactorable toward MDL-like simplicity
+- **[2504.20109v1] Personalized AGI via Neuroscience-Inspired Continuous Learning**: 
+  - Theoretical architecture with fast/slow learning modules
+  - Synaptic self-optimization, memory-efficient updates for on-device lifelong adaptation
+  - Addresses catastrophic forgetting through synaptic pruning, Hebbian plasticity, sparse coding
+- **[2510.18212] A Definition of AGI** (Hendrycks et al.):
+  - Quantifiable AGI definition based on Cattell-Horn-Carroll (CHC) theory
+  - 10 core cognitive domains, empirical scores: GPT-4 ~27%, GPT-5 ~57%
+  - Highlights "jagged" cognitive profile: strong on knowledge, weak on long-term memory
+- **[2501.03151v1] LLMs for AGI: A Survey of Foundational Principles**:
+  - Four requirements for AGI: embodiment, symbol grounding, causality, memory
+  - Current LLMs remain superficial and brittle in generalization
+- **[2311.02462] Levels of AGI**: Google DeepMind's multi-level ontology by depth (performance) and breadth (generality)
+
+### Trending Open Source Agent Repos (May 2026)
+- **future-agi/future-agi**: Open-source end-to-end platform for self-improving AI agents
+  - Evaluations, tracing, simulations, guardrails, gateway, optimization
+- **openai/openai-agents-python**: ~26k stars, multi-agent workflows, 100+ LLM support, provider-agnostic
+- **langchain-ai/langchain**: 50k+ stars, modular chains, LangGraph orchestration, extensive integrations
+- **microsoft/agent-framework**: ~10k stars, cross-language Python/.NET, production-grade
+- **crewAIInc/crewAI**: 48k+ stars, role-based crews, enterprise AMP suite, observability
+- **vrsen/agency-swarm**: 5k+ stars, structured agent swarms, Pydantic tools, communication flows
+- **aden-hive/hive**: 3k+ stars, production-grade, self-healing, graph-based execution DAGs
+- **VoltAgent/voltagent**: 9k+ stars, TypeScript, MCP integration, VoltOps console
+- **superagentxai/superagentX**: 2k+ stars, human-in-the-loop governance, 10k+ MCP tools
+
+### AI Agent Architecture Trends 2026
+- **MCP Dominance**: Model Context Protocol becoming standard for agent-tool integration
+  - Adopted by OpenAI, Anthropic, Claude Desktop
+  - Enables: Build tools once, deploy across various agents without rewriting
+- **Neuro-Symbolic Hybrid**: Perception (neural) + Reasoning (symbolic) separation
+  - Compositional reasoning through DSLs
+  - Program synthesis from examples
+- **Executable World Models**: Generate-and-verify with testable simulators
+  - ARC-AGI-3 breakthrough: executable Python simulators
+- **Self-Referential Meta-Learning**: Editable meta-solvers for open-ended improvement
+- **Constitutional Governance**: BIBLE.md pattern for self-modifying AI constraints
+- **Agent Pentesting**: Security-focused agents becoming production-ready
+- **40% of AI agent projects predicted to fail by 2027** due to architecture/engineering gaps
+
+### Build Task: Learning from Demonstration (LfD) Module
+
+**Motivation**: Based on neuroscience-inspired continuous learning research and the need for agents to acquire new skills from examples rather than explicit programming. LfD is a key AGI capability - learning from demonstration is how humans acquire most complex skills.
+
+**Key Components**:
+1. **Demonstration Recorder**: Capture successful task executions
+2. **Pattern Extractor**: Identify reusable patterns from demonstrations
+3. **Skill Synthesizer**: Generate executable skill definitions
+4. **Skill Library**: Versioned storage of learned skills
+5. **Transfer Learning**: Apply learned skills to new contexts

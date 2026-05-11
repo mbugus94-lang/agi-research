@@ -7,6 +7,166 @@
 
 ## Build Log
 
+### 2026-05-11 - Scheduled Run: Learning from Demonstration (LfD) Module
+**Status**: ✅ COMPLETE - 34/34 tests passed
+
+**Research Summary (May 11, 2026)**:
+
+**Industry News & Breakthroughs**:
+- **AI Pentesting Agents 2026**: 39+ open-source AI pentesting agents tested across 6 distinct architecture patterns
+  - Categories: single-agent, multi-agent planner-executor, specialized roles
+  - Security-focused agents becoming production-ready
+- **AI Agents Driving API-First Architecture**: Software vendors redesigning products for AI agent consumption
+  - Headless architectures becoming standard
+  - Agents no longer just reactive - they think, plan, and act independently
+- **Arm Holdings AGI CPU**: Strategic shift into chip design for AGI workloads
+  - $1 billion revenue target, addressing supply chain challenges
+- **DeepMind CEO AGI Test Proposal**: Most honest AGI test suggested - today's systems still far from passing
+  - Musk predicts AGI by end of 2026, Hassabis estimates around 2030
+
+**Key arXiv Papers (Past 2 Weeks)**:
+- **[2605.05138v1] Executable World Models for ARC-AGI-3**: Revolutionary approach using executable Python world models
+  - 7 games fully solved, mean RHAE 32.58%
+  - Key innovation: simulator is executable, testable, refactorable
+- **[2504.20109v1] Personalized AGI via Neuroscience-Inspired Continuous Learning**: 
+  - Theoretical architecture with fast/slow learning modules
+  - Synaptic self-optimization, memory-efficient updates for on-device lifelong adaptation
+  - Addresses catastrophic forgetting through synaptic pruning, Hebbian plasticity, sparse coding
+- **[2510.18212] A Definition of AGI** (Hendrycks et al.):
+  - Quantifiable AGI definition based on Cattell-Horn-Carroll (CHC) theory
+  - 10 core cognitive domains, empirical scores: GPT-4 ~27%, GPT-5 ~57%
+  - Highlights "jagged" cognitive profile: strong on knowledge, weak on long-term memory
+
+**Trending Open Source Agent Repos (May 2026)**:
+- **future-agi/future-agi**: Open-source end-to-end platform for self-improving AI agents
+- **openai/openai-agents-python**: ~26k stars, multi-agent workflows, 100+ LLM support
+- **langchain-ai/langchain**: 50k+ stars, modular chains, LangGraph orchestration
+- **microsoft/agent-framework**: ~10k stars, cross-language Python/.NET
+- **crewAIInc/crewAI**: 48k+ stars, role-based crews, enterprise AMP suite
+- **VoltAgent/voltagent**: 9k+ stars, TypeScript, MCP integration
+
+**AI Agent Architecture Trends 2026**:
+- **MCP Dominance**: Model Context Protocol becoming standard for agent-tool integration
+- **Neuro-Symbolic Hybrid**: Perception (neural) + Reasoning (symbolic) separation
+- **Executable World Models**: Generate-and-verify with testable simulators
+- **40% of AI agent projects predicted to fail by 2027** due to architecture/engineering gaps
+
+**Build Task**: Learning from Demonstration (LfD) Module
+
+**Motivation**: Based on neuroscience-inspired continuous learning research and the need for agents to acquire new skills from examples rather than explicit programming. LfD is a key AGI capability - learning from demonstration is how humans acquire most complex skills.
+
+**Key Components**:
+
+1. **DemonstrationRecorder**: Capture successful task executions
+   - `start_recording()` / `stop_recording()` lifecycle
+   - `record_step()` for individual action steps
+   - Support for multiple demonstration types: TASK_EXECUTION, TOOL_USAGE, DECISION_SEQUENCE, REPAIR_SEQUENCE
+   - Persistence to JSON storage
+
+2. **ActionStep**: Individual actions within demonstrations
+   - Tool calls with parameters
+   - Pre/post state tracking
+   - Duration and success tracking
+   - Notes and metadata
+
+3. **PatternExtractor**: Identify reusable patterns from demonstrations
+   - `extract_action_sequence()`: Find common action subsequences
+   - `extract_parameter_mappings()`: Identify parameter patterns across demos
+   - Pattern similarity detection using Jaccard similarity
+   - Confidence scoring based on frequency
+
+4. **ExtractedPattern**: Discovered reusable patterns
+   - Pattern types: ACTION_SEQUENCE, PARAMETER_MAPPING, STATE_TRANSITION, ERROR_RECOVERY
+   - Source demo tracking
+   - Frequency and confidence metrics
+   - Pre/post condition extraction
+
+5. **SkillSynthesizer**: Generate executable skill definitions
+   - `synthesize_skill()` from patterns and demonstrations
+   - `refine_skill()` with new demonstrations (version bumping)
+   - Parameter schema inference
+   - Success rate estimation
+   - Skill execution with tool registry
+
+6. **LearnedSkill**: Versioned learned skills
+   - Semantic versioning (major.minor.patch)
+   - Parent skill tracking for lineage
+   - Usage count tracking
+   - Required tools and parameter schema
+   - Pattern composition
+
+7. **TransferLearning**: Apply learned skills to new contexts
+   - `adapt_skill()` with parameter mapping strategy
+   - `adapt_skill()` with pattern substitution strategy
+   - `compose_skills()` for creating composite skills
+   - Context-aware adaptation with success rate penalties
+
+**Test Coverage**: 34/34 tests passed
+- ActionStep creation and serialization (3 tests)
+- Demonstration lifecycle and queries (6 tests)
+- DemonstrationRecorder workflow and persistence (7 tests)
+- Pattern extraction from demos (4 tests)
+- Skill synthesis, refinement, and execution (8 tests)
+- Transfer learning and adaptation (5 tests)
+- End-to-end integration workflow (1 test)
+
+**Usage Example**:
+```python
+from skills.learning_from_demonstration import create_lfd_system
+
+# Create LfD system
+recorder, extractor, synthesizer, transfer = create_lfd_system("./lfd_data")
+
+# Record a demonstration
+demo_id = recorder.start_recording("Search and analyze", tags=["research"])
+recorder.record_step(demo_id, "tool_call", {"query": "AGI"}, tool_name="search")
+recorder.record_step(demo_id, "reasoning", {"analysis": "summarize"})
+demo = recorder.stop_recording(demo_id, "Success", True)
+
+# Extract patterns from multiple demonstrations
+demos = [demo, ...]  # Multiple similar demonstrations
+patterns = extractor.extract_action_sequence(demos, min_frequency=2)
+
+# Synthesize skill
+skill = synthesizer.synthesize_skill(
+    name="research_skill",
+    description="Search and analyze information",
+    patterns=patterns,
+    demonstrations=demos
+)
+
+# Transfer to new context
+adapted = transfer.adapt_skill(
+    skill.skill_id,
+    target_context={"default_query": "AI"},
+    adaptation_strategy="parameter_mapping"
+)
+
+# Execute skill
+result = synthesizer.execute_skill(skill.skill_id, {"query": "neural networks"}, tool_registry)
+```
+
+**Research Synthesis**:
+- LfD enables skill acquisition from examples rather than explicit programming
+- Pattern extraction identifies reusable behavioral structures
+- Versioned skill library supports iterative refinement
+- Transfer learning enables skill generalization across contexts
+- Success rate tracking enables risk assessment for learned skills
+
+**Files Changed**:
+- `CURRENT_RESEARCH.md`: Updated with May 11 research findings
+- `skills/learning_from_demonstration.py`: 600+ lines - Complete LfD implementation
+- `experiments/test_learning_from_demonstration.py`: 600+ lines - 34 comprehensive tests
+- `AGENTS.md`: This build log entry
+
+**Next Priority**: Multi-Agent Coordination Protocol
+- Agent-to-agent task delegation
+- Consensus mechanisms for collaborative decisions
+- Shared context and state synchronization
+- Based on openai-agents-python and crewAI patterns
+
+---
+
 ### 2026-05-10 - Scheduled Run: Neuro-Symbolic Pattern DSL
 **Status**: ✅ COMPLETE - 58/58 tests passed
 
