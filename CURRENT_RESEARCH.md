@@ -4,6 +4,53 @@
 
 ---
 
+# AGI Research & Development Log
+
+## Research Update: May 12, 2026
+
+### Industry News & Breakthroughs
+- **AGI Advance Newsletter (May 5, 2026)**: Turing's weekly insights cover MoE model expert upcycling, Claude's performance on human-unsolvable bioinformatics, and new agent architectures
+- **SubQ AI 2026**: Long context breakthrough could change business memory, research, customer analysis, coding, and agents
+- **AGI/Singularity Predictions**: 9,800 predictions analyzed - Shane Legg (DeepMind) predicts 50% chance of Minimal AGI by 2028
+- **London Tech Week 2026**: Focus on AI-native product models, deep-tech breakthroughs, and efficient go-to-market
+- **Arm Holdings AGI CPU**: Strategic shift into chip design for AGI workloads with $1B revenue target
+
+### AI Agent Architecture Trends 2026
+- **40% of enterprise apps will embed AI agents by end 2026** (up from <5% in 2025) - Gartner
+- **Multi-Agent Systems (MAS)**: Shift from single-agent to coordinated, autonomous teams
+- **5 Proven Multi-Agent Architectures**: Hierarchical, Human-in-the-loop, Collaborative, Competitive, and Hybrid
+- **Purpose-Built Architecture**: Traditional security tools fail for AI agents - need context-aware detection
+- **Context Engineering**: The missing layer for enterprise-grade AI systems
+
+### Key arXiv Papers (May 2026)
+- **[2605.05138v1] Executable World Models for ARC-AGI-3**: Revolutionary Python simulator approach - 7 games fully solved, mean RHAE 32.58%
+- **[2604.18292] Agent-World: Scaling Real-World Environment Synthesis**: Self-evolving training arena from Renmin University/ByteDance - 23 benchmarks, Agent-World-8B/14B outperform proprietary baselines
+- **[2603.24621v1] ARC-AGI-3: New Challenge for Frontier Agentic Intelligence**: Interactive benchmark for turn-based environments - humans 100%, frontier AI <1% as of March 2026
+- **[2603.13372v1] ARC of Progress towards AGI Living Survey**: 82 approaches analyzed across ARC-AGI 1-3, performance degrades 2-3x from v1 to v2 to v3
+- **[2603.07896v1] SMGI: Structural Theory of General AI**: Typed meta-model theta = (r, H, Pi, L, E, M) with structural inclusion theorem showing classical RL/IRM/RL are restricted instances
+- **[2601.11658] Towards AGI: Pragmatic Self-Evolving Agent**: Hierarchical multi-agent with Base LLM, Operational SLM, Code-Gen LLM, Teacher-LLM - CL enables fast recovery, RL best for high-difficulty, GA yields diversity
+
+### Trending Open Source AI Agent Repos (May 2026)
+- **openai/openai-agents-python**: 270+ contributors, provider-agnostic, 100+ LLMs supported, v0.15.3 (May 2026)
+- **VoltAgent/voltagent**: TypeScript framework, 2k+ stars, VoltOps console, MCP compatibility, memory/RAG/guardrails
+- **ag2ai/ag2**: Formerly AutoGen, Python-native, v1.0 roadmap, agent OS for cooperative agents
+- **microsoft/agent-framework**: 82 releases, cross-language Python/.NET, graph-based orchestration, checkpointing
+- **VRSEN/agency-swarm**: OpenAI Agents SDK extension, structured orchestration, customizable roles, v1.9.4
+- **superagentxai/superagentX**: 100+ LLMs, 10,000+ MCP tools, Playwright automation, governance with human-in-the-loop
+- **agentspan-ai/agentspan**: Distributed durable runtime, crash recovery, cross-language SDKs, 15+ providers
+- **opencmit/alphora**: Production-ready composable agents, secure code sandbox, async OpenAI-compatible, Apache 2.0
+- **aden-hive/hive**: Python multi-agent harness, graph-based DAG execution, self-healing, fault tolerance
+
+### Key Insights for AGI Development
+1. **MCP (Model Context Protocol)** becoming standard for agent-tool integration
+2. **Neuro-Symbolic Hybrid**: Perception (neural) + Reasoning (symbolic) separation
+3. **Executable World Models**: Generate-and-verify with testable simulators
+4. **Self-Evolving Agents**: Curriculum learning + RL + Genetic Algorithms for autonomous improvement
+5. **Multi-Agent Orchestration**: 40% of enterprise apps embedding agents by 2026
+6. **ARC-AGI-3**: New frontier benchmark - agents must explore, infer goals, model dynamics without instructions
+
+---
+
 ## Phase 1: Research Findings
 
 ### Industry News & Breakthroughs (Week of May 10, 2026)
