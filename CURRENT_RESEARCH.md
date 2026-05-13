@@ -49,6 +49,34 @@
 5. **Multi-Agent Orchestration**: 40% of enterprise apps embedding agents by 2026
 6. **ARC-AGI-3**: New frontier benchmark - agents must explore, infer goals, model dynamics without instructions
 
+### Research Update: May 13, 2026
+
+**Industry Events:**
+- **AGI-26 Conference** announced for July 27, 2026 in San Francisco (19th annual AGI Society conference)
+  - Keynote speakers: Karl Friston (neuroscience-inspired models), Gary Marcus (symbolic AI)
+  - Three tracks: theoretical foundations, practical pathways, hybrid approaches
+
+**New arXiv Papers:**
+1. **[2604.18292] Agent-World** (Apr 20): Self-evolving training arena, Agent-World-8B/14B outperform proprietary models on 23 benchmarks
+2. **[2604.15236] Agentic Microphysics** (Apr 16): Safety framework for multi-agent interaction risks
+3. **[2604.11753v1] AggAgent** (Apr 13): Parallel scaling for long-horizon tasks, 5.3pp improvement
+4. **[2604.02434] Compositional Neuro-Symbolic Reasoning** (Apr 2): ARC-AGI-2 performance 16%→30.8%
+5. **[2603.28906v1] Category-Theoretic Framework for AGI** (Mar 30): Algebraic formalization comparing RL, Active Inference, CRL
+
+**Trending Repositories (Updated):**
+1. **Nanobot** (HKUDS/nanobot): 260+ contributors, multi-channel chat, v0.1.5.post3
+2. **Ouroboros** (razzant/ouroboros): Self-modifying with BIBLE.md constitution, multi-model review
+3. **GenericAgent** (lsdefine/GenericAgent): 10k+ stars, minimal ~3K lines, skill tree evolution
+4. **OpenHive** (aden-hive/hive): Graph-based DAGs, crash recovery, v0.10.5
+5. **Agent Zero** (agent0ai/agent-zero): Portable SKILL.md standard, v1.9
+
+**Key Insights:**
+1. Self-evolution becoming standard (Agent-World, Ouroboros, GenericAgent)
+2. Graph-based DAG orchestration is the new standard for multi-agent systems
+3. ARC-AGI-3 shows massive gap: humans 100%, frontier AI <1%
+4. Safety research shifting to population-level multi-agent risk analysis
+5. Parallel execution (AggAgent) enables cost-efficient long-horizon tasks
+
 ---
 
 ## Phase 1: Research Findings
