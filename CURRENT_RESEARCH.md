@@ -343,3 +343,99 @@
 3. **Skill Synthesizer**: Generate executable skill definitions
 4. **Skill Library**: Versioned storage of learned skills
 5. **Transfer Learning**: Apply learned skills to new contexts
+
+---
+
+## Research Summary (May 14, 2026)
+
+### Industry News & Breakthroughs
+- **DeepMind's AGI Definition Research**: Paper "A Definition of AGI" (arXiv:2510.18212) proposes quantifiable AGI definition based on Cattell-Horn-Carroll (CHC) theory
+  - 10 cognitive domains: reasoning, memory, perception, etc.
+  - GPT-4 scores ~27%, GPT-5 ~57% on AGI metrics
+  - Highlights "jagged" cognitive profile - strong on knowledge, weak on long-term memory
+- **AI Agent Architecture 2026**: Comprehensive technical breakdown published
+  - Agents moving beyond chatbots to autonomous task execution
+  - Production-ready agents require rigorous deterministic wrappers around non-deterministic LLMs
+  - LangSmith, Arize Phoenix, OpenTelemetry now mandatory for observability
+- **Enterprise AI Agent Adoption**: 40% of enterprise apps will embed AI agents by end of 2026 (Gartner)
+  - Up from <5% in 2025
+  - Agentic AI architects becoming highest-demand tech career
+- **Google Cloud Next 2026**: Long-running agents session announced
+  - Agent harnesses, persistent memory patterns, self-verification loops
+  - 24/7 competitive intelligence agent demo monitoring Reddit, YouTube, Hacker News
+
+### Key arXiv Papers (Past 2 Weeks)
+1. **[2510.18212] A Definition of AGI** (Hendrycks, Song, Szegedy, Lee, Gal et al.)
+   - Concrete, quantifiable AGI definition matching well-educated adult cognitive versatility
+   - Adapts human psychometric batteries to evaluate AI systems
+   - Current models show highly jagged profile - deficits in foundational cognitive machinery
+
+2. **[2605.05138v1] Executable World Models for ARC-AGI-3**
+   - Python executable world models with generate-and-verify loops
+   - 7 games fully solved, mean RHAE 32.58%
+   - Key innovation: simulator is executable, testable, refactorable
+
+3. **[2604.18292] Agent-World** (Renmin University/ByteDance)
+   - Self-evolving training arena with Agentic Environment-Task Discovery
+   - Agent-World-8B and 14B outperform proprietary models on 23 benchmarks
+   - Co-evolution of policies AND environments identifies capability gaps
+
+4. **[2604.15236] Agentic Microphysics**
+   - Safety framework for multi-agent interactions at population level
+   - Local interaction dynamics where one agent's output becomes another's input
+   - Generative safety methodology from micro to population-level risks
+
+5. **[2604.11753v1] AggAgent: Agentic Aggregation for Parallel Scaling**
+   - Coordinates parallel long-horizon agentic tasks
+   - Treats multiple rollouts as environment for inspection and synthesis
+   - Outperforms by 5.3pp average, 10.3pp on deep-research tasks
+
+### Trending Open Source AI Agent Repositories (May 2026)
+1. **LangChain** (langchain-ai/langchain): 50k+ stars, modular chains, LangGraph orchestration
+   - Agent engineering platform for chaining models, tools, vector stores
+   - LangSmith for evaluation and debugging, LangGraph for workflows
+
+2. **OpenAI Agents SDK** (openai/openai-agents-js): Multi-agent workflows, voice agents
+   - TypeScript/JavaScript framework with guardrails, handoffs, tracing
+   - ~26k stars, 90+ contributors, active development
+
+3. **Microsoft Agent Framework** (microsoft/agent-framework): Cross-language Python/.NET
+   - Production-grade multi-agent orchestration
+   - Graph-based patterns: sequential, concurrent, handoff, group collaboration
+   - ~13k stars, checkpointing, observability, governance
+
+4. **Mastra** (lirantal/mastra): TypeScript AI agent framework
+   - Agents, RAG, observability, workflow orchestration
+   - Vercel AI SDK integration, works with OpenAI, Anthropic, Gemini
+
+5. **Google ADK** (google/adk-python): Agent Development Kit
+   - Code-first development, modular multi-agent systems
+   - Rich tool ecosystem, optimized for Gemini but model-agnostic
+
+6. **Agent Zero** (agent0ai/agent-zero): Portable SKILL.md standard
+   - Personal, organic agent framework that grows with you
+   - Skills as structured portable capabilities
+
+7. **Dapr Agents** (dapr/dapr-agents): Scalable observable agent systems
+   - Thousands of agents, durable workflows, Kubernetes-native
+   - Multi-agent collaboration, vendor-neutral
+
+8. **Hive/OpenHive** (aden-hive/hive): Production-grade multi-agent harness
+   - State management, failure recovery, human-in-the-loop
+   - Graph-based execution DAG, role-based memory
+
+### Key Research Insights
+1. AGI definition becoming concrete and measurable - CHC-based psychometric approach
+2. Self-evolution emerging as standard (Agent-World, Ouroboros, GenericAgent)
+3. Graph-based DAG orchestration is new standard for multi-agent systems
+4. ARC-AGI-3 shows massive human-AI gap - humans 100%, frontier AI <1%
+5. Safety research shifting to population-level multi-agent risk (Agentic Microphysics)
+6. Parallel execution (AggAgent) enables cost-efficient long-horizon tasks
+7. Long-running agents with persistent memory becoming production reality
+
+### Next Build Priority
+**Self-Evolving Skill Acquisition Module**
+- Based on Agent-World and GenericAgent patterns
+- Crystallize successful execution paths into reusable skills
+- Skill tree organization with dependency tracking
+- Test on real agent tasks from AGI-26 benchmark suite

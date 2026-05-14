@@ -7,6 +7,208 @@
 
 ## Build Log
 
+### 2026-05-14 - Scheduled Run: Self-Evolving Skill Acquisition Module
+**Status**: ✅ COMPLETE - 38/38 tests passed
+
+**Research Summary (May 14, 2026)**:
+
+**Industry News & Breakthroughs**:
+- **DeepMind's AGI Definition Research**: Paper "A Definition of AGI" (arXiv:2510.18212) proposes quantifiable AGI definition based on Cattell-Horn-Carroll (CHC) theory
+  - 10 cognitive domains: reasoning, memory, perception, etc.
+  - GPT-4 scores ~27%, GPT-5 ~57% on AGI metrics
+  - Highlights "jagged" cognitive profile - strong on knowledge, weak on long-term memory
+- **AI Agent Architecture 2026**: Comprehensive technical breakdown published
+  - Agents moving beyond chatbots to autonomous task execution
+  - Production-ready agents require rigorous deterministic wrappers around non-deterministic LLMs
+  - LangSmith, Arize Phoenix, OpenTelemetry now mandatory for observability
+- **Enterprise AI Agent Adoption**: 40% of enterprise apps will embed AI agents by end 2026 (Gartner)
+  - Up from <5% in 2025
+  - Agentic AI architects becoming highest-demand tech career
+- **Google Cloud Next 2026**: Long-running agents session announced
+  - Agent harnesses, persistent memory patterns, self-verification loops
+  - 24/7 competitive intelligence agent demo monitoring Reddit, YouTube, Hacker News
+
+**Key arXiv Papers (Past 2 Weeks)**:
+1. **[2510.18212] A Definition of AGI** (Hendrycks, Song, Szegedy, Lee, Gal et al.)
+   - Concrete, quantifiable AGI definition matching well-educated adult cognitive versatility
+   - Adapts human psychometric batteries to evaluate AI systems
+   - Current models show highly jagged profile - deficits in foundational cognitive machinery
+
+2. **[2605.05138v1] Executable World Models for ARC-AGI-3**
+   - Python executable world models with generate-and-verify loops
+   - 7 games fully solved, mean RHAE 32.58%
+   - Key innovation: simulator is executable, testable, refactorable
+
+3. **[2604.18292] Agent-World** (Renmin University/ByteDance)
+   - Self-evolving training arena with Agentic Environment-Task Discovery
+   - Agent-World-8B and 14B outperform proprietary models on 23 benchmarks
+   - Co-evolution of policies AND environments identifies capability gaps
+
+4. **[2604.15236] Agentic Microphysics**
+   - Safety framework for multi-agent interactions at population level
+   - Local interaction dynamics where one agent's output becomes another's input
+   - Generative safety methodology from micro to population-level risks
+
+5. **[2604.11753v1] AggAgent: Agentic Aggregation for Parallel Scaling**
+   - Coordinates parallel long-horizon agentic tasks
+   - Treats multiple rollouts as environment for inspection and synthesis
+   - Outperforms by 5.3pp average, 10.3pp on deep-research tasks
+
+**Trending Open Source AI Agent Repositories (May 2026)**:
+1. **LangChain** (langchain-ai/langchain): 50k+ stars, modular chains, LangGraph orchestration
+2. **OpenAI Agents SDK** (openai/openai-agents-js): Multi-agent workflows, voice agents
+3. **Microsoft Agent Framework** (microsoft/agent-framework): Cross-language Python/.NET
+4. **Mastra** (lirantal/mastra): TypeScript AI agent framework
+5. **Google ADK** (google/adk-python): Agent Development Kit
+6. **Agent Zero** (agent0ai/agent-zero): Portable SKILL.md standard
+7. **Dapr Agents** (dapr/dapr-agents): Scalable observable agent systems
+8. **Hive/OpenHive** (aden-hive/hive): Production-grade multi-agent harness
+
+**Key Research Insights**:
+1. AGI definition becoming concrete and measurable - CHC-based psychometric approach
+2. Self-evolution emerging as standard (Agent-World, Ouroboros, GenericAgent)
+3. Graph-based DAG orchestration is new standard for multi-agent systems
+4. ARC-AGI-3 shows massive human-AI gap - humans 100%, frontier AI <1%
+5. Safety research shifting to population-level multi-agent risk (Agentic Microphysics)
+6. Parallel execution (AggAgent) enables cost-efficient long-horizon tasks
+7. Long-running agents with persistent memory becoming production reality
+
+**Build Task**: Self-Evolving Skill Acquisition Module
+
+**Motivation**: Based on Agent-World (arXiv:2604.18292) and GenericAgent patterns, the framework needs the ability to crystallize successful execution paths into reusable skills, organize them in a skill tree with dependency tracking, and evolve them through continuous learning. This is a core AGI capability - learning from demonstration and self-improvement.
+
+**Key Components**:
+
+1. **ExecutionStep**: Single step in a demonstrated execution
+   - step_number, action, tool_used, input_params, output_result, context, timestamp
+   - Serialization support for persistence
+
+2. **SkillDemonstration**: Recorded successful task execution
+   - demo_id, task_description, domain, steps, success_outcome
+   - performance_metrics, context, created_at
+   - Fingerprint-based deduplication
+
+3. **Skill**: Crystallized skill extracted from demonstrations
+   - skill_id, name, description, domain, skill_type, status
+   - derived_from (demo_ids), parent_skill, sub_skills (hierarchy)
+   - pattern_template, required_tools, parameter_schema
+   - Performance tracking: usage_count, success_count, average_performance
+   - Versioning: version, previous_versions
+   - Metadata: tags, dependencies, maturity_score
+
+4. **SkillStatus & SkillType**: Lifecycle and categorization enums
+   - Status: DRAFT, VALIDATED, ACTIVE, DEPRECATED, BROKEN
+   - Type: ATOMIC, COMPOSITE, ADAPTIVE, META
+
+5. **SkillDemonstrationRecorder**: Records and stores successful executions
+   - Deduplication via fingerprints
+   - Find demonstrations by domain, performance
+
+6. **PatternExtractor**: Extracts reusable patterns from demonstrations
+   - _analyze_step_sequences, _extract_parameter_schema
+   - _identify_required_tools, _identify_variable_slots
+   - _extract_invariant_structure
+
+7. **SkillTree**: Hierarchical organization with dependency tracking
+   - Add/get/find skills by domain, tags, status, maturity
+   - Dependency management: direct, transitive, cycle detection
+   - Skill lineage: parent chain traversal
+   - Subtree retrieval for hierarchical views
+   - Statistics: by status, type, domain
+
+8. **SkillCrystallizer**: Crystallizes demonstrations into reusable skills
+   - crystallize_skill(): Convert demos to skill (ATOMIC or COMPOSITE)
+   - evolve_skill(): Create new version with additional learnings
+   - validate_skill(): Check dependencies and test contexts
+   - specialize_skill(): Create domain-specific variants
+
+**Test Coverage**: 38/38 tests passed ✅
+- ExecutionStep creation and serialization (2 tests)
+- SkillDemonstration creation, fingerprint, serialization (3 tests)
+- Recorder initialization, recording, deduplication, finding (4 tests)
+- PatternExtractor extraction, empty handling (2 tests)
+- Skill creation, execution tracking, maturity, serialization (4 tests)
+- SkillTree: init, add/get, find by domain/tags, dependencies, transitive deps,
+  cycle detection, lineage, subtree, remove, stats, maturity filtering (13 tests)
+- Crystallizer: init, crystallize, atomic crystallize, validation, evolution,
+  specialization (6 tests)
+- Convenience functions: quick_crystallize (1 test)
+- Integration: empty demo handling, complex pattern, parameter schema (3 tests)
+
+**Usage Example**:
+```python
+from skills.skill_acquisition import (
+    SkillCrystallizer, ExecutionStep, SkillDemonstration,
+    create_crystallizer, quick_crystallize
+)
+
+# Record a demonstration
+steps = [
+    ExecutionStep(
+        step_number=1,
+        action="Analyze query",
+        input_params={"query": "AGI research"},
+        output_result={"intent": "research"},
+        context={}
+    ),
+    ExecutionStep(
+        step_number=2,
+        action="Execute search",
+        tool_used="web_search",
+        input_params={"time_range": "week"},
+        output_result={"results": 10},
+        context={}
+    )
+]
+
+crystallizer = create_crystallizer()
+demo = crystallizer.recorder.record_demonstration(
+    task_description="Research AGI developments",
+    domain="web_research",
+    steps=steps,
+    success_outcome="Summary of 5 papers",
+    performance_metrics={"accuracy": 0.92}
+)
+
+# Crystallize into skill
+skill = crystallizer.crystallize_skill(
+    demo_ids=[demo.demo_id],
+    name="Web Research",
+    description="Execute structured web research",
+    tags={"research", "web"}
+)
+
+# Create specialization
+specialized = crystallizer.specialize_skill(
+    skill_id=skill.skill_id,
+    specialization_name="Academic Research",
+    specialization_desc="Research academic papers",
+    specific_context={"sources": ["arxiv", "scholar"]}
+)
+```
+
+**Files Changed**:
+- `skills/skill_acquisition.py`: 700+ lines - Self-evolving skill acquisition system
+- `experiments/test_skill_acquisition.py`: 800+ lines - 38 comprehensive tests
+- `skills/__init__.py`: Updated exports
+- `CURRENT_RESEARCH.md`: Updated with May 14, 2026 research findings
+- `AGENTS.md`: This build log entry
+
+**Research Synthesis**:
+- Self-evolution is becoming a standard across leading frameworks (Agent-World, Ouroboros, GenericAgent)
+- Skill crystallization enables agents to learn from their own successful executions
+- Hierarchical skill organization with dependency tracking supports complex capability composition
+- Versioning and specialization enable continuous improvement and domain adaptation
+
+**Next Priority**: Long-Running Agent Architecture
+- Based on Google Cloud Next 2026 session and AggAgent research
+- Persistent memory patterns with tiered storage (short-term, episodic, semantic)
+- Self-verification loops for reliability
+- Checkpoint-resume for crash recovery
+- 24/7 agent harness with background task scheduling
+
+---
+
 ### 2026-05-13 - Scheduled Run: Research Synthesis Skill
 **Status**: ✅ COMPLETE - 23/23 tests passed
 

@@ -29,6 +29,17 @@ from .analysis import (
     generate_hypothesis
 )
 
+from .skill_acquisition import (
+    Skill,
+    SkillStatus,
+    SkillType,
+    SkillDemonstration,
+    ExecutionStep,
+    SkillCrystallizer,
+    create_crystallizer,
+    quick_crystallize
+)
+
 __all__ = [
     # Web Search
     "WebSearchSkill",
@@ -51,5 +62,15 @@ __all__ = [
     "analyze_patterns",
     "analyze_trends",
     "synthesize",
-    "generate_hypothesis"
+    "generate_hypothesis",
+    
+    # Skill Acquisition (Self-Evolving)
+    "Skill",
+    "SkillStatus",
+    "SkillType",
+    "SkillDemonstration",
+    "ExecutionStep",
+    "SkillCrystallizer",
+    "create_crystallizer",
+    "quick_crystallize"
 ]
