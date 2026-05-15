@@ -1,488 +1,462 @@
 """
-Memory System for AGI Research
+Memory Systems Implementation
 
-Implements a unified memory interface supporting multiple memory types
-and storage backends. Based on research findings from SMGI [^7] and
-LLM-in-Sandbox [^9] papers.
+Three-tier memory architecture:
+- Working Memory: Short-term, active context
+- Episodic Memory: Experiences and interactions
+- Semantic Memory: Facts and learned knowledge
+
+References:
+- Personalized AGI via Neuroscience-Inspired Learning (arXiv:2504.20109v1)
+- Tri-Memory Continual Learning system
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
-from enum import Enum
-from typing import Dict, List, Optional, Any, Callable
 import json
 import hashlib
-import os
-from pathlib import Path
-
-
-class MemoryType(Enum):
-    """Types of memory supported by the system."""
-    WORKING = "working"       # Short-term, limited capacity (~7 items)
-    EPISODIC = "episodic"     # Event sequences and experiences
-    SEMANTIC = "semantic"     # Facts, concepts, knowledge
-    PROCEDURAL = "procedural" # Skills and procedures
+from collections import deque
 
 
 @dataclass
 class MemoryEntry:
-    """A single memory entry."""
+    """Base memory entry"""
     id: str
     content: Any
-    memory_type: MemoryType
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: float
+    memory_type: str  # "working", "episodic", "semantic"
     metadata: Dict[str, Any] = field(default_factory=dict)
-    importance: float = 1.0  # 0.0 to 1.0
+    importance: float = 0.5  # 0.0 to 1.0
     access_count: int = 0
-    last_accessed: Optional[datetime] = None
+    last_accessed: float = 0.0
+
+
+class WorkingMemory:
+    """
+    Short-term memory for active context.
     
-    def __post_init__(self):
-        if not self.id:
-            self.id = self._generate_id()
+    Limited capacity, fast access.
+    Inspired by cognitive working memory (4±1 chunks).
+    """
     
-    def _generate_id(self) -> str:
-        """Generate unique ID based on content and timestamp."""
-        content_str = json.dumps(self.content, sort_keys=True, default=str)
-        hash_input = f"{content_str}{self.timestamp.isoformat()}"
-        return hashlib.md5(hash_input.encode()).hexdigest()[:16]
-    
-    def touch(self):
-        """Update access statistics."""
-        self.access_count += 1
-        self.last_accessed = datetime.now()
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization."""
-        return {
-            "id": self.id,
-            "content": self.content,
-            "memory_type": self.memory_type.value,
-            "timestamp": self.timestamp.isoformat(),
-            "metadata": self.metadata,
-            "importance": self.importance,
-            "access_count": self.access_count,
-            "last_accessed": self.last_accessed.isoformat() if self.last_accessed else None
+    def __init__(self, capacity: int = 7):
+        self.capacity = capacity
+        self.entries: deque = deque(maxlen=capacity)
+        self.context: Dict[str, Any] = {}
+        
+    def store(self, key: str, value: Any) -> None:
+        """Store in working context."""
+        self.context[key] = {
+            "value": value,
+            "timestamp": datetime.now().timestamp()
         }
     
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'MemoryEntry':
-        """Create from dictionary."""
-        return cls(
-            id=data["id"],
-            content=data["content"],
-            memory_type=MemoryType(data["memory_type"]),
-            timestamp=datetime.fromisoformat(data["timestamp"]),
-            metadata=data.get("metadata", {}),
-            importance=data.get("importance", 1.0),
-            access_count=data.get("access_count", 0),
-            last_accessed=datetime.fromisoformat(data["last_accessed"]) if data.get("last_accessed") else None
+    def retrieve(self, key: str) -> Optional[Any]:
+        """Retrieve from working context."""
+        if key in self.context:
+            entry = self.context[key]
+            entry["timestamp"] = datetime.now().timestamp()  # Update access time
+            return entry["value"]
+        return None
+    
+    def add_entry(self, entry: MemoryEntry) -> None:
+        """Add entry to working memory buffer.
+        
+        When capacity is exceeded, oldest entries (left side) are evicted.
+        """
+        entry.memory_type = "working"
+        # Append to right side; oldest entries on left will be evicted if needed
+        self.entries.append(entry)
+    
+    def get_recent(self, n: int = 5) -> List[MemoryEntry]:
+        """Get n most recent entries.
+        
+        Most recent entries are on the right side of deque.
+        """
+        # Get last n items from the right side (most recent)
+        return list(self.entries)[-n:] if len(self.entries) >= n else list(self.entries)
+    
+    def clear(self) -> None:
+        """Clear working memory (e.g., between tasks)."""
+        self.entries.clear()
+        self.context.clear()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "capacity": self.capacity,
+            "current_size": len(self.entries),
+            "context_keys": list(self.context.keys())
+        }
+
+
+class EpisodicMemory:
+    """
+    Memory of experiences and interactions.
+    
+    Stores episodes (experiences) with temporal indexing.
+    Implements importance-based retention and retrieval.
+    """
+    
+    def __init__(self, max_entries: int = 1000):
+        self.max_entries = max_entries
+        self.episodes: List[MemoryEntry] = []
+        self.index: Dict[str, List[str]] = {}  # Tag -> entry IDs
+        
+    def store_episode(
+        self,
+        content: Any,
+        tags: Optional[List[str]] = None,
+        importance: float = 0.5,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> MemoryEntry:
+        """
+        Store a new episode.
+        
+        Args:
+            content: The experience content
+            tags: Categorization tags
+            importance: 0.0 to 1.0 retention priority
+            metadata: Additional context
+        """
+        entry_id = hashlib.md5(
+            f"{content}{datetime.now().timestamp()}".encode()
+        ).hexdigest()[:12]
+        
+        entry = MemoryEntry(
+            id=entry_id,
+            content=content,
+            timestamp=datetime.now().timestamp(),
+            memory_type="episodic",
+            metadata=metadata or {},
+            importance=importance,
+            last_accessed=datetime.now().timestamp()
         )
+        
+        # Add tags
+        if tags:
+            for tag in tags:
+                if tag not in self.index:
+                    self.index[tag] = []
+                self.index[tag].append(entry_id)
+        
+        self.episodes.append(entry)
+        
+        # Prune if exceeding capacity
+        if len(self.episodes) > self.max_entries:
+            self._prune()
+        
+        return entry
+    
+    def retrieve_similar(
+        self,
+        context: Dict[str, Any],
+        limit: int = 5
+    ) -> List[MemoryEntry]:
+        """
+        Retrieve episodes similar to current context.
+        
+        Simple implementation: match tags and recency.
+        Future: vector similarity search
+        """
+        # Score episodes by relevance
+        scored = []
+        for entry in self.episodes:
+            score = self._calculate_relevance(entry, context)
+            scored.append((score, entry))
+        
+        # Sort by score and return top results
+        scored.sort(key=lambda x: x[0], reverse=True)
+        results = [entry for _, entry in scored[:limit]]
+        
+        # Update access metadata
+        for entry in results:
+            entry.access_count += 1
+            entry.last_accessed = datetime.now().timestamp()
+        
+        return results
+    
+    def retrieve_by_tag(self, tag: str, limit: int = 10) -> List[MemoryEntry]:
+        """Retrieve episodes by tag."""
+        entry_ids = self.index.get(tag, [])
+        entries = [e for e in self.episodes if e.id in entry_ids]
+        return entries[-limit:]  # Most recent
+    
+    def _calculate_relevance(
+        self,
+        entry: MemoryEntry,
+        context: Dict[str, Any]
+    ) -> float:
+        """Calculate relevance score for an episode."""
+        score = 0.0
+        
+        # Importance factor
+        score += entry.importance * 0.3
+        
+        # Recency factor (exponential decay)
+        age_hours = (datetime.now().timestamp() - entry.timestamp) / 3600
+        recency = max(0, 1 - (age_hours / 168))  # Decay over 1 week
+        score += recency * 0.3
+        
+        # Tag matching
+        context_tags = context.get("tags", [])
+        entry_tags = set()
+        for tag, ids in self.index.items():
+            if entry.id in ids:
+                entry_tags.add(tag)
+        
+        tag_overlap = len(set(context_tags) & entry_tags)
+        score += (tag_overlap / max(len(context_tags), 1)) * 0.4
+        
+        return score
+    
+    def _prune(self) -> None:
+        """Remove least important episodes when at capacity."""
+        # Sort by importance × recency
+        now = datetime.now().timestamp()
+        
+        def retention_priority(entry: MemoryEntry) -> float:
+            age = now - entry.timestamp
+            return entry.importance * max(0, 1 - age / (7 * 24 * 3600))
+        
+        self.episodes.sort(key=retention_priority)
+        # Remove bottom 10%
+        remove_count = max(1, len(self.episodes) // 10)
+        removed = self.episodes[:remove_count]
+        self.episodes = self.episodes[remove_count:]
+        
+        # Clean up index
+        removed_ids = {e.id for e in removed}
+        for tag in list(self.index.keys()):
+            self.index[tag] = [id for id in self.index[tag] if id not in removed_ids]
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "max_entries": self.max_entries,
+            "current_entries": len(self.episodes),
+            "tag_count": len(self.index),
+            "avg_importance": sum(e.importance for e in self.episodes) / max(len(self.episodes), 1)
+        }
 
 
-class MemoryAdapter(ABC):
-    """Abstract base class for memory storage backends."""
+class SemanticMemory:
+    """
+    Memory for facts, concepts, and learned knowledge.
     
-    @abstractmethod
-    def store(self, entry: MemoryEntry) -> str:
-        """Store a memory entry, return its ID."""
-        pass
-    
-    @abstractmethod
-    def retrieve(self, memory_id: str) -> Optional[MemoryEntry]:
-        """Retrieve a memory entry by ID."""
-        pass
-    
-    @abstractmethod
-    def query(self, memory_type: Optional[MemoryType] = None, 
-              limit: int = 10,
-              filter_fn: Optional[Callable[[MemoryEntry], bool]] = None) -> List[MemoryEntry]:
-        """Query memory entries with optional filtering."""
-        pass
-    
-    @abstractmethod
-    def update(self, memory_id: str, entry: MemoryEntry) -> bool:
-        """Update an existing memory entry."""
-        pass
-    
-    @abstractmethod
-    def delete(self, memory_id: str) -> bool:
-        """Delete a memory entry."""
-        pass
-    
-    @abstractmethod
-    def clear(self, memory_type: Optional[MemoryType] = None):
-        """Clear memory, optionally by type."""
-        pass
-
-
-class InMemoryAdapter(MemoryAdapter):
-    """In-memory storage adapter (fast, non-persistent)."""
+    Structured knowledge storage with categorization.
+    """
     
     def __init__(self):
-        self._storage: Dict[str, MemoryEntry] = {}
-    
-    def store(self, entry: MemoryEntry) -> str:
-        self._storage[entry.id] = entry
-        return entry.id
-    
-    def retrieve(self, memory_id: str) -> Optional[MemoryEntry]:
-        entry = self._storage.get(memory_id)
-        if entry:
-            entry.touch()
-        return entry
-    
-    def query(self, memory_type: Optional[MemoryType] = None,
-              limit: int = 10,
-              filter_fn: Optional[Callable[[MemoryEntry], bool]] = None) -> List[MemoryEntry]:
-        results = []
-        for entry in self._storage.values():
-            if memory_type and entry.memory_type != memory_type:
-                continue
-            if filter_fn and not filter_fn(entry):
-                continue
-            results.append(entry)
+        self.facts: Dict[str, Dict[str, Any]] = {}  # Key -> fact data
+        self.concepts: Dict[str, Dict[str, Any]] = {}  # Concept definitions
+        self.procedures: Dict[str, Dict[str, Any]] = {}  # How-to knowledge
         
-        # Sort by importance and recency
-        results.sort(key=lambda e: (e.importance, e.timestamp), reverse=True)
-        return results[:limit]
+    def store_fact(
+        self,
+        key: str,
+        value: Any,
+        category: str = "general",
+        confidence: float = 1.0
+    ) -> None:
+        """Store a factual piece of knowledge."""
+        self.facts[key] = {
+            "value": value,
+            "category": category,
+            "confidence": confidence,
+            "timestamp": datetime.now().timestamp(),
+            "access_count": 0
+        }
     
-    def update(self, memory_id: str, entry: MemoryEntry) -> bool:
-        if memory_id not in self._storage:
-            return False
-        self._storage[memory_id] = entry
-        return True
+    def retrieve_fact(self, key: str) -> Optional[Any]:
+        """Retrieve a fact by key."""
+        if key in self.facts:
+            self.facts[key]["access_count"] += 1
+            return self.facts[key]["value"]
+        return None
     
-    def delete(self, memory_id: str) -> bool:
-        if memory_id not in self._storage:
-            return False
-        del self._storage[memory_id]
-        return True
+    def store_concept(
+        self,
+        name: str,
+        definition: str,
+        attributes: Optional[Dict[str, Any]] = None,
+        relations: Optional[List[str]] = None
+    ) -> None:
+        """Store a concept definition."""
+        self.concepts[name] = {
+            "definition": definition,
+            "attributes": attributes or {},
+            "relations": relations or [],
+            "timestamp": datetime.now().timestamp()
+        }
     
-    def clear(self, memory_type: Optional[MemoryType] = None):
-        if memory_type is None:
-            self._storage.clear()
-        else:
-            self._storage = {
-                k: v for k, v in self._storage.items() 
-                if v.memory_type != memory_type
-            }
+    def retrieve_concept(self, name: str) -> Optional[Dict[str, Any]]:
+        """Retrieve a concept by name."""
+        return self.concepts.get(name)
     
-    def __len__(self) -> int:
-        return len(self._storage)
-
-
-class FileAdapter(MemoryAdapter):
-    """File-based persistent storage adapter."""
+    def store_procedure(
+        self,
+        name: str,
+        steps: List[str],
+        preconditions: Optional[List[str]] = None,
+        postconditions: Optional[List[str]] = None
+    ) -> None:
+        """Store a procedural skill."""
+        self.procedures[name] = {
+            "steps": steps,
+            "preconditions": preconditions or [],
+            "postconditions": postconditions or [],
+            "timestamp": datetime.now().timestamp()
+        }
     
-    def __init__(self, storage_dir: str = ".memory"):
-        self._storage_dir = Path(storage_dir)
-        self._storage_dir.mkdir(parents=True, exist_ok=True)
-        self._cache: Dict[str, MemoryEntry] = {}
-        self._load_all()
+    def retrieve_procedure(self, name: str) -> Optional[Dict[str, Any]]:
+        """Retrieve a procedure by name."""
+        return self.procedures.get(name)
     
-    def _get_file_path(self, memory_id: str) -> Path:
-        """Get file path for a memory entry."""
-        return self._storage_dir / f"{memory_id}.json"
-    
-    def _load_all(self):
-        """Load all memories from disk."""
-        for file_path in self._storage_dir.glob("*.json"):
-            try:
-                with open(file_path, 'r') as f:
-                    data = json.load(f)
-                    entry = MemoryEntry.from_dict(data)
-                    self._cache[entry.id] = entry
-            except Exception as e:
-                print(f"Warning: Failed to load {file_path}: {e}")
-    
-    def _save_entry(self, entry: MemoryEntry):
-        """Save a single entry to disk."""
-        file_path = self._get_file_path(entry.id)
-        with open(file_path, 'w') as f:
-            json.dump(entry.to_dict(), f, indent=2, default=str)
-    
-    def store(self, entry: MemoryEntry) -> str:
-        self._cache[entry.id] = entry
-        self._save_entry(entry)
-        return entry.id
-    
-    def retrieve(self, memory_id: str) -> Optional[MemoryEntry]:
-        entry = self._cache.get(memory_id)
-        if entry:
-            entry.touch()
-            self._save_entry(entry)
-        return entry
-    
-    def query(self, memory_type: Optional[MemoryType] = None,
-              limit: int = 10,
-              filter_fn: Optional[Callable[[MemoryEntry], bool]] = None) -> List[MemoryEntry]:
+    def search_facts(self, query: str) -> List[Tuple[str, Any]]:
+        """Search facts by partial key match."""
         results = []
-        for entry in self._cache.values():
-            if memory_type and entry.memory_type != memory_type:
-                continue
-            if filter_fn and not filter_fn(entry):
-                continue
-            results.append(entry)
-        
-        # Sort by importance and recency
-        results.sort(key=lambda e: (e.importance, e.timestamp), reverse=True)
-        return results[:limit]
+        query_lower = query.lower()
+        for key, data in self.facts.items():
+            if query_lower in key.lower():
+                results.append((key, data["value"]))
+        return results
     
-    def update(self, memory_id: str, entry: MemoryEntry) -> bool:
-        if memory_id not in self._cache:
-            return False
-        self._cache[memory_id] = entry
-        self._save_entry(entry)
-        return True
-    
-    def delete(self, memory_id: str) -> bool:
-        if memory_id not in self._cache:
-            return False
-        del self._cache[memory_id]
-        file_path = self._get_file_path(memory_id)
-        if file_path.exists():
-            file_path.unlink()
-        return True
-    
-    def clear(self, memory_type: Optional[MemoryType] = None):
-        if memory_type is None:
-            for memory_id in list(self._cache.keys()):
-                self.delete(memory_id)
-        else:
-            to_delete = [
-                k for k, v in self._cache.items() 
-                if v.memory_type == memory_type
-            ]
-            for memory_id in to_delete:
-                self.delete(memory_id)
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "fact_count": len(self.facts),
+            "concept_count": len(self.concepts),
+            "procedure_count": len(self.procedures)
+        }
 
 
-class Memory:
+class MemorySystem:
     """
-    Main memory system interface.
+    Unified memory system combining three tiers.
     
-    Provides unified access to multiple memory types with configurable
-    storage backends. Supports working memory capacity management and
-    consolidation to long-term memory.
+    Based on neuroscience-inspired Tri-Memory Continual Learning:
+    - Fast learning (working memory)
+    - Consolidation (episodic → semantic)
+    - Long-term retention (semantic)
     """
     
-    WORKING_MEMORY_CAPACITY = 7  # Miller's law
+    def __init__(
+        self,
+        working_capacity: int = 7,
+        episodic_capacity: int = 1000
+    ):
+        self.working = WorkingMemory(capacity=working_capacity)
+        self.episodic = EpisodicMemory(max_entries=episodic_capacity)
+        self.semantic = SemanticMemory()
+        
+    def store_working(self, key: str, value: Any) -> None:
+        """Store in working memory."""
+        self.working.store(key, value)
     
-    def __init__(self, adapter: Optional[MemoryAdapter] = None):
-        self._adapter = adapter or InMemoryAdapter()
-        self._working_memory: List[str] = []  # IDs in working memory
+    def retrieve_working(self, key: str) -> Optional[Any]:
+        """Retrieve from working memory."""
+        return self.working.retrieve(key)
     
-    def store(self, content: Any, 
-              memory_type: MemoryType = MemoryType.WORKING,
-              metadata: Optional[Dict[str, Any]] = None,
-              importance: float = 1.0) -> str:
-        """
-        Store content in memory.
-        
-        Args:
-            content: The content to store (any JSON-serializable data)
-            memory_type: Type of memory to store in
-            metadata: Optional metadata dictionary
-            importance: Importance score (0.0 to 1.0)
-        
-        Returns:
-            Memory entry ID
-        """
-        entry = MemoryEntry(
-            id="",
-            content=content,
-            memory_type=memory_type,
-            metadata=metadata or {},
-            importance=importance
-        )
-        
-        memory_id = self._adapter.store(entry)
-        
-        # Manage working memory capacity
-        if memory_type == MemoryType.WORKING:
-            self._working_memory.append(memory_id)
-            self._enforce_working_memory_limit()
-        
-        return memory_id
+    def store_episode(
+        self,
+        content: Any,
+        tags: Optional[List[str]] = None,
+        importance: float = 0.5,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> MemoryEntry:
+        """Store an episodic memory."""
+        return self.episodic.store_episode(content, tags, importance, metadata)
     
-    def retrieve(self, memory_id: str) -> Optional[Any]:
-        """
-        Retrieve content by memory ID.
-        
-        Args:
-            memory_id: The memory entry ID
-        
-        Returns:
-            The stored content, or None if not found
-        """
-        entry = self._adapter.retrieve(memory_id)
-        return entry.content if entry else None
+    def retrieve_episodes(
+        self,
+        context: Dict[str, Any],
+        limit: int = 5
+    ) -> List[MemoryEntry]:
+        """Retrieve relevant episodic memories."""
+        return self.episodic.retrieve_similar(context, limit)
     
-    def recall(self, query: Optional[str] = None,
-               memory_type: Optional[MemoryType] = None,
-               limit: int = 10,
-               min_importance: float = 0.0) -> List[Dict[str, Any]]:
-        """
-        Recall memories matching criteria.
-        
-        Args:
-            query: Optional search query (simple substring match for now)
-            memory_type: Filter by memory type
-            limit: Maximum number of results
-            min_importance: Minimum importance threshold
-        
-        Returns:
-            List of memory entries as dictionaries
-        """
-        def filter_fn(entry: MemoryEntry) -> bool:
-            if entry.importance < min_importance:
-                return False
-            if query:
-                content_str = json.dumps(entry.content, default=str).lower()
-                return query.lower() in content_str
-            return True
-        
-        entries = self._adapter.query(memory_type, limit, filter_fn)
-        return [e.to_dict() for e in entries]
+    def store_fact(
+        self,
+        key: str,
+        value: Any,
+        category: str = "general",
+        confidence: float = 1.0
+    ) -> None:
+        """Store a fact in semantic memory."""
+        self.semantic.store_fact(key, value, category, confidence)
     
-    def update(self, memory_id: str, new_content: Any,
-               new_importance: Optional[float] = None) -> bool:
-        """
-        Update an existing memory entry.
-        
-        Args:
-            memory_id: The memory entry ID
-            new_content: New content
-            new_importance: Optional new importance score
-        
-        Returns:
-            True if updated, False if not found
-        """
-        entry = self._adapter.retrieve(memory_id)
-        if not entry:
-            return False
-        
-        entry.content = new_content
-        if new_importance is not None:
-            entry.importance = new_importance
-        
-        return self._adapter.update(memory_id, entry)
+    def retrieve_fact(self, key: str) -> Optional[Any]:
+        """Retrieve a fact."""
+        return self.semantic.retrieve_fact(key)
     
-    def forget(self, memory_id: str) -> bool:
+    def consolidate(self) -> int:
         """
-        Delete a memory entry.
+        Consolidate episodic memories into semantic knowledge.
         
-        Args:
-            memory_id: The memory entry ID
-        
-        Returns:
-            True if deleted, False if not found
+        High-importance, frequently accessed episodes become facts.
+        Returns number of consolidated entries.
         """
-        if memory_id in self._working_memory:
-            self._working_memory.remove(memory_id)
-        return self._adapter.delete(memory_id)
-    
-    def consolidate(self, memory_id: Optional[str] = None) -> List[str]:
-        """
-        Consolidate working memory to long-term episodic memory.
+        consolidated = 0
+        threshold_importance = 0.8
+        threshold_access = 3
         
-        Based on research: Working memory has limited capacity and
-        must be consolidated to long-term storage.
-        
-        Args:
-            memory_id: Specific memory to consolidate, or None for all
-        
-        Returns:
-            List of consolidated memory IDs
-        """
-        consolidated = []
-        
-        if memory_id:
-            # Consolidate specific memory
-            entry = self._adapter.retrieve(memory_id)
-            if entry and entry.memory_type == MemoryType.WORKING:
-                entry.memory_type = MemoryType.EPISODIC
-                self._adapter.update(memory_id, entry)
-                if memory_id in self._working_memory:
-                    self._working_memory.remove(memory_id)
-                consolidated.append(memory_id)
-        else:
-            # Consolidate all working memory
-            for mid in list(self._working_memory):
-                entry = self._adapter.retrieve(mid)
-                if entry:
-                    entry.memory_type = MemoryType.EPISODIC
-                    self._adapter.update(mid, entry)
-                    consolidated.append(mid)
-            self._working_memory.clear()
+        for episode in self.episodic.episodes:
+            if (episode.importance >= threshold_importance and 
+                episode.access_count >= threshold_access):
+                
+                # Create fact key from content summary
+                content_str = str(episode.content)
+                key = f"learned_{episode.id}"
+                
+                self.semantic.store_fact(
+                    key=key,
+                    value=episode.content,
+                    category="consolidated",
+                    confidence=min(1.0, episode.importance)
+                )
+                consolidated += 1
         
         return consolidated
     
-    def get_working_memory(self) -> List[Dict[str, Any]]:
-        """Get all items currently in working memory."""
-        results = []
-        for memory_id in self._working_memory:
-            entry = self._adapter.retrieve(memory_id)
-            if entry:
-                results.append(entry.to_dict())
-        return results
-    
-    def clear(self, memory_type: Optional[MemoryType] = None):
-        """Clear memory, optionally by type."""
-        if memory_type == MemoryType.WORKING or memory_type is None:
-            self._working_memory.clear()
-        self._adapter.clear(memory_type)
-    
-    def _enforce_working_memory_limit(self):
-        """Enforce working memory capacity limit."""
-        while len(self._working_memory) > self.WORKING_MEMORY_CAPACITY:
-            # Remove oldest (FIFO) or least important
-            oldest_id = self._working_memory.pop(0)
-            # Auto-consolidate to episodic
-            entry = self._adapter.retrieve(oldest_id)
-            if entry:
-                entry.memory_type = MemoryType.EPISODIC
-                self._adapter.update(oldest_id, entry)
-    
-    def stats(self) -> Dict[str, Any]:
-        """Get memory system statistics."""
-        all_entries = self._adapter.query(limit=10000)
-        
-        type_counts = {}
-        for entry in all_entries:
-            type_name = entry.memory_type.value
-            type_counts[type_name] = type_counts.get(type_name, 0) + 1
-        
-        return {
-            "total_entries": len(all_entries),
-            "working_memory_items": len(self._working_memory),
-            "working_memory_capacity": self.WORKING_MEMORY_CAPACITY,
-            "by_type": type_counts,
-            "storage_adapter": self._adapter.__class__.__name__
+    def get_context_for_task(self, task: str, tags: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Gather relevant context for a task from all memory tiers."""
+        context = {
+            "working": {},
+            "episodic": [],
+            "semantic": {},
+            "task": task
         }
-
-
-def create_memory(adapter_type: str = "memory", **kwargs) -> Memory:
-    """
-    Factory function to create memory systems.
+        
+        # Get working memory context
+        context["working"] = dict(self.working.context)
+        
+        # Get relevant episodes
+        episode_context = {"tags": tags or [], "task": task}
+        context["episodic"] = [
+            {"content": e.content, "tags": self._get_tags_for_entry(e)}
+            for e in self.episodic.retrieve_similar(episode_context, limit=5)
+        ]
+        
+        # Search for relevant facts
+        task_keywords = task.lower().split()
+        relevant_facts = {}
+        for keyword in task_keywords:
+            for key, value in self.semantic.search_facts(keyword):
+                relevant_facts[key] = value
+        context["semantic"] = relevant_facts
+        
+        return context
     
-    Args:
-        adapter_type: "memory" or "file"
-        **kwargs: Additional arguments for the adapter
+    def _get_tags_for_entry(self, entry: MemoryEntry) -> List[str]:
+        """Get tags for an entry."""
+        tags = []
+        for tag, ids in self.episodic.index.items():
+            if entry.id in ids:
+                tags.append(tag)
+        return tags
     
-    Returns:
-        Configured Memory instance
-    """
-    if adapter_type == "memory":
-        adapter = InMemoryAdapter()
-    elif adapter_type == "file":
-        adapter = FileAdapter(**kwargs)
-    else:
-        raise ValueError(f"Unknown adapter type: {adapter_type}")
-    
-    return Memory(adapter)
-
-
-# Module-level convenience function
-memory = create_memory
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "working": self.working.to_dict(),
+            "episodic": self.episodic.to_dict(),
+            "semantic": self.semantic.to_dict()
+        }

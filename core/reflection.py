@@ -1,498 +1,459 @@
 """
-Reflection and Self-Improvement System
+Reflection & Self-Improvement System
 
-Based on research findings:
-- Self-evaluation of performance
-- Error analysis and pattern recognition
-- Improvement proposals (flagged for review)
-- Safety review before any self-modification
+Implements metacognitive capabilities:
+- Execution review and evaluation
+- Pattern extraction from experience
+- Strategy improvement
+- Self-correction
 
-Inspired by Ouroboros multi-model review and constitutional governance.
+References:
+- AI agent handbook: Reflection patterns
+- ARC-AGI: Test-time training (TTT) for adaptation
+- Conductor production: Reflection/evaluation loops
 """
 
-import json
-import uuid
 from dataclasses import dataclass, field
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Callable
-from enum import Enum
-
-
-class ReflectionType(Enum):
-    PERFORMANCE = "performance"
-    ERROR = "error"
-    IMPROVEMENT = "improvement"
-    SAFETY = "safety"
-
-
-class ReflectionStatus(Enum):
-    PENDING = "pending"
-    REVIEWED = "reviewed"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    IMPLEMENTED = "implemented"
+import json
 
 
 @dataclass
 class Reflection:
-    """A reflection on some aspect of the system"""
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    type: str = field(default_factory=lambda: ReflectionType.PERFORMANCE.value)
-    subject: str = ""  # What was being reflected on
-    observation: str = ""  # What was observed
-    analysis: str = ""  # Why it happened
-    proposal: Optional[str] = None  # What to do about it (for improvements)
-    status: str = field(default_factory=lambda: ReflectionStatus.PENDING.value)
-    confidence: float = 0.5  # How confident in this reflection
-    severity: str = "info"  # info, warning, critical
-    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    reviewed_at: Optional[str] = None
-    reviewer: Optional[str] = None  # Who reviewed (self, human, other agent)
-    
-    def to_dict(self) -> Dict:
-        return {
-            "id": self.id,
-            "type": self.type,
-            "subject": self.subject,
-            "observation": self.observation,
-            "analysis": self.analysis,
-            "proposal": self.proposal,
-            "status": self.status,
-            "confidence": self.confidence,
-            "severity": self.severity,
-            "created_at": self.created_at,
-            "reviewed_at": self.reviewed_at,
-            "reviewer": self.reviewer
-        }
+    """A reflection on execution experience"""
+    timestamp: float
+    focus: str  # What was reflected on
+    observations: List[str]  # Key observations
+    insights: List[str]  # Derived insights
+    recommendations: List[str]  # Actionable recommendations
+    confidence: float  # Confidence in reflection (0-1)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
-class PerformanceMetrics:
-    """Metrics for evaluating performance"""
-    task_id: str = ""
-    task_type: str = ""
-    success: bool = False
-    duration_seconds: float = 0.0
-    steps_completed: int = 0
-    steps_total: int = 0
-    adaptations_needed: int = 0
-    errors_encountered: int = 0
-    skills_used: List[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    
-    def to_dict(self) -> Dict:
-        return {
-            "task_id": self.task_id,
-            "task_type": self.task_type,
-            "success": self.success,
-            "duration_seconds": self.duration_seconds,
-            "steps_completed": self.steps_completed,
-            "steps_total": self.steps_total,
-            "adaptations_needed": self.adaptations_needed,
-            "errors_encountered": self.errors_encountered,
-            "skills_used": self.skills_used,
-            "timestamp": self.timestamp
-        }
+class ExecutionTrace:
+    """Complete record of execution for analysis"""
+    goal: str
+    steps: List[Dict[str, Any]]
+    outcomes: List[Dict[str, Any]]
+    success: bool
+    execution_time: float
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-class ReflectionSystem:
+@dataclass
+class Pattern:
+    """Extracted pattern from experience"""
+    id: str
+    type: str  # "success", "failure", "strategy", "tool"
+    description: str
+    conditions: List[str]  # When pattern applies
+    consequences: List[str]  # What happens
+    frequency: int = 1
+    confidence: float = 0.5
+    examples: List[str] = field(default_factory=list)
+
+
+class Reflector:
     """
-    Self-reflection and improvement system.
+    Self-reflection system for agents.
     
-    Principles (from Ouroboros and safety research):
-    1. All self-modifications require review
-    2. Multi-perspective reflection (simulated)
-    3. Safety-first: flag risky proposals
-    4. Document everything for audit
+    Implements metacognitive capabilities:
+    - Review execution and identify issues
+    - Extract patterns from success/failure
+    - Generate insights for improvement
+    - Recommend strategy adjustments
+    
+    Based on:
+    - ReAct: Observation and reflection as part of loop
+    - Test-Time Training (TTT): Adaptation during execution
+    - ARC-AGI: Reflection for better generalization
     """
     
     def __init__(self):
         self.reflections: List[Reflection] = []
-        self.performance_history: List[PerformanceMetrics] = []
-        self.improvement_proposals: List[Reflection] = []
-        self.error_patterns: Dict[str, int] = {}  # Error type -> count
-        
-        # Safety keywords for flagging risky proposals
-        self.safety_keywords = [
-            "delete", "remove", "overwrite", "bypass", 
-            "disable", "override", "auto-execute", "self-modify",
-            "core", "memory", "identity", "governance"
-        ]
+        self.patterns: List[Pattern] = []
+        self.performance_history: List[Dict[str, Any]] = []
     
-    def record_performance(self, metrics: PerformanceMetrics) -> None:
-        """Record performance metrics for a task"""
-        self.performance_history.append(metrics)
-        
-        # Auto-generate performance reflection
-        reflection = self._generate_performance_reflection(metrics)
-        if reflection:
-            self.reflections.append(reflection)
-    
-    def _generate_performance_reflection(self, 
-                                        metrics: PerformanceMetrics) -> Optional[Reflection]:
-        """Generate a reflection based on performance metrics"""
-        
-        if metrics.success and metrics.adaptations_needed == 0:
-            return None  # Perfect execution, no reflection needed
-        
-        observation = f"Task {'succeeded' if metrics.success else 'failed'}"
-        analysis = []
-        
-        if metrics.adaptations_needed > 0:
-            analysis.append(f"Required {metrics.adaptations_needed} plan adaptations")
-        
-        if metrics.errors_encountered > 0:
-            analysis.append(f"Encountered {metrics.errors_encountered} errors")
-        
-        if metrics.duration_seconds > 60:  # Slow
-            analysis.append(f"Took {metrics.duration_seconds:.1f}s (consider optimization)")
-        
-        # Check for patterns
-        success_rate = self._calculate_success_rate(metrics.task_type)
-        if success_rate < 0.7:
-            analysis.append(f"Low success rate ({success_rate:.1%}) for this task type")
-        
-        return Reflection(
-            type=ReflectionType.PERFORMANCE.value,
-            subject=metrics.task_id,
-            observation=observation,
-            analysis="; ".join(analysis),
-            confidence=0.7,
-            severity="warning" if not metrics.success else "info"
-        )
-    
-    def analyze_error(self, error: Exception, context: Dict) -> Reflection:
+    def evaluate(
+        self,
+        goal: str,
+        thoughts: List[Any],
+        observations: List[Any],
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
-        Analyze an error and create a reflection.
+        Evaluate execution and generate reflection.
         
-        Tracks patterns for continuous improvement.
+        Returns assessment with recommendations.
         """
-        error_type = type(error).__name__
-        error_msg = str(error)
+        # Build execution trace
+        trace = self._build_trace(goal, thoughts, observations, context)
         
-        # Track pattern
-        self.error_patterns[error_type] = self.error_patterns.get(error_type, 0) + 1
+        # Analyze execution
+        analysis = self._analyze_execution(trace)
         
-        # Analyze if recurring
-        count = self.error_patterns[error_type]
-        is_recurring = count > 3
+        # Determine if complete
+        complete = self._is_complete(trace, analysis)
         
+        # Generate insights
+        insights = self._generate_insights(trace, analysis)
+        
+        # Extract patterns
+        new_patterns = self._extract_patterns(trace, analysis)
+        for p in new_patterns:
+            self._add_or_update_pattern(p)
+        
+        # Create reflection record
         reflection = Reflection(
-            type=ReflectionType.ERROR.value,
-            subject=error_type,
-            observation=f"Error: {error_msg[:100]}",
-            analysis=f"Occurred {count} times. {'Pattern detected!' if is_recurring else 'Isolated incident.'}",
-            confidence=min(0.5 + (count * 0.1), 0.9),
-            severity="critical" if is_recurring else "warning"
+            timestamp=datetime.now().timestamp(),
+            focus=goal,
+            observations=analysis.get("observations", []),
+            insights=insights,
+            recommendations=analysis.get("recommendations", []),
+            confidence=analysis.get("confidence", 0.5)
         )
-        
         self.reflections.append(reflection)
         
-        # If recurring, propose improvement
-        if is_recurring:
-            proposal = self._propose_error_fix(error_type, context)
-            if proposal:
-                self.improvement_proposals.append(proposal)
-        
-        return reflection
-    
-    def _propose_error_fix(self, error_type: str, context: Dict) -> Optional[Reflection]:
-        """Propose a fix for a recurring error"""
-        
-        proposals = {
-            "KeyError": "Add input validation before accessing dict keys",
-            "ValueError": "Add type checking and conversion for inputs",
-            "TimeoutError": "Increase timeout or add retry logic",
-            "ConnectionError": "Add fallback mechanisms for network calls",
-            "RuntimeError": "Review execution flow for race conditions"
-        }
-        
-        if error_type in proposals:
-            return Reflection(
-                type=ReflectionType.IMPROVEMENT.value,
-                subject=f"Fix for {error_type}",
-                observation=f"Recurring {error_type} errors detected",
-                analysis=f"Pattern suggests {error_type} is systemic",
-                proposal=proposals[error_type],
-                confidence=0.6,
-                severity="warning"
-            )
-        
-        return None
-    
-    def propose_improvement(self, subject: str, observation: str,
-                           analysis: str, proposal: str,
-                           confidence: float = 0.5) -> Reflection:
-        """
-        Propose a system improvement.
-        
-        CRITICAL: All proposals are flagged for review.
-        Self-modification requires human or multi-agent approval.
-        """
-        
-        # Check for safety concerns
-        is_risky = any(kw in proposal.lower() for kw in self.safety_keywords)
-        
-        reflection = Reflection(
-            type=ReflectionType.IMPROVEMENT.value,
-            subject=subject,
-            observation=observation,
-            analysis=analysis,
-            proposal=proposal,
-            confidence=confidence,
-            severity="critical" if is_risky else "warning"
-        )
-        
-        # Auto-flag for review
-        if is_risky:
-            reflection.status = ReflectionStatus.REJECTED.value
-            reflection.analysis += " [AUTO-REJECTED: Modifies critical system component]"
-        
-        self.improvement_proposals.append(reflection)
-        self.reflections.append(reflection)
-        
-        return reflection
-    
-    def review_proposal(self, proposal_id: str, 
-                       reviewer: str,
-                       approved: bool,
-                       feedback: Optional[str] = None) -> Optional[Reflection]:
-        """
-        Review an improvement proposal.
-        
-        Multi-model review inspired by Ouroboros:
-        - Can be reviewed by human or simulated multi-agent consensus
-        """
-        for reflection in self.improvement_proposals:
-            if reflection.id == proposal_id:
-                reflection.reviewed_at = datetime.now().isoformat()
-                reflection.reviewer = reviewer
-                
-                if approved:
-                    reflection.status = ReflectionStatus.APPROVED.value
-                else:
-                    reflection.status = ReflectionStatus.REJECTED.value
-                    if feedback:
-                        reflection.analysis += f" [Feedback: {feedback}]"
-                
-                return reflection
-        
-        return None
-    
-    def simulate_multi_review(self, proposal: Reflection) -> Dict:
-        """
-        Simulate multi-model review (like Ouroboros).
-        
-        Returns consensus metrics.
-        """
-        # Simulate 3 perspectives (in production, would use multiple LLMs)
-        perspectives = ["conservative", "pragmatic", "innovative"]
-        
-        scores = []
-        for perspective in perspectives:
-            # Simple heuristic scoring
-            score = proposal.confidence
-            
-            if perspective == "conservative":
-                # Conservative: penalize risky proposals
-                if any(kw in proposal.proposal.lower() for kw in self.safety_keywords):
-                    score *= 0.3
-                else:
-                    score *= 0.8
-            
-            elif perspective == "pragmatic":
-                # Pragmatic: value practical improvements
-                if "optimize" in proposal.proposal or "improve" in proposal.proposal:
-                    score *= 1.1
-                else:
-                    score *= 0.9
-            
-            elif perspective == "innovative":
-                # Innovative: reward bold ideas
-                if "new" in proposal.proposal or "redesign" in proposal.proposal:
-                    score *= 1.2
-                else:
-                    score *= 0.9
-            
-            scores.append(min(score, 1.0))
-        
-        avg_score = sum(scores) / len(scores)
+        # Store performance data
+        self.performance_history.append({
+            "goal": goal,
+            "success": trace.success,
+            "execution_time": trace.execution_time,
+            "step_count": len(trace.steps),
+            "timestamp": datetime.now().timestamp()
+        })
         
         return {
-            "perspectives": dict(zip(perspectives, scores)),
-            "average": avg_score,
-            "consensus": avg_score > 0.6,
-            "unanimous": all(s > 0.5 for s in scores)
+            "complete": complete,
+            "success": trace.success,
+            "insights": insights,
+            "recommendations": reflection.recommendations,
+            "patterns_found": len(new_patterns),
+            "improvement_needed": not complete or not trace.success
         }
     
-    def generate_self_improvement_report(self) -> Dict:
+    def reflect_on_strategy(
+        self,
+        strategy_name: str,
+        usage_history: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """
-        Generate a report on potential self-improvements.
+        Reflect on effectiveness of a planning strategy.
         
-        Based on performance history and error patterns.
+        Returns improvement recommendations.
         """
+        if not usage_history:
+            return {"improvements": [], "assessment": "insufficient_data"}
+        
+        # Calculate metrics
+        total = len(usage_history)
+        successes = sum(1 for h in usage_history if h.get("success", False))
+        avg_time = sum(h.get("execution_time", 0) for h in usage_history) / total
+        
+        success_rate = successes / total if total > 0 else 0
+        
+        # Identify issues
+        issues = []
+        if success_rate < 0.7:
+            issues.append("low_success_rate")
+        if avg_time > 60:  # 60 seconds threshold
+            issues.append("slow_execution")
+        
+        # Generate recommendations
+        recommendations = []
+        if "low_success_rate" in issues:
+            recommendations.append("Consider decomposing tasks further")
+            recommendations.append("Review failure patterns for common causes")
+        if "slow_execution" in issues:
+            recommendations.append("Look for parallelization opportunities")
+            recommendations.append("Simplify task decomposition")
+        
+        return {
+            "strategy": strategy_name,
+            "success_rate": success_rate,
+            "avg_execution_time": avg_time,
+            "total_uses": total,
+            "issues": issues,
+            "recommendations": recommendations,
+            "assessment": "needs_improvement" if issues else "effective"
+        }
+    
+    def extract_learning(
+        self,
+        experiences: List[ExecutionTrace],
+        min_confidence: float = 0.7
+    ) -> List[Dict[str, Any]]:
+        """
+        Extract learnings from multiple experiences.
+        
+        Finds patterns that hold across executions.
+        """
+        learnings = []
+        
+        # Analyze common success factors
+        successes = [e for e in experiences if e.success]
+        failures = [e for e in experiences if not e.success]
+        
+        if len(successes) >= 3:
+            common_success_patterns = self._find_commonalities(successes)
+            if common_success_patterns:
+                learnings.append({
+                    "type": "success_factor",
+                    "patterns": common_success_patterns,
+                    "confidence": len(successes) / len(experiences)
+                })
+        
+        if len(failures) >= 3:
+            common_failure_patterns = self._find_commonalities(failures)
+            if common_failure_patterns:
+                learnings.append({
+                    "type": "failure_factor",
+                    "patterns": common_failure_patterns,
+                    "confidence": len(failures) / len(experiences),
+                    "avoid": True
+                })
+        
+        return learnings
+    
+    def _build_trace(
+        self,
+        goal: str,
+        thoughts: List[Any],
+        observations: List[Any],
+        context: Dict[str, Any]
+    ) -> ExecutionTrace:
+        """Build execution trace from execution data."""
+        steps = []
+        for i, (thought, obs) in enumerate(zip(thoughts, observations)):
+            step = {
+                "step": i,
+                "thought": str(thought.content) if hasattr(thought, 'content') else str(thought),
+                "thought_type": thought.type if hasattr(thought, 'type') else "unknown",
+                "action": obs.action if hasattr(obs, 'action') else str(obs),
+                "result": obs.result if hasattr(obs, 'result') else None,
+                "success": obs.success if hasattr(obs, 'success') else False
+            }
+            steps.append(step)
+        
+        # Determine overall success
+        success = any(
+            obs.success if hasattr(obs, 'success') else False
+            for obs in observations
+        ) if observations else False
+        
+        # Estimate execution time from timestamps if available
+        execution_time = 0.0
+        if observations and hasattr(observations[0], 'timestamp'):
+            start = observations[0].timestamp
+            end = observations[-1].timestamp
+            execution_time = end - start
+        
+        return ExecutionTrace(
+            goal=goal,
+            steps=steps,
+            outcomes=[{"success": obs.success, "result": obs.result} for obs in observations],
+            success=success,
+            execution_time=execution_time,
+            metadata={"context_keys": list(context.keys())}
+        )
+    
+    def _analyze_execution(self, trace: ExecutionTrace) -> Dict[str, Any]:
+        """Analyze execution trace for issues and patterns."""
+        observations = []
+        recommendations = []
+        
+        # Check for failures
+        failures = [s for s in trace.steps if not s.get("success", False)]
+        if failures:
+            observations.append(f"{len(failures)} steps failed")
+            
+            # Categorize failures
+            error_types = set()
+            for f in failures:
+                result = str(f.get("result", ""))
+                if "error" in result.lower():
+                    error_types.add("execution_error")
+                elif "not found" in result.lower():
+                    error_types.add("resource_not_found")
+                else:
+                    error_types.add("unknown")
+            
+            if "execution_error" in error_types:
+                recommendations.append("Review tool/skill error handling")
+            if "resource_not_found" in error_types:
+                recommendations.append("Verify resource availability before execution")
+        
+        # Check for repetition (stuck in loop)
+        thought_contents = [s.get("thought", "") for s in trace.steps]
+        if len(thought_contents) > 5:
+            unique_thoughts = len(set(thought_contents))
+            if unique_thoughts / len(thought_contents) < 0.5:
+                observations.append("Possible repetition or stuck loop detected")
+                recommendations.append("Add progress tracking to avoid loops")
+        
+        # Check completion indicators
+        if trace.success:
+            observations.append("Goal achieved successfully")
+            recommendations.append("Consider recording successful approach as pattern")
+        else:
+            observations.append("Goal not fully achieved")
+            recommendations.append("Analyze partial progress for next attempt")
+        
+        # Calculate confidence based on data quality
+        confidence = min(1.0, len(trace.steps) / 10)  # More steps = more confidence
+        
+        return {
+            "observations": observations,
+            "recommendations": recommendations,
+            "confidence": confidence,
+            "failure_count": len(failures),
+            "total_steps": len(trace.steps)
+        }
+    
+    def _is_complete(self, trace: ExecutionTrace, analysis: Dict[str, Any]) -> bool:
+        """Determine if task is complete based on trace and analysis."""
+        # Success = complete
+        if trace.success:
+            return True
+        
+        # Too many failures = likely stuck
+        if analysis.get("failure_count", 0) > 3:
+            return True
+        
+        # Check for completion indicators in results
+        for step in trace.steps:
+            result = str(step.get("result", "")).lower()
+            if "complete" in result or "done" in result or "finished" in result:
+                return True
+        
+        return False
+    
+    def _generate_insights(
+        self,
+        trace: ExecutionTrace,
+        analysis: Dict[str, Any]
+    ) -> List[str]:
+        """Generate insights from analysis."""
+        insights = []
+        
+        # Success insights
+        if trace.success:
+            insights.append("Approach was effective for this goal")
+            if trace.execution_time < 10:
+                insights.append("Execution was efficient (under 10s)")
+        
+        # Failure insights
+        failures = analysis.get("failure_count", 0)
+        if failures > 0:
+            insights.append(f"Encountered {failures} execution issues")
+            if failures / max(len(trace.steps), 1) > 0.5:
+                insights.append("High failure rate suggests approach needs revision")
+        
+        # Step-based insights
+        if len(trace.steps) > 8:
+            insights.append("Complex task with many steps - consider better decomposition")
+        
+        return insights
+    
+    def _extract_patterns(
+        self,
+        trace: ExecutionTrace,
+        analysis: Dict[str, Any]
+    ) -> List[Pattern]:
+        """Extract patterns from execution."""
+        patterns = []
+        
+        # Success pattern
+        if trace.success:
+            pattern = Pattern(
+                id=f"success_{datetime.now().timestamp()}",
+                type="success",
+                description=f"Successful approach for: {trace.goal[:50]}",
+                conditions=[f"goal contains: {trace.goal[:30]}"],
+                consequences=["successful_completion"],
+                confidence=0.7
+            )
+            patterns.append(pattern)
+        
+        # Failure pattern
+        failures = analysis.get("failure_count", 0)
+        if failures > 0:
+            pattern = Pattern(
+                id=f"failure_{datetime.now().timestamp()}",
+                type="failure",
+                description=f"Encountered {failures} failures",
+                conditions=["multiple_step_failures"],
+                consequences=["incomplete_execution"],
+                confidence=0.6
+            )
+            patterns.append(pattern)
+        
+        return patterns
+    
+    def _add_or_update_pattern(self, new_pattern: Pattern) -> None:
+        """Add new pattern or update existing similar one."""
+        # Check for similar existing pattern
+        for existing in self.patterns:
+            if existing.type == new_pattern.type:
+                if existing.description == new_pattern.description:
+                    # Update existing
+                    existing.frequency += 1
+                    existing.confidence = min(1.0, existing.confidence + 0.1)
+                    existing.examples.append(new_pattern.id)
+                    return
+        
+        # Add new
+        self.patterns.append(new_pattern)
+    
+    def _find_commonalities(self, traces: List[ExecutionTrace]) -> List[str]:
+        """Find common elements across traces."""
+        if not traces:
+            return []
+        
+        # Simple implementation: find common step patterns
+        common = []
+        
+        # Check for common first steps
+        first_steps = [t.steps[0].get("thought", "") if t.steps else "" for t in traces]
+        if len(set(first_steps)) == 1:
+            common.append(f"always_starts_with: {first_steps[0][:50]}")
+        
+        # Check for common success indicators
+        success_indicators = set()
+        for trace in traces:
+            for step in trace.steps:
+                if step.get("success", False):
+                    result = str(step.get("result", ""))
+                    success_indicators.add(result[:50])
+        
+        if success_indicators:
+            common.append(f"success_looks_like: {list(success_indicators)[0]}")
+        
+        return common
+    
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """Get summary of performance over time."""
         if not self.performance_history:
             return {"status": "no_data"}
         
-        # Calculate metrics
-        total_tasks = len(self.performance_history)
-        successful_tasks = sum(1 for m in self.performance_history if m.success)
-        success_rate = successful_tasks / total_tasks if total_tasks > 0 else 0
-        
-        avg_duration = sum(m.duration_seconds for m in self.performance_history) / total_tasks
-        total_adaptations = sum(m.adaptations_needed for m in self.performance_history)
-        
-        # Identify weakest skill
-        skill_success = {}
-        for metric in self.performance_history:
-            for skill in metric.skills_used:
-                if skill not in skill_success:
-                    skill_success[skill] = {"success": 0, "total": 0}
-                skill_success[skill]["total"] += 1
-                if metric.success:
-                    skill_success[skill]["success"] += 1
-        
-        weakest_skill = None
-        lowest_rate = 1.0
-        for skill, stats in skill_success.items():
-            rate = stats["success"] / stats["total"]
-            if rate < lowest_rate:
-                lowest_rate = rate
-                weakest_skill = skill
-        
-        # Generate proposals
-        proposals = []
-        
-        if success_rate < 0.8:
-            proposals.append(Reflection(
-                type=ReflectionType.IMPROVEMENT.value,
-                subject="Overall Success Rate",
-                observation=f"Success rate is {success_rate:.1%}",
-                analysis="Below target of 80%",
-                proposal="Review and strengthen error handling across all skills",
-                confidence=0.8
-            ))
-        
-        if weakest_skill and lowest_rate < 0.7:
-            proposals.append(Reflection(
-                type=ReflectionType.IMPROVEMENT.value,
-                subject=f"Skill: {weakest_skill}",
-                observation=f"Success rate for {weakest_skill} is {lowest_rate:.1%}",
-                analysis="Skill performance below threshold",
-                proposal=f"Add more robust error handling and input validation to {weakest_skill}",
-                confidence=0.7
-            ))
-        
-        # Add error pattern proposals
-        for error_type, count in sorted(self.error_patterns.items(), key=lambda x: -x[1])[:3]:
-            proposals.append(Reflection(
-                type=ReflectionType.IMPROVEMENT.value,
-                subject=f"Error Pattern: {error_type}",
-                observation=f"{error_type} occurred {count} times",
-                analysis="Recurring error pattern detected",
-                proposal=f"Add specific handling for {error_type} in affected components",
-                confidence=min(0.5 + (count * 0.05), 0.9)
-            ))
+        total = len(self.performance_history)
+        successes = sum(1 for p in self.performance_history if p.get("success", False))
+        avg_time = sum(p.get("execution_time", 0) for p in self.performance_history) / total
         
         return {
-            "status": "generated",
-            "metrics": {
-                "total_tasks": total_tasks,
-                "success_rate": success_rate,
-                "avg_duration": avg_duration,
-                "total_adaptations": total_adaptations,
-                "error_patterns": dict(self.error_patterns)
-            },
-            "weakest_skill": weakest_skill,
-            "proposals": [p.to_dict() for p in proposals]
+            "total_executions": total,
+            "success_rate": successes / total,
+            "avg_execution_time": avg_time,
+            "pattern_count": len(self.patterns),
+            "reflection_count": len(self.reflections)
         }
     
-    def _calculate_success_rate(self, task_type: str) -> float:
-        """Calculate success rate for a task type"""
-        relevant = [m for m in self.performance_history if m.task_type == task_type]
-        if not relevant:
-            return 1.0  # Assume success if no data
-        
-        successful = sum(1 for m in relevant if m.success)
-        return successful / len(relevant)
-    
-    def get_pending_proposals(self) -> List[Reflection]:
-        """Get all pending improvement proposals"""
-        return [r for r in self.improvement_proposals 
-                if r.status == ReflectionStatus.PENDING.value]
-    
-    def get_critical_reflections(self) -> List[Reflection]:
-        """Get critical reflections requiring attention"""
-        return [r for r in self.reflections if r.severity == "critical"]
-    
-    def save(self, path: str) -> None:
-        """Save reflection system state"""
-        state = {
-            "reflections": [r.to_dict() for r in self.reflections],
-            "performance_history": [m.to_dict() for m in self.performance_history],
-            "improvement_proposals": [p.to_dict() for p in self.improvement_proposals],
-            "error_patterns": self.error_patterns
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "reflection_count": len(self.reflections),
+            "pattern_count": len(self.patterns),
+            "performance_entries": len(self.performance_history),
+            "summary": self.get_performance_summary()
         }
-        
-        with open(path, 'w') as f:
-            json.dump(state, f, indent=2)
-    
-    def load(self, path: str) -> None:
-        """Load reflection system state"""
-        with open(path, 'r') as f:
-            state = json.load(f)
-        
-        self.reflections = [Reflection(**r) for r in state.get("reflections", [])]
-        self.performance_history = [PerformanceMetrics(**m) for m in state.get("performance_history", [])]
-        self.improvement_proposals = [Reflection(**r) for r in state.get("improvement_proposals", [])]
-        self.error_patterns = state.get("error_patterns", {})
-
-
-if __name__ == "__main__":
-    # Basic test
-    reflection = ReflectionSystem()
-    
-    # Record some performance
-    reflection.record_performance(PerformanceMetrics(
-        task_id="test-1",
-        task_type="research",
-        success=True,
-        duration_seconds=45,
-        steps_completed=3,
-        steps_total=3,
-        adaptations_needed=1,
-        skills_used=["web_search", "summarize"]
-    ))
-    
-    # Simulate failures
-    for i in range(4):
-        try:
-            raise KeyError(f"Missing key: field_{i}")
-        except KeyError as e:
-            reflection.analyze_error(e, {"iteration": i})
-    
-    # Propose improvement
-    proposal = reflection.propose_improvement(
-        subject="Add better error handling",
-        observation="KeyError occurring frequently",
-        analysis="Input validation missing",
-        proposal="Add input validation before accessing dictionary keys",
-        confidence=0.8
-    )
-    
-    print("Reflections:")
-    for r in reflection.reflections:
-        print(f"  [{r.type}] {r.subject}: {r.observation[:50]}...")
-    
-    print("\nPending Proposals:")
-    for p in reflection.get_pending_proposals():
-        print(f"  - {p.proposal}")
-    
-    print("\nSelf-Improvement Report:")
-    report = reflection.generate_self_improvement_report()
-    print(json.dumps(report, indent=2))
-    
-    # Multi-review simulation
-    print("\nMulti-Model Review:")
-    review = reflection.simulate_multi_review(proposal)
-    print(json.dumps(review, indent=2))

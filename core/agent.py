@@ -1,508 +1,354 @@
 """
 Base Agent Implementation
 
-A minimal but extensible agent architecture based on 2026 research:
-- Cartesian agency: clear separation between core and interface
-- Test-time adaptation: refinement during execution
-- Constitutional governance: safety-first self-modification
+Core agent loop implementing ReAct pattern:
+Reason → Act → Observe → Reflect → Repeat
+
+References:
+- vasilyevdm/ai-agent-handbook: ReAct, Plan+Execute, Reflection patterns
+- NVIDIA AI-Q Blueprint: Two-tier routing (shallow/fast vs deep/complex)
 """
 
-import json
-import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Callable
+from typing import List, Dict, Any, Optional, Callable
 from enum import Enum
-from core.memory import Memory, MemoryType, create_memory
+import json
+import time
+from datetime import datetime
 
 
 class AgentState(Enum):
     IDLE = "idle"
     PLANNING = "planning"
     EXECUTING = "executing"
+    OBSERVING = "observing"
     REFLECTING = "reflecting"
-    WAITING = "waiting"
+    COMPLETE = "complete"
+    ERROR = "error"
 
 
 @dataclass
-class AgentIdentity:
-    """Persistent identity across sessions - inspired by Ouroboros"""
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    name: str = "AGI-Agent"
-    version: str = "0.1.0"
-    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    core_values: List[str] = field(default_factory=lambda: [
-        "safety_first",
-        "incremental_progress",
-        "test_everything",
-        "document_findings"
-    ])
-    
-    def to_dict(self) -> Dict:
-        return {
-            "id": self.id,
-            "name": self.name,
-            "version": self.version,
-            "created_at": self.created_at,
-            "core_values": self.core_values
-        }
+class Observation:
+    """Result of an action"""
+    timestamp: float
+    action: str
+    result: Any
+    success: bool
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
-class Task:
-    """A task for the agent to execute"""
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    description: str = ""
-    goal: str = ""
-    context: Dict[str, Any] = field(default_factory=dict)
-    parent_id: Optional[str] = None
-    subtasks: List[str] = field(default_factory=list)
-    status: str = "pending"  # pending, in_progress, completed, failed
-    result: Any = None
-    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    completed_at: Optional[str] = None
-    
-    def to_dict(self) -> Dict:
-        return {
-            "id": self.id,
-            "description": self.description,
-            "goal": self.goal,
-            "context": self.context,
-            "parent_id": self.parent_id,
-            "subtasks": self.subtasks,
-            "status": self.status,
-            "result": self.result,
-            "created_at": self.created_at,
-            "completed_at": self.completed_at
-        }
+class Thought:
+    """Reasoning step"""
+    step: int
+    content: str
+    type: str  # "plan", "action", "reflection", "decision"
+    timestamp: float
+
+
+@dataclass
+class AgentResult:
+    """Final execution result"""
+    goal: str
+    success: bool
+    output: Any
+    thoughts: List[Thought]
+    observations: List[Observation]
+    execution_time: float
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class BaseAgent:
     """
-    Base agent with integrated memory system.
+    Base agent implementing the ReAct (Reason, Act, Observe, Reflect) loop.
     
-    Features:
-    - Identity persistence
-    - State management  
-    - Skill registry
-    - Integrated memory (working, episodic, semantic, procedural)
-    - Automatic memory consolidation
-    - Memory-aware task execution
+    Architecture inspired by:
+    - NVIDIA AI-Q: Two-tier routing (simple vs complex)
+    - Microsoft multi-agent: Orchestration patterns
+    - Conductor production patterns: Durable execution
     """
     
-    def __init__(self, identity: Optional[AgentIdentity] = None, 
-                 memory_adapter: str = "memory",
-                 memory_path: Optional[str] = None):
-        self.identity = identity or AgentIdentity()
+    def __init__(
+        self,
+        name: str = "agent",
+        max_iterations: int = 10,
+        skills: Optional[List[Any]] = None,
+        planner: Optional[Any] = None,
+        memory: Optional[Any] = None,
+        reflector: Optional[Any] = None
+    ):
+        self.name = name
+        self.max_iterations = max_iterations
+        self.skills = skills or []
+        self.planner = planner
+        self.memory = memory
+        self.reflector = reflector
+        
         self.state = AgentState.IDLE
+        self.thoughts: List[Thought] = []
+        self.observations: List[Observation] = []
+        self.current_iteration = 0
         
-        # Initialize memory system
-        if memory_adapter == "file" and memory_path:
-            self.memory = create_memory("file", storage_dir=memory_path)
+    def think(self, context: Dict[str, Any]) -> Thought:
+        """
+        Reasoning step: analyze situation and decide next action.
+        
+        Implements two-tier routing:
+        - Simple tasks: Direct action selection
+        - Complex tasks: Full planning with decomposition
+        """
+        self.state = AgentState.PLANNING
+        
+        # Determine if task needs full planning or direct action
+        if self._is_simple_task(context):
+            content = self._select_direct_action(context)
+            thought_type = "action"
         else:
-            self.memory = create_memory("memory")
+            if self.planner:
+                plan = self.planner.create_plan(context)
+                content = f"Plan: {plan}"
+            else:
+                content = self._basic_reasoning(context)
+            thought_type = "plan"
         
-        # Store agent identity in semantic memory
-        self.memorize_fact(
-            content={"agent_identity": self.identity.to_dict()},
-            category="identity",
-            importance=1.0
-        )
-        
-        self.skills: Dict[str, Callable] = {}
-        self.current_task: Optional[Task] = None
-        self.task_history: List[Task] = []
-        self.reflection_enabled = True
-        
-    def register_skill(self, name: str, skill: Callable, 
-                       store_in_memory: bool = True) -> None:
-        """Register a skill function, optionally store in procedural memory."""
-        self.skills[name] = skill
-        
-        if store_in_memory:
-            self.learn_skill(
-                skill_name=name,
-                skill_description=getattr(skill, '__doc__', 'No description'),
-                importance=0.8
-            )
-    
-    def remember(self, content: Any, context: Optional[Dict] = None,
-                 importance: float = 0.5) -> str:
-        """
-        Store experience in working memory.
-        Auto-consolidates to episodic when working memory is full (Miller's Law).
-        
-        Args:
-            content: The experience/content to remember
-            context: Additional context metadata
-            importance: Importance score (0.0-1.0)
-        
-        Returns:
-            Memory ID
-        """
-        metadata = context or {}
-        metadata['agent_state'] = self.state.value
-        metadata['timestamp'] = datetime.now().isoformat()
-        
-        return self.memory.store(
+        thought = Thought(
+            step=self.current_iteration,
             content=content,
-            memory_type=MemoryType.WORKING,
-            metadata=metadata,
-            importance=importance
+            type=thought_type,
+            timestamp=time.time()
         )
+        self.thoughts.append(thought)
+        return thought
     
-    def recall(self, query: Optional[str] = None, 
-               memory_type: Optional[MemoryType] = None,
-               limit: int = 5,
-               min_importance: float = 0.0) -> List[Dict]:
+    def act(self, thought: Thought, context: Dict[str, Any]) -> Observation:
         """
-        Recall memories matching criteria.
-        
-        Args:
-            query: Optional search query
-            memory_type: Filter by memory type
-            limit: Maximum results
-            min_importance: Minimum importance threshold
-        
-        Returns:
-            List of memory entries
+        Execute the planned action using available skills.
         """
-        return self.memory.recall(
-            query=query,
-            memory_type=memory_type,
-            limit=limit,
-            min_importance=min_importance
+        self.state = AgentState.EXECUTING
+        
+        # Extract action from thought
+        action = self._parse_action(thought.content)
+        
+        # Find appropriate skill
+        skill = self._select_skill(action, context)
+        
+        if skill:
+            try:
+                result = skill.execute(action, context)
+                success = True
+            except Exception as e:
+                result = {"error": str(e)}
+                success = False
+        else:
+            result = {"error": f"No skill found for action: {action}"}
+            success = False
+        
+        observation = Observation(
+            timestamp=time.time(),
+            action=action,
+            result=result,
+            success=success
         )
+        self.observations.append(observation)
+        return observation
     
-    def memorize_fact(self, content: Any, category: str = "general",
-                      importance: float = 0.5) -> str:
+    def observe(self, observation: Observation) -> Dict[str, Any]:
         """
-        Store a fact in semantic (long-term) memory.
-        
-        Args:
-            content: The fact to memorize
-            category: Fact category
-            importance: Importance score (0.0-1.0)
-        
-        Returns:
-            Memory ID
+        Process observation and update context.
         """
-        return self.memory.store(
-            content=content,
-            memory_type=MemoryType.SEMANTIC,
-            metadata={"category": category, "type": "fact"},
-            importance=importance
-        )
-    
-    def learn_skill(self, skill_name: str, 
-                    skill_description: str,
-                    importance: float = 0.5) -> str:
-        """
-        Store a skill in procedural memory.
+        self.state = AgentState.OBSERVING
         
-        Args:
-            skill_name: Name of the skill
-            skill_description: Description of what the skill does
-            importance: Importance score (0.0-1.0)
-        
-        Returns:
-            Memory ID
-        """
-        return self.memory.store(
-            content={
-                "skill_name": skill_name,
-                "description": skill_description,
-                "registered": True
-            },
-            memory_type=MemoryType.PROCEDURAL,
-            metadata={"type": "skill", "available": skill_name in self.skills},
-            importance=importance
-        )
-    
-    def get_memory_context(self, task_description: str, 
-                          limit: int = 7) -> Dict[str, Any]:
-        """
-        Retrieve relevant memory context for a task.
-        
-        Based on research: Working memory capacity is ~7 items (Miller's Law).
-        Retrieves most relevant memories across all types.
-        
-        Args:
-            task_description: Current task for relevance matching
-            limit: Maximum memories to retrieve (default 7 for Miller's Law)
-        
-        Returns:
-            Dictionary with working, episodic, semantic, and procedural memories
-        """
-        # Get working memory (current context)
-        working = self.memory.get_working_memory()
-        
-        # Get relevant episodic memories (past experiences)
-        episodic = self.recall(
-            query=task_description,
-            memory_type=MemoryType.EPISODIC,
-            limit=limit
-        )
-        
-        # Get relevant semantic memories (facts/knowledge)
-        semantic = self.recall(
-            query=task_description,
-            memory_type=MemoryType.SEMANTIC,
-            limit=limit // 2
-        )
-        
-        # Get procedural memories (available skills)
-        procedural = self.recall(
-            memory_type=MemoryType.PROCEDURAL,
-            limit=limit // 2
-        )
-        
-        return {
-            "working_memory": working,
-            "episodic_memories": episodic,
-            "semantic_memories": semantic,
-            "procedural_memories": procedural,
-            "total_context_items": len(working) + len(episodic) + len(semantic) + len(procedural)
+        # Update context with observation
+        context_update = {
+            "last_observation": observation.result,
+            "last_action_success": observation.success,
+            "step": self.current_iteration
         }
-    
-    def get_identity(self) -> Dict:
-        """Return agent identity as dict"""
-        return self.identity.to_dict()
-    
-    def create_task(self, description: str, goal: str, 
-                    context: Optional[Dict] = None,
-                    parent_id: Optional[str] = None) -> Task:
-        """Create a new task"""
-        task = Task(
-            description=description,
-            goal=goal,
-            context=context or {},
-            parent_id=parent_id
-        )
         
-        # Store task creation in working memory
-        self.remember(
-            content={"event": "task_created", "task": task.to_dict()},
-            context={"task_id": task.id, "goal": goal},
-            importance=0.6
-        )
+        # Store in memory if available
+        if self.memory:
+            self.memory.store_episode({
+                "action": observation.action,
+                "result": observation.result,
+                "success": observation.success,
+                "timestamp": observation.timestamp
+            })
         
-        return task
+        return context_update
     
-    def execute_skill(self, skill_name: str, **kwargs) -> Any:
-        """Execute a registered skill with memory logging"""
-        if skill_name not in self.skills:
-            raise ValueError(f"Skill '{skill_name}' not found. Available: {list(self.skills.keys())}")
+    def reflect(self, context: Dict[str, Any]) -> Optional[Thought]:
+        """
+        Reflect on progress and decide whether to continue or terminate.
+        
+        Returns None if task is complete, otherwise returns reflection thought.
+        """
+        self.state = AgentState.REFLECTING
+        
+        if self.reflector:
+            reflection = self.reflector.evaluate(
+                goal=context.get("goal"),
+                thoughts=self.thoughts,
+                observations=self.observations,
+                context=context
+            )
+            
+            if reflection.get("complete", False):
+                return None
+            
+            thought = Thought(
+                step=self.current_iteration,
+                content=reflection.get("insight", "Continue execution"),
+                type="reflection",
+                timestamp=time.time()
+            )
+            self.thoughts.append(thought)
+            return thought
+        
+        # Basic reflection: check if goal achieved or max iterations
+        if self._is_goal_achieved(context) or self.current_iteration >= self.max_iterations:
+            return None
+        
+        thought = Thought(
+            step=self.current_iteration,
+            content="Continue to next step",
+            type="reflection",
+            timestamp=time.time()
+        )
+        self.thoughts.append(thought)
+        return thought
+    
+    def run(self, goal: str, initial_context: Optional[Dict[str, Any]] = None) -> AgentResult:
+        """
+        Execute the full ReAct loop.
+        
+        Pattern: ReAct (Reason, Act, Observe, Reflect)
+        Reference: Yao et al. "ReAct: Synergizing Reasoning and Acting in Language Models"
+        """
+        start_time = time.time()
+        
+        context = initial_context or {}
+        context["goal"] = goal
+        context["agent_name"] = self.name
         
         self.state = AgentState.EXECUTING
         
-        # Log skill execution start
-        exec_id = self.remember(
-            content={"event": "skill_execution_start", "skill": skill_name, "args": kwargs},
-            importance=0.4
-        )
-        
-        try:
-            result = self.skills[skill_name](**kwargs)
+        while self.current_iteration < self.max_iterations:
+            # 1. REASON: Think about next action
+            thought = self.think(context)
             
-            # Log success
-            self.remember(
-                content={"event": "skill_execution_success", "skill": skill_name, "result_preview": str(result)[:200]},
-                context={"execution_id": exec_id},
-                importance=0.5
-            )
+            # 2. ACT: Execute the action
+            observation = self.act(thought, context)
             
-            return result
-        except Exception as e:
-            # Log failure
-            self.remember(
-                content={"event": "skill_execution_failure", "skill": skill_name, "error": str(e)},
-                context={"execution_id": exec_id},
-                importance=0.7
-            )
-            return {"error": str(e), "skill": skill_name}
-        finally:
-            self.state = AgentState.IDLE
-    
-    def execute_task(self, task: Task, max_iterations: int = 10) -> Task:
-        """
-        Execute a task with memory-aware planning and test-time refinement.
-        
-        Stores task progress and results in episodic memory for future learning.
-        """
-        self.current_task = task
-        task.status = "in_progress"
-        
-        # Get memory context for this task
-        memory_context = self.get_memory_context(task.description)
-        task.context['memory_context'] = memory_context
-        
-        # Store task start in episodic memory
-        self.memory.store(
-            content={"event": "task_started", "task_id": task.id, "description": task.description},
-            memory_type=MemoryType.EPISODIC,
-            metadata={"goal": task.goal},
-            importance=0.6
-        )
-        
-        for iteration in range(max_iterations):
-            # Planning phase with memory context
-            self.state = AgentState.PLANNING
-            plan = self._generate_plan(task, iteration)
+            # 3. OBSERVE: Process result
+            context_update = self.observe(observation)
+            context.update(context_update)
             
-            # Store plan in working memory
-            self.remember(
-                content={"event": "plan_generated", "iteration": iteration, "plan": plan},
-                context={"task_id": task.id},
-                importance=0.5
-            )
-            
-            # Execution phase
-            self.state = AgentState.EXECUTING
-            step_result = self._execute_plan_step(plan, iteration)
-            
-            # Store execution result
-            self.remember(
-                content={"event": "step_executed", "iteration": iteration, "result": step_result},
-                context={"task_id": task.id},
-                importance=0.5
-            )
-            
-            # Reflection/adaptation phase (test-time refinement)
-            if self.reflection_enabled:
-                self.state = AgentState.REFLECTING
-                reflection = self._reflect_on_step(step_result, iteration)
-                
-                # Store reflection in episodic memory
-                self.memory.store(
-                    content={"event": "reflection", "iteration": iteration, "adapt": reflection,
-                             "step_result": step_result},
-                    memory_type=MemoryType.EPISODIC,
-                    metadata={"task_id": task.id},
-                    importance=0.6
-                )
-                
-                if reflection:
-                    self._adapt_plan(task, step_result)
-            
-            # Check completion
-            if self._is_task_complete(task, step_result):
-                task.status = "completed"
-                task.result = step_result
-                task.completed_at = datetime.now().isoformat()
-                
-                # Store task completion in episodic memory
-                self.memory.store(
-                    content={"event": "task_completed", "task_id": task.id, 
-                             "iterations": iteration + 1, "result": step_result},
-                    memory_type=MemoryType.EPISODIC,
-                    metadata={"goal": task.goal, "success": True},
-                    importance=0.8
-                )
-                
+            # 4. REFLECT: Evaluate progress
+            reflection = self.reflect(context)
+            if reflection is None:
                 break
-        else:
-            task.status = "failed"
-            task.result = {"error": "Max iterations reached"}
             
-            # Store failure in episodic memory
-            self.memory.store(
-                content={"event": "task_failed", "task_id": task.id, "reason": "max_iterations"},
-                memory_type=MemoryType.EPISODIC,
-                metadata={"goal": task.goal, "success": False},
-                importance=0.7
-            )
+            self.current_iteration += 1
         
-        self.task_history.append(task)
-        self.current_task = None
-        self.state = AgentState.IDLE
+        execution_time = time.time() - start_time
         
-        # Consolidate working memory after task
-        self.memory.consolidate()
+        # Determine success
+        success = any(obs.success for obs in self.observations)
         
-        return task
-    
-    def _generate_plan(self, task: Task, iteration: int) -> Dict:
-        """Generate a plan for the task using memory context"""
-        # Retrieve similar past task experiences
-        relevant_experiences = self.recall(
-            query=task.goal,
-            memory_type=MemoryType.EPISODIC,
-            limit=3
+        # Compile output
+        output = self._compile_output()
+        
+        self.state = AgentState.COMPLETE if success else AgentState.ERROR
+        
+        return AgentResult(
+            goal=goal,
+            success=success,
+            output=output,
+            thoughts=self.thoughts,
+            observations=self.observations,
+            execution_time=execution_time,
+            metadata={
+                "iterations": self.current_iteration,
+                "agent_name": self.name,
+                "final_state": self.state.value
+            }
         )
+    
+    def _is_simple_task(self, context: Dict[str, Any]) -> bool:
+        """
+        Two-tier routing: determine if task can be handled without full planning.
+        """
+        goal = context.get("goal", "")
+        # Simple heuristics for quick classification
+        simple_indicators = ["quick", "simple", "lookup", "search", "check"]
+        complex_indicators = ["complex", "multi-step", "analyze", "research", "build"]
         
-        return {
-            "iteration": iteration,
-            "action": "execute_skill",
-            "target": task.description,
-            "steps": ["analyze", "execute", "verify"],
-            "relevant_past_experiences": len(relevant_experiences)
-        }
+        goal_lower = goal.lower()
+        simple_score = sum(1 for s in simple_indicators if s in goal_lower)
+        complex_score = sum(1 for c in complex_indicators if c in goal_lower)
+        
+        return simple_score > complex_score
     
-    def _execute_plan_step(self, plan: Dict, iteration: int) -> Dict:
-        """Execute a single plan step"""
-        return {
-            "iteration": iteration,
-            "status": "executed",
-            "plan": plan
-        }
+    def _select_direct_action(self, context: Dict[str, Any]) -> str:
+        """Select immediate action for simple tasks."""
+        goal = context.get("goal", "")
+        # Direct mapping for common simple tasks
+        if "search" in goal.lower():
+            return f"web_search: {goal}"
+        elif "calculate" in goal.lower() or "compute" in goal.lower():
+            return f"calculate: {goal}"
+        else:
+            return f"process: {goal}"
     
-    def _reflect_on_step(self, result: Dict, iteration: int) -> bool:
-        """
-        Reflect on execution and decide if adaptation is needed.
-        Returns True if adaptation should occur.
-        """
-        # Basic implementation - will be enhanced with core/reflection.py
-        if "error" in result:
-            return True  # Adapt on error
+    def _basic_reasoning(self, context: Dict[str, Any]) -> str:
+        """Basic reasoning when no planner is available."""
+        return f"Analyze goal and determine approach: {context.get('goal')}"
+    
+    def _parse_action(self, thought_content: str) -> str:
+        """Extract action from thought content."""
+        # Simple parsing - in production use structured output
+        if "Plan:" in thought_content:
+            return thought_content.split("Plan:")[1].strip()
+        elif ":" in thought_content:
+            return thought_content.split(":", 1)[1].strip()
+        return thought_content
+    
+    def _select_skill(self, action: str, context: Dict[str, Any]) -> Optional[Any]:
+        """Select appropriate skill for action."""
+        for skill in self.skills:
+            if skill.can_handle(action, context):
+                return skill
+        return None
+    
+    def _is_goal_achieved(self, context: Dict[str, Any]) -> bool:
+        """Check if goal has been achieved."""
+        # Check last observation for success indicators
+        if self.observations:
+            last = self.observations[-1]
+            if last.success and "complete" in str(last.result).lower():
+                return True
         return False
     
-    def _adapt_plan(self, task: Task, result: Dict) -> None:
-        """Adapt plan based on reflection"""
-        pass  # To be implemented with core/planner.py
-    
-    def _is_task_complete(self, task: Task, result: Dict) -> bool:
-        """Check if task is complete"""
-        return result.get("status") == "success"
-    
-    def get_memory_stats(self) -> Dict[str, Any]:
-        """Get memory system statistics"""
-        return self.memory.stats()
-    
-    def save_agent_state(self, path: str) -> None:
-        """Save complete agent state including memory"""
-        state = {
-            "identity": self.identity.to_dict(),
-            "memory_stats": self.memory.stats(),
-            "task_history_count": len(self.task_history),
-            "skills_registered": list(self.skills.keys()),
-            "timestamp": datetime.now().isoformat()
+    def _compile_output(self) -> Dict[str, Any]:
+        """Compile final output from execution."""
+        return {
+            "thoughts": [
+                {"step": t.step, "type": t.type, "content": t.content}
+                for t in self.thoughts
+            ],
+            "observations": [
+                {"action": o.action, "success": o.success, "result": o.result}
+                for o in self.observations
+            ],
+            "final_observation": self.observations[-1].result if self.observations else None
         }
-        
-        with open(path, 'w') as f:
-            json.dump(state, f, indent=2)
     
-    def __repr__(self) -> str:
-        return f"BaseAgent({self.identity.name}, {self.identity.id[:8]}, state={self.state.value})"
-
-
-def example_skill(name: str = "world") -> str:
-    """Example skill for testing"""
-    return f"Hello, {name}!"
-
-
-if __name__ == "__main__":
-    # Basic test
-    agent = BaseAgent()
-    agent.register_skill("greet", example_skill)
-    
-    print("Agent Identity:", agent.get_identity())
-    
-    task = agent.create_task(
-        description="Test greeting",
-        goal="Execute a greeting skill"
-    )
-    
-    result = agent.execute_task(task, max_iterations=1)
-    print("Task Result:", result.to_dict())
-    print("Agent Status:", agent.get_status())
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize agent state."""
+        return {
+            "name": self.name,
+            "state": self.state.value,
+            "iterations": self.current_iteration,
+            "thought_count": len(self.thoughts),
+            "observation_count": len(self.observations)
+        }

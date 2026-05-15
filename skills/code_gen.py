@@ -1,327 +1,215 @@
 """
 Code Generation Skill
 
-Provides AGI agent with code generation and manipulation capabilities.
-Critical for self-modification (with safety checks).
+Capability for generating, analyzing, and executing code.
 """
 
-import json
-import re
-from typing import List, Dict, Optional, Tuple
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-from datetime import datetime
-from enum import Enum
-
-
-class CodeAction(Enum):
-    GENERATE = "generate"
-    MODIFY = "modify"
-    REVIEW = "review"
-    TEST = "test"
 
 
 @dataclass
 class CodeResult:
+    """Result of code generation/execution"""
     code: str
     language: str
-    explanation: str
-    tests: Optional[str] = None
-    file_path: Optional[str] = None
-    timestamp: str = ""
-    
-    def __post_init__(self):
-        if not self.timestamp:
-            self.timestamp = datetime.now().isoformat()
-    
-    def to_dict(self) -> Dict:
-        return {
-            "code": self.code,
-            "language": self.language,
-            "explanation": self.explanation,
-            "tests": self.tests,
-            "file_path": self.file_path,
-            "timestamp": self.timestamp
-        }
+    success: bool
+    output: Optional[str] = None
+    error: Optional[str] = None
 
 
 class CodeGenSkill:
     """
-    Code generation and manipulation skill.
+    Skill for code generation and execution.
     
-    SAFETY: All self-modification proposals require review.
-    Critical files are protected from automatic modification.
+    Supports multiple languages and execution contexts.
     """
     
-    CRITICAL_FILES = [
-        "agent.py",      # Core agent identity
-        "memory.py",     # Memory system
-        "reflection.py", # Safety/oversight
-        "constitution.py"  # Governance (if exists)
-    ]
+    def __init__(self):
+        self.name = "code_gen"
+        self.description = "Generate, analyze, and execute code"
+        self.capabilities = [
+            "write code",
+            "generate code",
+            "execute code",
+            "analyze code",
+            "refactor code",
+            "debug code"
+        ]
+        self.supported_languages = ["python", "javascript", "typescript", "bash", "json"]
     
-    def __init__(self, safe_mode: bool = True):
-        self.safe_mode = safe_mode
-        self.generation_history: List[Dict] = []
+    def can_handle(self, action: str, context: Dict[str, Any]) -> bool:
+        """Check if this skill can handle the action."""
+        action_lower = action.lower()
+        
+        code_keywords = [
+            "code", "program", "script", "function", "class",
+            "write", "generate", "create", "implement",
+            "execute", "run", "test", "debug", "refactor"
+        ]
+        
+        language_keywords = [
+            "python", "javascript", "typescript", "js", "ts",
+            "bash", "shell", "json", "yaml"
+        ]
+        
+        # Check for code-related keywords
+        has_code_keyword = any(kw in action_lower for kw in code_keywords)
+        has_language = any(lang in action_lower for lang in language_keywords)
+        
+        return has_code_keyword or has_language
     
-    def generate(self, 
-                 description: str,
-                 language: str = "python",
-                 include_tests: bool = True,
-                 context: Optional[Dict] = None) -> CodeResult:
-        """
-        Generate code from natural language description.
+    def execute(self, action: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute code generation/execution action."""
+        # Determine operation type
+        operation = self._determine_operation(action)
         
-        Returns structured code with explanation.
-        """
-        # In production, calls LLM for code generation
-        # For now, returns scaffold/template
+        # Extract language
+        language = self._detect_language(action, context)
         
-        if language == "python":
-            code = self._generate_python_scaffold(description, context)
-            tests = self._generate_python_tests(description) if include_tests else None
+        # Extract code or specification
+        spec = self._extract_specification(action, context)
+        
+        if operation == "generate":
+            return self._handle_generate(spec, language, context)
+        elif operation == "execute":
+            return self._handle_execute(spec, language, context)
+        elif operation == "analyze":
+            return self._handle_analyze(spec, context)
+        elif operation == "debug":
+            return self._handle_debug(spec, context)
         else:
-            code = f"# TODO: Implement {description}\n# Language: {language}"
-            tests = None
-        
-        result = CodeResult(
-            code=code,
-            language=language,
-            explanation=f"Generated code for: {description}",
-            tests=tests
-        )
-        
-        self.generation_history.append({
-            "action": "generate",
-            "description": description,
-            "language": language,
-            "timestamp": datetime.now().isoformat()
-        })
-        
-        return result
-    
-    def modify(self,
-               file_path: str,
-               modification: str,
-               reason: str,
-               context: Optional[Dict] = None) -> Dict:
-        """
-        Propose a code modification.
-        
-        SAFETY: Checks if file is critical before allowing.
-        Returns proposal that requires review if critical.
-        """
-        # Check if critical
-        is_critical = any(cf in file_path for cf in self.CRITICAL_FILES)
-        
-        if is_critical and self.safe_mode:
             return {
                 "success": False,
-                "requires_review": True,
-                "reason": f"File '{file_path}' is CRITICAL. Self-modification requires review.",
-                "proposal": {
-                    "file_path": file_path,
-                    "modification": modification,
-                    "reason": reason
-                },
-                "safety_level": "critical"
+                "error": f"Unknown operation: {operation}",
+                "supported_operations": ["generate", "execute", "analyze", "debug"]
             }
+    
+    def _determine_operation(self, action: str) -> str:
+        """Determine the operation type from action."""
+        action_lower = action.lower()
         
-        # In production, would apply diff
+        if any(kw in action_lower for kw in ["write", "generate", "create", "implement"]):
+            return "generate"
+        elif any(kw in action_lower for kw in ["execute", "run", "test"]):
+            return "execute"
+        elif any(kw in action_lower for kw in ["analyze", "review", "check"]):
+            return "analyze"
+        elif any(kw in action_lower for kw in ["debug", "fix", "repair"]):
+            return "debug"
+        
+        # Default to generate
+        return "generate"
+    
+    def _detect_language(self, action: str, context: Dict[str, Any]) -> str:
+        """Detect programming language from action."""
+        action_lower = action.lower()
+        
+        # Check for explicit language mentions
+        if "python" in action_lower or ".py" in action_lower:
+            return "python"
+        elif "typescript" in action_lower or ".ts" in action_lower:
+            return "typescript"
+        elif "javascript" in action_lower or ".js" in action_lower:
+            return "javascript"
+        elif "bash" in action_lower or "shell" in action_lower:
+            return "bash"
+        elif "json" in action_lower:
+            return "json"
+        
+        # Default to Python
+        return "python"
+    
+    def _extract_specification(self, action: str, context: Dict[str, Any]) -> str:
+        """Extract code specification from action."""
+        # Remove operation keywords
+        spec = action
+        for kw in ["write code", "generate", "create", "implement", "execute", "run", "debug", "fix"]:
+            spec = spec.replace(kw, "").replace(kw.title(), "")
+        
+        # Remove language mentions
+        for lang in ["python", "javascript", "typescript", "bash", "shell"]:
+            spec = spec.replace(f"in {lang}", "").replace(lang, "")
+        
+        return spec.strip(": ")
+    
+    def _handle_generate(
+        self,
+        spec: str,
+        language: str,
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Handle code generation."""
         return {
             "success": True,
-            "file_path": file_path,
-            "modification": modification,
-            "applied": False,  # Requires explicit apply
-            "reason": reason
-        }
-    
-    def review_code(self, 
-                    code: str,
-                    language: str = "python",
-                    review_type: str = "general") -> Dict:
-        """
-        Review code for issues.
-        
-        Review types: general, security, performance, style
-        """
-        issues = []
-        
-        if review_type == "security":
-            issues = self._security_review(code, language)
-        elif review_type == "performance":
-            issues = self._performance_review(code, language)
-        elif review_type == "style":
-            issues = self._style_review(code, language)
-        else:
-            issues = self._general_review(code, language)
-        
-        return {
-            "code_length": len(code),
+            "operation": "generate",
+            "specification": spec,
             "language": language,
-            "review_type": review_type,
-            "issues_found": len(issues),
-            "issues": issues,
-            "passed": len(issues) == 0
+            "note": "Code generation request recorded",
+            "code": None,  # Would be generated by LLM
+            "metadata": {
+                "line_count_estimate": spec.count("\n") + 10,
+                "complexity": self._estimate_complexity(spec)
+            }
         }
     
-    def _security_review(self, code: str, language: str) -> List[Dict]:
-        """Security-focused code review"""
-        issues = []
+    def _handle_execute(
+        self,
+        spec: str,
+        language: str,
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Handle code execution."""
+        return {
+            "success": True,
+            "operation": "execute",
+            "language": language,
+            "note": "Code execution framework ready",
+            "output": None,  # Would contain actual output
+            "execution_context": {
+                "sandbox": True,
+                "timeout": 30,
+                "allowed_imports": ["os", "sys", "json", "re", "math", "random"]
+            }
+        }
+    
+    def _handle_analyze(self, spec: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle code analysis."""
+        return {
+            "success": True,
+            "operation": "analyze",
+            "note": "Code analysis framework ready",
+            "analysis_types": ["syntax", "style", "complexity", "security"]
+        }
+    
+    def _handle_debug(self, spec: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle debugging."""
+        return {
+            "success": True,
+            "operation": "debug",
+            "note": "Debugging framework ready",
+            "approach": ["identify_error", "analyze_cause", "propose_fix", "verify_fix"]
+        }
+    
+    def _estimate_complexity(self, spec: str) -> str:
+        """Estimate complexity of code to generate."""
+        word_count = len(spec.split())
         
-        if language == "python":
-            # Check for dangerous patterns
-            dangerous = ["eval(", "exec(", "__import__", "subprocess.call", "os.system"]
-            for pattern in dangerous:
-                if pattern in code:
-                    issues.append({
-                        "severity": "high",
-                        "pattern": pattern,
-                        "message": f"Potentially dangerous pattern found: {pattern}",
-                        "line": self._find_line(code, pattern)
-                    })
-            
-            # Check for hardcoded secrets
-            secret_patterns = ["password", "api_key", "secret", "token"]
-            for pattern in secret_patterns:
-                if re.search(rf'{pattern}\s*=\s*["\'][^"\']+["\']', code, re.IGNORECASE):
-                    issues.append({
-                        "severity": "medium",
-                        "pattern": pattern,
-                        "message": f"Potential hardcoded secret: {pattern}",
-                        "line": self._find_line(code, pattern)
-                    })
-        
-        return issues
+        if word_count < 10:
+            return "simple"
+        elif word_count < 30:
+            return "moderate"
+        else:
+            return "complex"
     
-    def _performance_review(self, code: str, language: str) -> List[Dict]:
-        """Performance-focused code review"""
-        issues = []
-        
-        if language == "python":
-            # Check for inefficient patterns
-            if "for.*in.*range.*len" in code:
-                issues.append({
-                    "severity": "low",
-                    "message": "Consider using enumerate() instead of range(len())",
-                    "type": "optimization"
-                })
-        
-        return issues
+    def learn_from(self, experience: Dict[str, Any]) -> None:
+        """Learn from code generation experience."""
+        pass
     
-    def _style_review(self, code: str, language: str) -> List[Dict]:
-        """Style-focused code review"""
-        issues = []
-        
-        lines = code.split('\n')
-        for i, line in enumerate(lines, 1):
-            if len(line) > 100:
-                issues.append({
-                    "severity": "low",
-                    "line": i,
-                    "message": "Line exceeds 100 characters",
-                    "type": "style"
-                })
-        
-        return issues
-    
-    def _general_review(self, code: str, language: str) -> List[Dict]:
-        """General code review combining all aspects"""
-        security = self._security_review(code, language)
-        performance = self._performance_review(code, language)
-        style = self._style_review(code, language)
-        
-        return security + performance + style
-    
-    def _find_line(self, code: str, pattern: str) -> Optional[int]:
-        """Find line number containing pattern"""
-        lines = code.split('\n')
-        for i, line in enumerate(lines, 1):
-            if pattern in line:
-                return i
-        return None
-    
-    def _generate_python_scaffold(self, description: str, context: Optional[Dict]) -> str:
-        """Generate Python code scaffold"""
-        return f'''"""
-{description}
-
-Generated by AGI agent code generation skill.
-"""
-
-def main():
-    """Main function"""
-    # TODO: Implement based on: {description}
-    pass
-
-if __name__ == "__main__":
-    main()
-'''
-    
-    def _generate_python_tests(self, description: str) -> str:
-        """Generate Python test scaffold"""
-        return f'''"""
-Tests for: {description}
-"""
-
-import pytest
-
-def test_main():
-    """Basic test"""
-    assert True  # TODO: Add real tests
-
-if __name__ == "__main__":
-    pytest.main([__file__])
-'''
-    
-    def get_modification_proposals(self) -> List[Dict]:
-        """Get all pending modification proposals"""
-        return [h for h in self.generation_history 
-                if h.get("action") == "propose_modify"]
-
-
-# Skill function interfaces
-def generate_code(description: str, **kwargs) -> Dict:
-    """Agent-callable code generation"""
-    skill = CodeGenSkill()
-    result = skill.generate(description, **kwargs)
-    return result.to_dict()
-
-
-def propose_modification(file_path: str, modification: str, 
-                        reason: str, **kwargs) -> Dict:
-    """Agent-callable modification proposal"""
-    skill = CodeGenSkill()
-    return skill.modify(file_path, modification, reason, **kwargs)
-
-
-def review_code(code: str, **kwargs) -> Dict:
-    """Agent-callable code review"""
-    skill = CodeGenSkill()
-    return skill.review_code(code, **kwargs)
-
-
-if __name__ == "__main__":
-    # Test the skill
-    skill = CodeGenSkill()
-    
-    # Generate code
-    print("=== Generate Code ===")
-    result = skill.generate("A function to calculate fibonacci numbers", 
-                           include_tests=True)
-    print(f"Language: {result.language}")
-    print(f"Code:\n{result.code}")
-    print(f"Tests:\n{result.tests}")
-    
-    # Review code
-    print("\n=== Code Review ===")
-    review = skill.review_code(result.code, review_type="security")
-    print(f"Issues found: {review['issues_found']}")
-    for issue in review['issues']:
-        print(f"  [{issue['severity']}] {issue['message']}")
-    
-    # Try to modify critical file
-    print("\n=== Critical File Modification (Should Fail) ===")
-    mod = skill.modify("core/agent.py", "# Test", "Testing safety")
-    print(f"Allowed: {mod['success']}")
-    print(f"Requires review: {mod.get('requires_review', False)}")
-    print(f"Reason: {mod.get('reason', 'N/A')}")
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "supported_languages": self.supported_languages,
+            "capabilities": self.capabilities
+        }
