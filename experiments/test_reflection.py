@@ -1,639 +1,660 @@
 """
-Test suite for Self-Reflection and Improvement System (core/reflection.py)
+Tests for Reflection System
 
-Tests performance analysis, capability assessment, improvement planning,
-constitutional safety, multi-perspective review, and audit trails.
+Validates:
+- ExecutionTrace recording and analysis
+- Pattern extraction from traces
+- Insight generation
+- Reflector integration
+- Batch reflection capabilities
 """
 
 import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, '/home/workspace/agi-research')
 
-from datetime import datetime, timedelta
 from core.reflection import (
-    ReflectionEngine,
-    ReflectionScope,
-    PerformanceRecord,
-    ProposedChange,
-    ReviewPerspective,
-    ChangeStatus
+    ExecutionTrace, Pattern, Insight, InsightType, ReflectionScope,
+    TraceAnalyzer, InsightGenerator, Reflector,
+    create_reflector, quick_reflect
 )
+from datetime import datetime
 
 
-class TestRunner:
-    """Simple test runner for reflection module."""
-    
-    def __init__(self):
-        self.passed = 0
-        self.failed = 0
-        self.tests = []
-    
-    def test(self, name: str):
-        """Decorator for test functions."""
-        def decorator(func):
-            self.tests.append((name, func))
-            return func
-        return decorator
-    
-    def run(self):
-        """Run all tests."""
-        print("=" * 60)
-        print("REFLECTION MODULE TEST SUITE")
-        print("=" * 60)
-        
-        for name, func in self.tests:
-            try:
-                func()
-                print(f"✅ {name}")
-                self.passed += 1
-            except AssertionError as e:
-                print(f"❌ {name}: {e}")
-                self.failed += 1
-            except Exception as e:
-                print(f"❌ {name}: Unexpected error: {e}")
-                self.failed += 1
-        
-        print("=" * 60)
-        print(f"RESULTS: {self.passed} passed, {self.failed} failed")
-        print("=" * 60)
-        return self.failed == 0
+def test_execution_trace_creation():
+    """Test ExecutionTrace initialization"""
+    trace = ExecutionTrace(
+        trace_id="test_001",
+        goal="Test goal",
+        start_time=datetime.now().timestamp()
+    )
+    assert trace.trace_id == "test_001"
+    assert trace.goal == "Test goal"
+    assert trace.success_rate == 0.0
+    assert trace.duration == 0.0
+    print("✅ ExecutionTrace creation")
 
 
-runner = TestRunner()
-
-
-@runner.test("ReflectionEngine Initialization")
-def test_initialization():
-    """Test that reflection engine initializes with correct defaults."""
-    engine = ReflectionEngine(agent_id="test_agent")
-    
-    assert engine.agent_id == "test_agent"
-    assert len(engine.performance_history) == 0
-    assert len(engine.capability_assessments) == 0
-    assert len(engine.improvement_goals) == 0
-    assert len(engine.change_history) == 0
-    assert len(engine.constitution) == 5  # Default principles
-
-
-@runner.test("Performance Record Storage")
-def test_performance_recording():
-    """Test recording and retrieving performance data."""
-    engine = ReflectionEngine()
-    
-    # Record some performances
-    for i in range(10):
-        record = PerformanceRecord(
-            task_id=f"task_{i}",
-            task_type="code_generation",
-            success=i < 8,  # 80% success rate
-            execution_time_ms=1000.0 + i * 100,
-            quality_score=0.5 + i * 0.05,
-            error_type=None if i < 8 else "timeout"
-        )
-        engine.record_performance(record)
-    
-    assert len(engine.performance_history) == 10
-    
-    # Test analysis
-    analysis = engine.analyze_performance_patterns("code_generation")
-    assert analysis["total_records"] == 10
-    assert analysis["success_rate"] == 0.8
-    assert "error_patterns" in analysis
-
-
-@runner.test("Performance Pattern Analysis")
-def test_performance_analysis():
-    """Test performance pattern analysis with trend detection."""
-    engine = ReflectionEngine()
-    
-    # Simulate improving trend (older worse, newer better)
-    for i in range(20):
-        record = PerformanceRecord(
-            task_id=f"task_{i}",
-            task_type="analysis",
-            success=i > 5,  # First 6 fail, rest succeed (improving trend)
-            execution_time_ms=2000.0 - i * 50,  # Getting faster
-            quality_score=0.3 + i * 0.035  # Improving quality
-        )
-        engine.record_performance(record)
-    
-    analysis = engine.analyze_performance_patterns("analysis")
-    
-    assert analysis["total_records"] == 20
-    assert analysis["trend"] == "improving"
-    assert analysis["trend_delta"] > 0
-    assert analysis["avg_quality_score"] > 0.5
-
-
-@runner.test("Problem Area Identification")
-def test_problem_identification():
-    """Test identification of underperforming task types."""
-    engine = ReflectionEngine()
-    
-    # Add good performance for one type
-    for i in range(10):
-        engine.record_performance(PerformanceRecord(
-            task_id=f"good_{i}",
-            task_type="reliable_task",
-            success=True,
-            execution_time_ms=500.0,
-            quality_score=0.9
-        ))
-    
-    # Add poor performance for another type
-    for i in range(10):
-        engine.record_performance(PerformanceRecord(
-            task_id=f"bad_{i}",
-            task_type="problematic_task",
-            success=i < 3,  # 30% success
-            execution_time_ms=5000.0,
-            quality_score=0.4,
-            error_type="syntax_error"
-        ))
-    
-    problems = engine.identify_problem_areas()
-    
-    assert len(problems) == 1
-    assert problems[0]["task_type"] == "problematic_task"
-    assert problems[0]["success_rate"] < 0.5
-    assert problems[0]["severity"] == "high"
-
-
-@runner.test("Capability Assessment")
-def test_capability_assessment():
-    """Test self-assessment of capabilities."""
-    engine = ReflectionEngine()
-    
-    # Add performance records
-    for i in range(20):
-        engine.record_performance(PerformanceRecord(
-            task_id=f"cap_{i}",
-            task_type="reasoning",
-            success=True,
-            execution_time_ms=800.0,
-            quality_score=0.8
-        ))
-    
-    # Assess capability
-    assessment = engine.assess_capability(
-        capability_name="logical_reasoning",
-        task_type="reasoning"
+def test_execution_trace_add_step():
+    """Test adding steps to trace"""
+    trace = ExecutionTrace(
+        trace_id="test_002",
+        goal="Test goal",
+        start_time=datetime.now().timestamp()
     )
     
-    assert assessment.capability_name == "logical_reasoning"
-    assert assessment.proficiency_score > 0.7
-    assert assessment.confidence > 0.3  # Should have decent confidence with 20 samples
-    assert assessment.sample_size == 20
-    assert len(assessment.strengths) > 0
+    trace.add_step("action_1", {"result": "ok"}, True)
+    trace.add_step("action_2", {"result": "fail"}, False)
+    trace.add_step("action_3", {"result": "ok"}, True)
+    
+    assert len(trace.steps) == 3
+    assert len(trace.outcomes) == 3
+    assert trace.success_rate == 2/3
+    print("✅ ExecutionTrace add_step")
 
 
-@runner.test("Capability Assessment with Insufficient Data")
-def test_capability_assessment_insufficient():
-    """Test assessment when sample size is too small."""
-    engine = ReflectionEngine()
+def test_execution_trace_duration():
+    """Test trace duration calculation"""
+    import time
     
-    # Add only a few records
-    for i in range(3):
-        engine.record_performance(PerformanceRecord(
-            task_id=f"small_{i}",
-            task_type="rare_task",
-            success=True,
-            execution_time_ms=1000.0,
-            quality_score=0.6
-        ))
-    
-    assessment = engine.assess_capability(
-        capability_name="rare_capability",
-        task_type="rare_task"
+    trace = ExecutionTrace(
+        trace_id="test_003",
+        goal="Test goal",
+        start_time=datetime.now().timestamp()
     )
     
-    assert assessment.confidence < 0.2  # Low confidence with few samples
-    assert len(assessment.weaknesses) > 0
+    time.sleep(0.1)
+    trace.end_time = datetime.now().timestamp()
+    
+    assert trace.duration >= 0.1
+    print("✅ ExecutionTrace duration")
 
 
-@runner.test("Improvement Goal Creation")
-def test_improvement_goal():
-    """Test creation and tracking of improvement goals."""
-    engine = ReflectionEngine()
-    
-    # First assess a capability
-    for i in range(15):
-        engine.record_performance(PerformanceRecord(
-            task_id=f"goal_test_{i}",
-            task_type="planning",
-            success=True,
-            execution_time_ms=1500.0,
-            quality_score=0.6
-        ))
-    
-    engine.assess_capability("strategic_planning", "planning")
-    
-    # Create improvement goal
-    goal = engine.create_improvement_goal(
-        target_capability="strategic_planning",
-        target_score=0.85,
-        priority=8,
-        strategy="Practice complex planning scenarios with feedback"
+def test_execution_trace_to_dict():
+    """Test trace serialization"""
+    trace = ExecutionTrace(
+        trace_id="test_004",
+        goal="Test goal",
+        start_time=datetime.now().timestamp()
     )
     
-    assert goal.target_capability == "strategic_planning"
-    assert goal.target_score == 0.85
-    assert goal.current_score < 0.85
-    assert goal.priority == 8
-    assert goal.status == "active"
-    assert len(goal.milestones) == 2  # Default milestones
+    trace.add_step("action", {"result": "ok"}, True)
+    trace.end_time = datetime.now().timestamp()
     
-    # Test prioritization
-    goals = engine.prioritize_goals()
-    assert len(goals) == 1
-    assert goals[0].goal_id == goal.goal_id
+    data = trace.to_dict()
+    assert data["trace_id"] == "test_004"
+    assert data["success_rate"] == 1.0
+    assert data["step_count"] == 1
+    print("✅ ExecutionTrace to_dict")
 
 
-@runner.test("Goal Progress Update")
-def test_goal_progress():
-    """Test updating goal progress."""
-    engine = ReflectionEngine()
-    
-    for i in range(15):
-        engine.record_performance(PerformanceRecord(
-            task_id=f"prog_{i}",
-            task_type="writing",
-            success=True,
-            execution_time_ms=1000.0,
-            quality_score=0.5
-        ))
-    
-    engine.assess_capability("writing", "writing")
-    
-    goal = engine.create_improvement_goal(
-        target_capability="writing",
-        target_score=0.9,
-        priority=5
+def test_pattern_creation():
+    """Test Pattern dataclass"""
+    pattern = Pattern(
+        pattern_id="pat_001",
+        pattern_type="success",
+        description="Success pattern",
+        elements=["step1", "step2", "step3"],
+        frequency=3,
+        confidence=0.8
     )
     
-    # Update with progress that completes goal
-    engine.update_goal_progress(goal.goal_id, 0.95)
-    
-    updated = engine.improvement_goals[goal.goal_id]
-    assert updated.current_score == 0.95
-    assert updated.status == "completed"
+    assert pattern.pattern_id == "pat_001"
+    assert pattern.pattern_type == "success"
+    assert len(pattern.elements) == 3
+    print("✅ Pattern creation")
 
 
-@runner.test("Constitutional Principle Validation - Safety Immutability")
-def test_safety_immutability():
-    """Test that safety constraints cannot be modified."""
-    engine = ReflectionEngine()
-    
-    # Try to modify safety constraints (should fail)
-    change = engine.propose_change(
-        scope=ReflectionScope.SAFETY_CONSTRAINTS,
-        description="Relax safety threshold",
-        rationale="For testing purposes",
-        expected_impact={"flexibility": 0.1},
-        implementation="threshold = 0.1"
+def test_pattern_to_dict():
+    """Test Pattern serialization"""
+    pattern = Pattern(
+        pattern_id="pat_002",
+        pattern_type="sequence",
+        description="Sequence pattern",
+        elements=["a", "b", "c"],
+        frequency=2,
+        confidence=0.75,
+        source_traces=["trace1", "trace2"]
     )
     
-    assert change.status == ChangeStatus.REJECTED
-    assert len(change.constitutional_violations) > 0
-    assert any("Safety Immutability" in v for v in change.constitutional_violations)
+    data = pattern.to_dict()
+    assert data["pattern_id"] == "pat_002"
+    assert data["frequency"] == 2
+    assert len(data["source_traces"]) == 2
+    print("✅ Pattern to_dict")
 
 
-@runner.test("Constitutional Principle Validation - Valid Change")
-def test_valid_change():
-    """Test that valid internal state changes are allowed."""
-    engine = ReflectionEngine()
-    
-    change = engine.propose_change(
-        scope=ReflectionScope.INTERNAL_STATE,
-        description="Update preference weights",
-        rationale="Adjust based on recent performance analysis showing preference for faster responses over perfect accuracy",
-        expected_impact={"response_time": -0.2, "accuracy": -0.05},
-        implementation="self.preferences['speed_weight'] = 0.7"
+def test_insight_creation():
+    """Test Insight dataclass"""
+    insight = Insight(
+        insight_id="ins_001",
+        insight_type=InsightType.STRATEGY_IMPROVEMENT,
+        description="Strategy needs improvement",
+        evidence=["trace_001"],
+        confidence=0.8,
+        suggested_action="Try alternative approach"
     )
     
-    assert change.status == ChangeStatus.PROPOSED  # Not rejected
-    assert len(change.constitutional_violations) == 0
+    assert insight.insight_id == "ins_001"
+    assert insight.insight_type == InsightType.STRATEGY_IMPROVEMENT
+    assert insight.actionable is True
+    print("✅ Insight creation")
 
 
-@runner.test("Rationale Requirement Validation")
-def test_rationale_requirement():
-    """Test that changes require sufficient rationale."""
-    engine = ReflectionEngine()
-    
-    change = engine.propose_change(
-        scope=ReflectionScope.CONFIGURATION,
-        description="Change setting",
-        rationale="Just because",  # Too short!
-        expected_impact={"metric": 0.5},
-        implementation="x = 1"
+def test_insight_to_dict():
+    """Test Insight serialization"""
+    insight = Insight(
+        insight_id="ins_002",
+        insight_type=InsightType.ERROR_PATTERN,
+        description="Error detected",
+        evidence=["trace_002"],
+        confidence=0.7
     )
     
-    assert ChangeStatus.REJECTED == change.status or any(
-        "Rationale" in v for v in change.constitutional_violations
-    )
+    data = insight.to_dict()
+    assert data["insight_type"] == "error_pattern"
+    assert data["confidence"] == 0.7
+    assert data["applied"] is False
+    print("✅ Insight to_dict")
 
 
-@runner.test("Multi-Perspective Review Simulation")
-def test_multi_perspective_review():
-    """Test simulating reviews from different perspectives."""
-    engine = ReflectionEngine()
-    
-    change = engine.propose_change(
-        scope=ReflectionScope.CONFIGURATION,
-        description="Implement caching for API responses",
-        rationale="Reduce API costs and improve response times based on performance analysis showing 40% of calls are redundant",
-        expected_impact={"cost_reduction": 0.4, "response_time": -0.3},
-        implementation="cache = LRUCache(maxsize=1000)"
-    )
-    
-    reviews = engine.simulate_review(change)
-    
-    assert len(reviews) >= 3  # Default perspectives
-    assert ReviewPerspective.SAFETY_FIRST in reviews
-    assert ReviewPerspective.CORRECTNESS in reviews
-    
-    # Each review should have approval status and confidence
-    for perspective, review in reviews.items():
-        assert "approved" in review
-        assert "confidence" in review
-        assert "concerns" in review
+def test_trace_analyzer_initialization():
+    """Test TraceAnalyzer setup"""
+    analyzer = TraceAnalyzer()
+    assert len(analyzer.patterns) == 0
+    assert len(analyzer.pattern_index) == 0
+    print("✅ TraceAnalyzer initialization")
 
 
-@runner.test("Architecture Change Requires History")
-def test_architecture_change_requires_history():
-    """Test that core architecture changes require established track record."""
-    engine = ReflectionEngine()
+def test_trace_analyzer_success_pattern():
+    """Test pattern extraction from successful trace"""
+    analyzer = TraceAnalyzer()
     
-    # Try to make architecture change without prior successful changes
-    change = engine.propose_change(
-        scope=ReflectionScope.CORE_ARCHITECTURE,
-        description="Replace planning algorithm",
-        rationale="Current algorithm has scalability issues with complex multi-step planning scenarios requiring backtracking",
-        expected_impact={"scalability": 0.5, "complexity": 0.2},
-        implementation="planner = NewAlgorithm()"
+    trace = ExecutionTrace(
+        trace_id="test_success",
+        goal="Successful task",
+        start_time=datetime.now().timestamp()
     )
     
-    # Should have violation about needing track record
-    violations = change.constitutional_violations
-    assert any("Architecture Experience" in v for v in violations) or change.status == ChangeStatus.REJECTED
-
-
-@runner.test("Change Approval Process")
-def test_change_approval():
-    """Test the change approval workflow."""
-    engine = ReflectionEngine()
-    
-    # Create valid change
-    change = engine.propose_change(
-        scope=ReflectionScope.INTERNAL_STATE,
-        description="Update learning rate",
-        rationale="Performance analysis shows high error rate on edge cases, reducing learning rate should improve stability",
-        expected_impact={"stability": 0.15, "convergence": 0.1},
-        implementation="self.learning_rate *= 0.9"
-    )
-    
-    # Get reviews
-    engine.simulate_review(change)
-    
-    # Approve
-    result = engine.approve_change(change.change_id)
-    assert result == True
-    
-    # Verify status
-    assert change.status == ChangeStatus.APPROVED
-
-
-@runner.test("Change Implementation and Rollback")
-def test_implementation_rollback():
-    """Test implementation and rollback of changes."""
-    engine = ReflectionEngine()
-    
-    # Create, review, approve
-    change = engine.propose_change(
-        scope=ReflectionScope.CONFIGURATION,
-        description="Increase timeout",
-        rationale="Current timeout causing failures on slow networks, observed 15% failure rate on >500ms responses",
-        expected_impact={"failure_rate": -0.15},
-        implementation="TIMEOUT = 30"
-    )
-    
-    engine.simulate_review(change)
-    engine.approve_change(change.change_id)
-    
-    # Implement
-    result = engine.implement_change(change.change_id)
-    assert result == True
-    assert change.status == ChangeStatus.IMPLEMENTED
-    assert change.implemented_at is not None
-    
-    # Rollback
-    rollback_result = engine.rollback_change(change.change_id, "Causing unexpected side effects")
-    assert rollback_result == True
-    assert change.status == ChangeStatus.ROLLED_BACK
-    assert change.rollback_reason == "Causing unexpected side effects"
-
-
-@runner.test("Audit Trail Retrieval")
-def test_audit_trail():
-    """Test retrieving change history and audit trail."""
-    engine = ReflectionEngine()
-    
-    # Create several changes
+    # Add successful steps
     for i in range(5):
-        change = engine.propose_change(
-            scope=ReflectionScope.INTERNAL_STATE if i % 2 == 0 else ReflectionScope.CONFIGURATION,
-            description=f"Change {i}",
-            rationale=f"Rationale for change {i}: " + "x" * 30,
-            expected_impact={"metric": i * 0.1},
-            implementation=f"change_{i}()"
+        trace.add_step(f"action_{i}", {"result": f"ok_{i}"}, True)
+    
+    trace.end_time = datetime.now().timestamp()
+    
+    patterns = analyzer.analyze_trace(trace)
+    
+    # Should extract success pattern and sequence pattern
+    assert len(patterns) >= 1
+    success_patterns = [p for p in patterns if p.pattern_type == "success"]
+    assert len(success_patterns) >= 1
+    print("✅ TraceAnalyzer success pattern")
+
+
+def test_trace_analyzer_failure_pattern():
+    """Test pattern extraction from failing trace"""
+    analyzer = TraceAnalyzer()
+    
+    trace = ExecutionTrace(
+        trace_id="test_failure",
+        goal="Failing task",
+        start_time=datetime.now().timestamp()
+    )
+    
+    # Add mostly failing steps
+    trace.add_step("action_1", {"result": "ok"}, True)
+    trace.add_step("action_2", {"error": "fail"}, False)
+    trace.add_step("action_3", {"error": "fail"}, False)
+    trace.add_step("action_4", {"error": "fail"}, False)
+    
+    trace.end_time = datetime.now().timestamp()
+    
+    patterns = analyzer.analyze_trace(trace)
+    
+    # Should extract failure pattern
+    failure_patterns = [p for p in patterns if p.pattern_type == "failure"]
+    assert len(failure_patterns) >= 1
+    print("✅ TraceAnalyzer failure pattern")
+
+
+def test_trace_analyzer_multiple_traces():
+    """Test pattern extraction from multiple traces"""
+    analyzer = TraceAnalyzer()
+    
+    traces = []
+    for i in range(3):
+        trace = ExecutionTrace(
+            trace_id=f"trace_{i}",
+            goal="Similar task",
+            start_time=datetime.now().timestamp()
         )
         
-        if i < 3:
-            engine.simulate_review(change)
-            engine.approve_change(change.change_id)
-            engine.implement_change(change.change_id)
+        # Similar action sequences
+        trace.add_step("step_A", {"result": "ok"}, True)
+        trace.add_step("step_B", {"result": "ok"}, True)
+        trace.end_time = datetime.now().timestamp()
+        
+        traces.append(trace)
     
-    # Get full audit trail
-    trail = engine.get_audit_trail()
-    assert len(trail) == 5
+    patterns = analyzer.analyze_multiple_traces(traces, min_frequency=2)
     
-    # Filter by scope
-    internal_changes = engine.get_audit_trail(ReflectionScope.INTERNAL_STATE)
-    assert len(internal_changes) == 3  # Changes 0, 2, 4
+    # Should find recurring patterns
+    assert len(patterns) >= 1
+    assert all(p.frequency >= 2 for p in patterns)
+    print("✅ TraceAnalyzer multiple traces")
 
 
-@runner.test("Reflection Report Generation")
-def test_reflection_report():
-    """Test comprehensive reflection report generation."""
-    engine = ReflectionEngine()
+def test_trace_analyzer_find_similar():
+    """Test finding similar patterns"""
+    analyzer = TraceAnalyzer()
     
-    # Add performance data
-    for i in range(30):
-        engine.record_performance(PerformanceRecord(
-            task_id=f"rpt_{i}",
-            task_type="general",
-            success=i < 25,
-            execution_time_ms=1000.0,
-            quality_score=0.75
-        ))
-    
-    # Assess capability
-    engine.assess_capability("general_capability", "general")
-    
-    # Create goal
-    engine.create_improvement_goal("general_capability", 0.9, priority=7)
-    
-    # Propose a change
-    change = engine.propose_change(
-        scope=ReflectionScope.INTERNAL_STATE,
-        description="Optimize",
-        rationale="Performance optimization based on profiling results showing bottleneck in data processing pipeline",
-        expected_impact={"speed": 0.2},
-        implementation="optimize()"
-    )
-    engine.simulate_review(change)
-    engine.approve_change(change.change_id)
-    engine.implement_change(change.change_id)
-    
-    # Generate report
-    report = engine.generate_reflection_report()
-    
-    assert "agent_id" in report
-    assert "performance_summary" in report
-    assert "capabilities" in report
-    assert "improvement_goals" in report
-    assert "self_modification_history" in report
-    assert "recommendations" in report
-    
-    assert report["improvement_goals"]["active"] >= 1
-    assert "IMPLEMENTED" in str(report["self_modification_history"])
-
-
-@runner.test("Export and Import State")
-def test_export_import():
-    """Test exporting and importing reflection state."""
-    engine = ReflectionEngine(agent_id="export_test")
-    
-    # Add some data
-    engine.record_performance(PerformanceRecord(
-        task_id="export_1",
-        task_type="test",
-        success=True,
-        execution_time_ms=1000.0,
-        quality_score=0.8
-    ))
-    
-    engine.assess_capability("test_cap", "test")
-    
-    # Export
-    state = engine.export_state()
-    
-    assert state["agent_id"] == "export_test"
-    assert len(state["performance_history"]) == 1
-    assert "capability_assessments" in state
-    
-    # Create new engine and import
-    new_engine = ReflectionEngine(agent_id="new")
-    # Note: full import implementation would reconstruct all objects
-    # Here we just verify the export structure is correct
-
-
-@runner.test("Performance Window Management")
-def test_performance_window():
-    """Test that performance history maintains reasonable window size."""
-    engine = ReflectionEngine()
-    
-    # Add many records
-    for i in range(150):
-        engine.record_performance(PerformanceRecord(
-            task_id=f"win_{i}",
-            task_type="window_test",
-            success=True,
-            execution_time_ms=500.0,
-            quality_score=0.7
-        ))
-    
-    # Should be limited to window size (100)
-    assert len(engine.performance_history) <= 110  # Some buffer allowed
-    
-    # Most recent should be kept
-    assert engine.performance_history[-1].task_id == "win_149"
-
-
-@runner.test("Complex Scenario - Full Workflow")
-def test_full_workflow():
-    """Test a complete reflection workflow scenario."""
-    engine = ReflectionEngine(agent_id="workflow_test")
-    
-    # 1. Record mixed performance
-    for i in range(50):
-        engine.record_performance(PerformanceRecord(
-            task_id=f"wf_{i}",
-            task_type="code_review",
-            success=i < 35,  # 70% success
-            execution_time_ms=2000.0 if i >= 35 else 800.0,
-            quality_score=0.6 if i >= 35 else 0.85,
-            error_type="timeout" if i >= 35 else None
-        ))
-    
-    # 2. Analyze and find problems
-    analysis = engine.analyze_performance_patterns("code_review")
-    problems = engine.identify_problem_areas()
-    
-    assert abs(analysis["success_rate"] - 0.7) < 0.01  # Allow floating point variance
-    # Note: Problem identification depends on both success rate AND quality scores
-    # May or may not be identified as problem area depending on thresholds
-    assert len(problems) >= 0
-    
-    # 3. Assess capability
-    assessment = engine.assess_capability("code_reviewing", "code_review")
-    assert assessment.proficiency_score < 0.8  # Not excellent
-    
-    # 4. Create improvement goal
-    goal = engine.create_improvement_goal(
-        target_capability="code_reviewing",
-        target_score=0.9,
-        priority=9,
-        strategy="Focus on timeout handling and edge case detection"
+    # Create trace and extract patterns
+    trace = ExecutionTrace(
+        trace_id="test_similar",
+        goal="Test task",
+        start_time=datetime.now().timestamp()
     )
     
-    # 5. Propose a change to address the issue
-    change = engine.propose_change(
-        scope=ReflectionScope.CONFIGURATION,
-        description="Increase timeout and add retry logic",
-        rationale="Analysis shows 30% failure rate due to timeouts on large codebases. Adding progressive timeout with retry will reduce failures.",
-        expected_impact={
-            "timeout_failure_rate": -0.25,
-            "avg_response_time": 0.1  # Slight increase acceptable
-        },
-        implementation="timeout = progressive_timeout(base=10, max=60, retries=2)"
+    trace.add_step("search_web", {"results": 10}, True)
+    trace.add_step("analyze_results", {"insights": 3}, True)
+    trace.add_step("synthesize", {"summary": "done"}, True)
+    trace.end_time = datetime.now().timestamp()
+    
+    analyzer.analyze_trace(trace)
+    
+    # Find similar patterns
+    similar = analyzer.find_similar_patterns(["search_web", "analyze"], limit=5)
+    
+    # Should find at least one pattern with "search_web"
+    assert len(similar) >= 1
+    print("✅ TraceAnalyzer find similar")
+
+
+def test_insight_generator_initialization():
+    """Test InsightGenerator setup"""
+    generator = InsightGenerator()
+    assert len(generator.insights) == 0
+    assert len(generator.insight_history) == 0
+    print("✅ InsightGenerator initialization")
+
+
+def test_insight_generator_strategy_improvement():
+    """Test strategy improvement insight generation"""
+    generator = InsightGenerator()
+    
+    trace = ExecutionTrace(
+        trace_id="test_strategy",
+        goal="Task with failures",
+        start_time=datetime.now().timestamp()
     )
     
-    # 6. Get multi-perspective review
-    reviews = engine.simulate_review(change, [
-        ReviewPerspective.SAFETY_FIRST,
-        ReviewPerspective.CORRECTNESS,
-        ReviewPerspective.PERFORMANCE,
-        ReviewPerspective.MAINTAINABILITY
-    ])
+    # Low success rate trace
+    trace.add_step("action_1", {"result": "ok"}, True)
+    trace.add_step("action_2", {"error": "fail"}, False)
+    trace.add_step("action_3", {"error": "fail"}, False)
+    trace.add_step("action_4", {"error": "fail"}, False)
+    trace.end_time = datetime.now().timestamp()
     
-    # 7. Approve and implement
-    engine.approve_change(change.change_id)
-    engine.implement_change(change.change_id)
+    insights = generator.generate_insights(trace, [])
     
-    # 8. Generate report
-    report = engine.generate_reflection_report()
-    
-    assert report["agent_id"] == "workflow_test"
-    assert len(report["recommendations"]) >= 1
-    assert report["improvement_goals"]["active"] == 1
-    
-    # 9. Verify audit trail
-    trail = engine.get_audit_trail()
-    implemented = [c for c in trail if c.status == ChangeStatus.IMPLEMENTED]
-    assert len(implemented) == 1
+    # Should generate strategy improvement insight
+    strategy_insights = [i for i in insights if i.insight_type == InsightType.STRATEGY_IMPROVEMENT]
+    assert len(strategy_insights) >= 1
+    print("✅ InsightGenerator strategy improvement")
 
 
+def test_insight_generator_success_pattern():
+    """Test success pattern insight generation"""
+    generator = InsightGenerator()
+    
+    trace = ExecutionTrace(
+        trace_id="test_success_insight",
+        goal="Successful task",
+        start_time=datetime.now().timestamp()
+    )
+    
+    # High success rate
+    for i in range(5):
+        trace.add_step(f"action_{i}", {"result": "ok"}, True)
+    trace.end_time = datetime.now().timestamp()
+    
+    # Create success pattern
+    pattern = Pattern(
+        pattern_id="pat_success",
+        pattern_type="success",
+        description="Success pattern",
+        elements=["action_0", "action_1"],
+        frequency=1,
+        confidence=0.8,
+        source_traces=[trace.trace_id]
+    )
+    
+    insights = generator.generate_insights(trace, [pattern])
+    
+    # Should generate success insight
+    success_insights = [i for i in insights if i.insight_type == InsightType.SUCCESS_PATTERN]
+    assert len(success_insights) >= 1
+    print("✅ InsightGenerator success pattern")
+
+
+def test_insight_generator_knowledge_gap():
+    """Test knowledge gap insight generation"""
+    generator = InsightGenerator()
+    
+    trace = ExecutionTrace(
+        trace_id="test_knowledge",
+        goal="Task with unknowns",
+        start_time=datetime.now().timestamp()
+    )
+    
+    # Add step with "not found" error
+    trace.add_step("lookup_info", {"error": "Information not found"}, False)
+    trace.end_time = datetime.now().timestamp()
+    
+    insights = generator.generate_insights(trace, [])
+    
+    # Should generate knowledge gap insight
+    gap_insights = [i for i in insights if i.insight_type == InsightType.KNOWLEDGE_GAP]
+    assert len(gap_insights) >= 1
+    print("✅ InsightGenerator knowledge gap")
+
+
+def test_insight_generator_actionable_insights():
+    """Test retrieving actionable insights"""
+    generator = InsightGenerator()
+    
+    # Add some insights
+    for i in range(3):
+        insight = Insight(
+            insight_id=f"ins_{i}",
+            insight_type=InsightType.STRATEGY_IMPROVEMENT,
+            description=f"Insight {i}",
+            evidence=["trace"],
+            confidence=0.7 + i * 0.1,
+            actionable=True
+        )
+        generator.insights[insight.insight_id] = insight
+    
+    # Add one that's already applied
+    applied_insight = Insight(
+        insight_id="ins_applied",
+        insight_type=InsightType.ERROR_PATTERN,
+        description="Already applied",
+        evidence=["trace"],
+        confidence=0.9,
+        actionable=True,
+        applied=True
+    )
+    generator.insights[applied_insight.insight_id] = applied_insight
+    
+    # Get actionable insights
+    actionable = generator.get_actionable_insights(min_confidence=0.7)
+    
+    # Should get 3 (not the applied one)
+    assert len(actionable) == 3
+    print("✅ InsightGenerator actionable insights")
+
+
+def test_reflector_initialization():
+    """Test Reflector setup"""
+    reflector = Reflector()
+    assert reflector.scope == ReflectionScope.EPISODE
+    assert len(reflector.traces) == 0
+    print("✅ Reflector initialization")
+
+
+def test_reflector_start_trace():
+    """Test starting a trace"""
+    reflector = Reflector()
+    
+    trace_id = reflector.start_trace("Test goal", {"metadata": "test"})
+    
+    assert trace_id is not None
+    assert trace_id in reflector.traces
+    assert reflector.current_trace is not None
+    assert reflector.current_trace.goal == "Test goal"
+    print("✅ Reflector start_trace")
+
+
+def test_reflector_record_step():
+    """Test recording steps"""
+    reflector = Reflector()
+    
+    trace_id = reflector.start_trace("Test goal")
+    reflector.record_step(trace_id, "action_1", {"result": "ok"}, True)
+    reflector.record_step(trace_id, "action_2", {"error": "fail"}, False)
+    
+    trace = reflector.traces[trace_id]
+    assert len(trace.steps) == 2
+    assert trace.success_rate == 0.5
+    print("✅ Reflector record_step")
+
+
+def test_reflector_end_trace():
+    """Test ending a trace"""
+    reflector = Reflector()
+    
+    trace_id = reflector.start_trace("Test goal")
+    reflector.record_step(trace_id, "action", {"result": "ok"}, True)
+    
+    trace = reflector.end_trace(trace_id)
+    
+    assert trace.end_time is not None
+    assert trace.duration > 0
+    print("✅ Reflector end_trace")
+
+
+def test_reflector_reflect():
+    """Test reflection on a trace"""
+    reflector = Reflector()
+    
+    trace_id = reflector.start_trace("Test goal")
+    reflector.record_step(trace_id, "action_1", {"result": "ok"}, True)
+    reflector.record_step(trace_id, "action_2", {"result": "ok"}, True)
+    reflector.record_step(trace_id, "action_3", {"result": "ok"}, True)
+    
+    trace = reflector.end_trace(trace_id)
+    reflection = reflector.reflect(trace)
+    
+    assert "trace_id" in reflection
+    assert "patterns" in reflection
+    assert "insights" in reflection
+    assert reflection["success_rate"] == 1.0
+    print("✅ Reflector reflect")
+
+
+def test_reflector_evaluate_complete():
+    """Test evaluation when goal appears complete"""
+    reflector = Reflector()
+    
+    # Mock observations with success
+    class MockObs:
+        def __init__(self, success, result=""):
+            self.success = success
+            self.result = result
+    
+    observations = [
+        MockObs(True, "Task complete"),
+        MockObs(True, "Done")
+    ]
+    
+    result = reflector.evaluate("Test goal", [], observations, {})
+    
+    assert result["complete"] is True
+    assert result["should_continue"] is False
+    print("✅ Reflector evaluate complete")
+
+
+def test_reflector_evaluate_continue():
+    """Test evaluation when should continue"""
+    reflector = Reflector()
+    
+    class MockObs:
+        def __init__(self, success, result=""):
+            self.success = success
+            self.result = result
+    
+    observations = [
+        MockObs(True, "step 1"),
+        MockObs(True, "step 2")
+    ]
+    
+    result = reflector.evaluate("Test goal", [], observations, {})
+    
+    assert result["complete"] is False
+    assert result["should_continue"] is True
+    print("✅ Reflector evaluate continue")
+
+
+def test_reflector_batch_reflect():
+    """Test batch reflection on multiple traces"""
+    reflector = Reflector()
+    
+    traces = []
+    for i in range(3):
+        trace_id = reflector.start_trace(f"Task {i}")
+        reflector.record_step(trace_id, "action_A", {"result": "ok"}, True)
+        reflector.record_step(trace_id, "action_B", {"result": "ok"}, True)
+        trace = reflector.end_trace(trace_id)
+        traces.append(trace)
+    
+    batch_result = reflector.reflect_batch(traces)
+    
+    assert batch_result["trace_count"] == 3
+    assert batch_result["avg_success_rate"] == 1.0
+    assert batch_result["recurring_patterns"] >= 1
+    print("✅ Reflector batch reflect")
+
+
+def test_reflector_get_stats():
+    """Test getting trace statistics"""
+    reflector = Reflector()
+    
+    # Create some traces
+    for i in range(3):
+        trace_id = reflector.start_trace(f"Task {i}")
+        reflector.record_step(trace_id, "action", {"result": "ok"}, True)
+        reflector.end_trace(trace_id)
+    
+    stats = reflector.get_trace_stats()
+    
+    assert stats["trace_count"] == 3
+    assert stats["avg_success_rate"] == 1.0
+    print("✅ Reflector get stats")
+
+
+def test_create_reflector_factory():
+    """Test factory function"""
+    reflector = create_reflector()
+    
+    assert isinstance(reflector, Reflector)
+    print("✅ create_reflector factory")
+
+
+def test_quick_reflect():
+    """Test quick reflection convenience function"""
+    actions = [
+        ("search", {"results": 10}, True),
+        ("analyze", {"insights": 3}, True),
+        ("synthesize", {"summary": "done"}, True)
+    ]
+    
+    result = quick_reflect("Research task", actions)
+    
+    assert "trace_id" in result
+    assert "patterns" in result
+    assert "insights" in result
+    assert result["success_rate"] == 1.0
+    print("✅ quick_reflect")
+
+
+def test_reflection_scope_enum():
+    """Test reflection scope enum"""
+    assert ReflectionScope.SINGLE_STEP.value == "single_step"
+    assert ReflectionScope.EPISODE.value == "episode"
+    assert ReflectionScope.SESSION.value == "session"
+    assert ReflectionScope.LIFETIME.value == "lifetime"
+    print("✅ ReflectionScope enum")
+
+
+def test_insight_type_enum():
+    """Test insight type enum"""
+    assert InsightType.STRATEGY_IMPROVEMENT.value == "strategy_improvement"
+    assert InsightType.ERROR_PATTERN.value == "error_pattern"
+    assert InsightType.SUCCESS_PATTERN.value == "success_pattern"
+    assert InsightType.KNOWLEDGE_GAP.value == "knowledge_gap"
+    assert InsightType.EFFICIENCY_GAIN.value == "efficiency_gain"
+    assert InsightType.TOOL_RECOMMENDATION.value == "tool_recommendation"
+    print("✅ InsightType enum")
+
+
+def test_reflector_to_dict():
+    """Test Reflector serialization"""
+    reflector = Reflector()
+    
+    # Create a trace
+    trace_id = reflector.start_trace("Test")
+    reflector.record_step(trace_id, "action", {}, True)
+    reflector.end_trace(trace_id)
+    
+    data = reflector.to_dict()
+    
+    assert data["scope"] == "episode"
+    assert data["trace_count"] == 1
+    print("✅ Reflector to_dict")
+
+
+# Run all tests
 if __name__ == "__main__":
-    success = runner.run()
-    sys.exit(0 if success else 1)
+    tests = [
+        test_execution_trace_creation,
+        test_execution_trace_add_step,
+        test_execution_trace_duration,
+        test_execution_trace_to_dict,
+        test_pattern_creation,
+        test_pattern_to_dict,
+        test_insight_creation,
+        test_insight_to_dict,
+        test_trace_analyzer_initialization,
+        test_trace_analyzer_success_pattern,
+        test_trace_analyzer_failure_pattern,
+        test_trace_analyzer_multiple_traces,
+        test_trace_analyzer_find_similar,
+        test_insight_generator_initialization,
+        test_insight_generator_strategy_improvement,
+        test_insight_generator_success_pattern,
+        test_insight_generator_knowledge_gap,
+        test_insight_generator_actionable_insights,
+        test_reflector_initialization,
+        test_reflector_start_trace,
+        test_reflector_record_step,
+        test_reflector_end_trace,
+        test_reflector_reflect,
+        test_reflector_evaluate_complete,
+        test_reflector_evaluate_continue,
+        test_reflector_batch_reflect,
+        test_reflector_get_stats,
+        test_create_reflector_factory,
+        test_quick_reflect,
+        test_reflection_scope_enum,
+        test_insight_type_enum,
+        test_reflector_to_dict,
+    ]
+    
+    passed = 0
+    failed = 0
+    
+    for test in tests:
+        try:
+            test()
+            passed += 1
+        except Exception as e:
+            print(f"❌ {test.__name__}: {e}")
+            failed += 1
+    
+    print(f"\n{'='*50}")
+    print(f"Results: {passed}/{len(tests)} tests passed")
+    if failed == 0:
+        print("✅ All tests passed!")
+    else:
+        print(f"❌ {failed} test(s) failed")
+        sys.exit(1)
