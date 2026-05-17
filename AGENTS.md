@@ -7,6 +7,164 @@
 
 ## Build Log
 
+### 2026-05-17 - Scheduled Run: Bayesian Belief-Based Planner
+**Status**: ✅ COMPLETE - 34/34 tests passed
+
+**Research Summary (May 17, 2026)**:
+
+**Industry News & Breakthroughs**:
+- **Gemini Spark**: Google's upcoming always-on AI agent leaked ahead of I/O 2026
+  - Runs proactively in background vs reactive prompt-response
+  - Pulls from linked apps, chat history, schedules, websites, location data
+  - Full workflow automation across services
+  
+- **Microsoft MDASH**: Multi-agent AI system topping cybersecurity benchmarks
+  - 100+ specialized agents working together across multiple models
+  - Scored 88.45% on CyberGym benchmark vs Anthropic Mythos
+  - Found 16 new Windows vulnerabilities including 4 critical RCE flaws
+
+- **AGIBOT 2026 Partner Conference**: Chinese embodied AI deployment focus
+  - "Redefining Productivity in the AGI Era" theme
+  - Sharebot global robotics rental platform (RaaS model)
+  - 2026 marked as start of "deployment phase" for embodied AI
+
+- **Former OpenAI Researcher Warning**: Daniel Kokotajlo on AI safety
+  - "AI is not loyal to us" - fundamental misalignment risk
+  - AI agents as potential turning point requiring safeguards
+
+**Key arXiv Papers (Past 2 Weeks)**:
+1. **[2605.00742v1] Position: Agentic AI Orchestration Should Be Bayes-Consistent**
+   - Bayesian decision theory should guide agentic control layers
+   - Maintain beliefs about task-relevant latent quantities
+   - Update from interactions, choose actions in utility-aware way
+   - This paper motivated today's build
+
+2. **[2604.14990] AGI Alignment Through Autonomy-Supporting Parenting**
+   - Reframes AGI as developing subject vs tool to control
+   - Proposes "autonomy-supporting parenting" approach
+   - Gradual reduction of human control, maintaining ethical engagement
+
+3. **[2604.11753] AggAgent: Agentic Aggregation for Parallel Scaling**
+   - Treats parallel rollouts as interactive environment for synthesis
+   - Outperforms existing methods by 5.3pp average, 10.3pp on deep research
+   - Enables cross-trajectory reasoning with minimal overhead
+
+4. **[2603.24621] ARC-AGI-3: New Challenge for Frontier Agentic Intelligence**
+   - Interactive benchmark for abstract, turn-based environments
+   - Humans: 100%, Frontier AI: <1% as of March 2026
+   - Focus on fluid adaptive efficiency without language/external knowledge
+
+5. **[2603.19461] HyperAgents: Self-Modifying Agent Framework**
+   - Combines task-solving agent with meta-agent that can modify both
+   - Extends DGM (Darwin Gödel Machine) to DGM-H
+   - Self-accelerating progress on computable tasks across domains
+
+**Trending Open Source AI Agent Repositories (May 2026)**:
+1. **deer-flow** (zbinxp/deer-flow): Long-horizon SuperAgent harness
+2. **Nanobot** (HKUDS/nanobot): Ultra-lightweight agent framework
+3. **OpenAkita** (liuchaoxun/openakita): Multi-agent orchestration, 89+ tools
+4. **Agent-S** (simular-ai/agent-s): Autonomous GUI agents, SOTA on OSWorld
+5. **Agent Zero** (agent0ai/agent-zero): Portable SKILL.md standard
+6. **Ouroboros** (razzant/ouroboros): Self-modifying AI agent
+
+**Key Research Insights**:
+1. **Bayesian orchestration** emerging as principled approach for agent control
+2. **Always-on agents** becoming reality (Gemini Spark, background processing)
+3. **Self-modification** frameworks gaining traction (HyperAgents, Ouroboros)
+4. **Human-AI gap** on ARC-AGI-3 is stark - AGI still distant
+5. **Multi-agent security applications** showing practical results (MDASH)
+6. **Autonomy vs control** debate intensifying - parenting vs containment
+7. **Parallel aggregation** (AggAgent) enabling cost-efficient long-horizon tasks
+
+**Build Task**: Bayesian Belief-Based Planner
+
+**Motivation**: Based on arXiv:2605.00742v1 "Position: Agentic AI Orchestration Should Be Bayes-Consistent" - applying Bayesian decision theory to the agentic control layer. Unlike classical planners, Bayesian planners maintain probabilistic beliefs about action effectiveness and update them from execution outcomes, enabling principled decision-making under uncertainty.
+
+**Key Components**:
+
+1. **BeliefType & DistributionType**: Enums for belief categorization
+   - BeliefType: TASK_DIFFICULTY, TOOL_EFFECTIVENESS, STRATEGY_QUALITY, etc.
+   - DistributionType: BETA (binary), GAUSSIAN (continuous), CATEGORICAL (discrete)
+
+2. **Belief**: Probabilistic belief about latent quantities
+   - Conjugate priors for efficient Bayesian updating
+   - Beta for binary outcomes (success/failure counts)
+   - Gaussian with precision-weighted updates for continuous values
+   - Categorical with probability vectors for discrete options
+   - Methods: expected_value(), uncertainty(), update_beta(), update_gaussian(), sample()
+
+3. **Action**: Possible action with expected utility
+   - Links to success_probability, cost_belief, quality_belief Beliefs
+   - expected_utility() combines success probability minus normalized cost
+
+4. **BayesianPlan**: Plan that maintains beliefs about execution
+   - Collection of Actions with shared Belief context
+   - select_next_action() based on highest expected utility
+   - update_from_observation() performs Bayesian updating on relevant beliefs
+   - value_of_information() identifies high-impact uncertainty reduction
+   - should_explore() decides exploration vs exploitation
+   - get_statistics() for observability/debugging
+
+5. **BayesianPlanner**: Planner using Bayesian decision theory
+   - Maintains global beliefs about tool/strategy effectiveness
+   - Creates plans with initialized Beta(α, β) priors (configurable prior_strength)
+   - Learns from execution outcomes: update_from_execution()
+   - Recommends tools based on learned effectiveness: recommend_tool()
+   - Ranks tools by expected success probability: get_tool_ranking()
+
+**Test Coverage**: 34/34 tests passed ✅
+- Belief creation and distributions: Beta, Gaussian, Categorical (9 tests)
+- Bayesian updating: success/failure observations, parameter inference (4 tests)
+- Action utility calculation: expected utility, cost-benefit tradeoffs (3 tests)
+- BayesianPlan management: creation, beliefs, action selection (9 tests)
+- Planner learning: tool recommendation, ranking, statistics (7 tests)
+- Integration: full workflow, exploration-exploitation tradeoff (2 tests)
+
+**Usage Example**:
+```python
+from core.bayesian_planner import create_bayesian_planner, quick_plan
+
+# Create planner with strong priors (higher = more conservative learning)
+planner = create_bayesian_planner(prior_strength=2.0)
+
+# Create plan for goal with available actions
+plan = planner.plan("Research AGI", [
+    {"name": "web_search", "type": "tool", "params": {"engine": "google"}},
+    {"name": "arxiv_search", "type": "tool", "params": {"category": "cs.AI"}},
+])
+
+# Execute and learn
+planner.update_from_execution(plan, "web_search", success=True, cost=0.3, quality=0.8)
+planner.update_from_execution(plan, "arxiv_search", success=True, cost=0.2, quality=0.9)
+
+# Get tool recommendation based on learned effectiveness
+recommended, prob = planner.recommend_tool("Find AI papers", ["web_search", "arxiv_search"])
+
+# Get ranked tool list
+tool_rankings = planner.get_tool_ranking()
+# Returns: [("arxiv_search", 0.75, 0.03), ("web_search", 0.60, 0.04)]
+```
+
+**Research Synthesis**: The Bayesian planner demonstrates:
+- **Principled uncertainty handling**: Beta distributions track tool success rates
+- **Continuous learning**: Each execution updates beliefs via conjugate Bayesian updating
+- **Exploration-exploitation**: VoI calculation identifies high-value information gathering
+- **Observability**: Belief statistics enable debugging and monitoring
+
+**Files Changed**:
+- `core/bayesian_planner.py`: 400+ lines - Bayesian belief-based planning system
+- `experiments/test_bayesian_planner.py`: 700+ lines - 34 comprehensive tests
+- `CURRENT_RESEARCH.md`: Updated with May 17, 2026 research findings
+- `AGENTS.md`: This build log entry
+
+**Next Priority**: Integration with existing workflow DAG
+- Use Bayesian beliefs to guide workflow node selection
+- Track tool effectiveness across DAG executions
+- Value of information for parallel branch exploration
+- Bayesian model for checkpoint-resume decisions
+
+---
+
 ### 2026-05-14 - Scheduled Run: Self-Evolving Skill Acquisition Module
 **Status**: ✅ COMPLETE - 38/38 tests passed
 

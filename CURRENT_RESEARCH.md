@@ -14,6 +14,104 @@
 
 ---
 
+## AGI Research Log
+
+## Research Summary (May 17, 2026)
+
+### Key Industry Developments
+- **Gemini Spark**: Google's upcoming always-on AI agent (leaked ahead of I/O 2026)
+  - Runs proactively in background, not just reactive to prompts
+  - Pulls from linked apps, chat history, schedules, websites, location data
+  - Full workflow automation across services
+  
+- **Microsoft MDASH**: Multi-agent AI system topping cybersecurity benchmarks
+  - 100+ specialized agents working together across multiple models
+  - Scored 88.45% on CyberGym benchmark vs Anthropic Mythos
+  - Found 16 new Windows vulnerabilities including 4 critical RCE flaws
+
+- **AGIBOT 2026 Partner Conference**: Chinese embodied AI deployment focus
+  - "Redefining Productivity in the AGI Era" theme
+  - Sharebot global robotics rental platform (RaaS model)
+  - 2026 marked as start of "deployment phase" for embodied AI
+
+- **Former OpenAI Researcher Warning**: Daniel Kokotajlo on AI safety
+  - "AI is not loyal to us" - fundamental misalignment risk
+  - AI agents as potential turning point requiring safeguards
+  - AI Futures Project advocating for stronger governance
+
+### Recent arXiv Papers (Past 2 Weeks)
+1. **[2605.00742v1] Position: Agentic AI Orchestration Should Be Bayes-Consistent**
+   - Bayesian decision theory should guide agentic control layers
+   - Maintain beliefs about task-relevant latent quantities
+   - Update from interactions, choose actions in utility-aware way
+
+2. **[2604.14990] AGI Alignment Through Autonomy-Supporting Parenting**
+   - Reframes AGI as developing subject vs tool to control
+   - Proposes "autonomy-supporting parenting" approach
+   - Gradual reduction of human control, maintaining ethical engagement
+
+3. **[2604.11753] AggAgent: Agentic Aggregation for Parallel Scaling**
+   - Treats parallel rollouts as interactive environment for synthesis
+   - Outperforms existing methods by 5.3pp average, 10.3pp on deep research
+   - Enables cross-trajectory reasoning with minimal overhead
+
+4. **[2603.24621] ARC-AGI-3: New Challenge for Frontier Agentic Intelligence**
+   - Interactive benchmark for abstract, turn-based environments
+   - Humans: 100%, Frontier AI: <1% as of March 2026
+   - Focus on fluid adaptive efficiency without language/external knowledge
+
+5. **[2603.19461] HyperAgents: Self-Modifying Agent Framework**
+   - Combines task-solving agent with meta-agent that can modify both
+   - Extends DGM (Darwin Gödel Machine) to DGM-H
+   - Self-accelerating progress on computable tasks across domains
+
+### Trending Open Source AI Agent Repositories (May 2026)
+1. **deer-flow** (zbinxp/deer-flow): Long-horizon SuperAgent harness
+   - Sandboxes, memories, tools, skills, subagents
+   - Complete rewrite v2.0 built on LangGraph/LangChain
+   
+2. **Nanobot** (HKUDS/nanobot): Ultra-lightweight agent framework
+   - OpenClaw/Codex-like approach with minimal core
+   - 260+ contributors, chat channels, MCP, deployment ready
+
+3. **OpenAkita** (liuchaoxun/openakita): Multi-agent orchestration
+   - 89+ built-in tools, 30+ LLM providers
+   - 3-layer memory system, ReAct reasoning
+   - Skill marketplace with AI-generated skills
+
+4. **Agent-S** (simular-ai/agent-s): Autonomous GUI agents
+   - State-of-the-art on OSWorld benchmarks (66-72.6%)
+   - Agent-Computer Interface for learning from experience
+   - 11k+ stars, active development
+
+5. **Agent Zero** (agent0ai/agent-zero): Portable SKILL.md standard
+   - SKILL.md compatible with Claude Code, Codex
+   - Git-based projects, persistent memory
+   - 16k+ stars, 50 releases
+
+6. **Ouroboros** (razzant/ouroboros): Self-modifying AI agent
+   - Writes/rewrites own code autonomously
+   - Constitution (BIBLE.md) + multi-model review
+   - 30+ autonomous cycles within 24 hours reported
+
+### Key Research Insights
+1. **Bayesian orchestration** emerging as principled approach for agent control
+2. **Always-on agents** becoming reality (Gemini Spark, background processing)
+3. **Self-modification** frameworks gaining traction (HyperAgents, Ouroboros)
+4. **Human-AI gap** on ARC-AGI-3 is stark - AGI still distant
+5. **Multi-agent security applications** showing practical results (MDASH)
+6. **Autonomy vs control** debate intensifying - parenting vs containment
+7. **Parallel aggregation** (AggAgent) enabling cost-efficient long-horizon tasks
+
+### Implications for Our Framework
+- Consider Bayesian belief updating in our planning layer
+- Background processing capability for long-running tasks
+- Self-improvement mechanisms beyond skill crystallization
+- Multi-agent security/verification patterns for critical operations
+- ARC-AGI-3 style abstract reasoning as evaluation target
+
+---
+
 ## 1. Latest AGI Research Findings (Week of May 16, 2026)
 
 ### 1.1 Industry & News Highlights
