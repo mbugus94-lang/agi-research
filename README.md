@@ -1,44 +1,50 @@
-# AGI Research & Build
+# AGI Continuous Research & Build Project
 
-A living research repository exploring AGI architectures, agent systems, and continuous learning implementations.
+An incremental, working-code approach to building toward AGI capabilities through daily research and implementation.
 
-## Vision
+## Philosophy
+- Incremental, working code over perfect architecture
+- Test everything
+- Small, daily progress compounds
+- Self-modifications require review, never auto-apply
 
-Build toward AGI through incremental, working systems — emphasizing continuous learning, self-reflection, and modular capabilities.
-
-## Repository Structure
-
+## Directory Structure
 ```
 agi-research/
-├── README.md              # This file
-├── CURRENT_RESEARCH.md    # Latest research findings & insights
-├── ARCHITECTURE.md        # System design & architecture decisions
-├── core/                  # Core AGI components
-│   ├── agent.py          # Base agent implementation
-│   ├── memory.py         # Memory systems (episodic, semantic, procedural)
-│   ├── planner.py        # Planning & goal decomposition
-│   └── reflection.py     # Self-reflection & improvement
-├── skills/               # Capability modules
-├── experiments/          # Validation tests & experiments
-└── docs/                 # Documentation & notes
+├── README.md                 # This file
+├── CURRENT_RESEARCH.md       # Latest research findings
+├── ARCHITECTURE.md           # System design documentation
+├── core/                     # Core agent components
+│   ├── agent.py             # Base agent implementation
+│   ├── memory.py            # Memory systems
+│   ├── planner.py           # Planning & orchestration
+│   └── reflection.py        # Self-reflection mechanisms
+├── skills/                   # Capability modules
+│   ├── web_search.py
+│   ├── code_gen.py
+│   └── analysis.py
+└── experiments/              # Validation tests & experiments
+    └── test_*.py
 ```
 
-## Key Principles
-
-1. **Incremental Progress**: Working code over perfect architecture
-2. **Continuous Learning**: Systems that improve from experience
-3. **Modular Design**: Composable, reusable components
-4. **Test Everything**: Validation is essential
-5. **Document Continuously**: Research findings inform implementation
-
 ## Current Status
+- Research phase active: tracking latest AGI research, arXiv papers, open-source projects
+- Core components: In development
+- Next priority: Multi-agent coordination layer
 
-See `CURRENT_RESEARCH.md` for latest research and `ARCHITECTURE.md` for system design.
+## Key Research Insights
+See `CURRENT_RESEARCH.md` for latest findings on:
+- Multi-agent AI teams for scientific research
+- Self-improving embodied agents (ASH)
+- Agent memory challenges (GroupMemBench)
+- Trending open-source agent frameworks
 
-## Research Focus Areas
+## Development Workflow
+1. Research (15 min) - web, arXiv, GitHub
+2. Document findings in CURRENT_RESEARCH.md
+3. Build ONE component/experiment
+4. Test and commit
+5. Push to repository
 
-- Multi-agent orchestration & coordination
-- Memory systems (episodic, semantic, procedural)
-- Self-reflection & metacognition
-- Tool use & extensibility
-- Continuous learning & adaptation
+## License
+MIT
