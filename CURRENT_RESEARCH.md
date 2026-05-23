@@ -1,82 +1,136 @@
-# AGI Research Update - 2026-05-22
+# AGI Research Update - 2026-05-23
 
-## Key Research Findings
+## Key Research Findings (Week of May 17-23, 2026)
 
-### 1. Teams of AI Agents for Scientific Research (Nature, May 2026)
-- **Paper**: Two new systems published in *Nature* use teams of AI agents to develop hypotheses, propose experiments, and analyze data
-- **Systems**:
-  - Google DeepMind's multi-agent scientific system
-  - FutureHouse's "Robin" - found drugs for dry age-related macular degeneration using AI agent literature reviews and experiment selection
-- **Significance**: AI agents moving from passive assistants to active participants in the scientific process
-- **Source**: https://www.nature.com/articles/d41586-026-01596-4
+### Industry News & Breakthroughs
 
-### 2. OpenAI Symphony - Autonomous Coding Agent Orchestration (May 2026)
-- **Open-source SPEC.md** for autonomous coding agent orchestration
-- **Key Innovation**: Agent work not tied to PRs - can analyze codebase, generate implementation plans, break down into task trees
-- **Implication**: Shift toward more autonomous, planning-capable coding agents
-- **Source**: https://www.infoq.com/news/2026/05/openai-symphony-agents/
+**AI Agent Memory 2026 Benchmarks (Mem0)**:
+- Single-pass ADD-only extraction now treats agent-generated facts as first-class
+- Key challenges: temporal abstraction, cross-session memory evolution, privacy architectures
+- Multi-scope memory pattern: user_id, agent_id, run_id, app_id tagging
 
-### 3. Agentic AI Market Growth
-- **Token consumption increased 320x** for AI reasoning (Dell/NVIDIA announcement)
-- **Agentic AI paradigm shift** from chatbot (1.0) to autonomous agent (2.0)
-- **Google Gemini Spark**: Personal AI agent for complex multi-step background tasks
-- **Major players entering**: Figma AI agent for design, SAP AI Agent Hub for enterprise
+**Multi-Agent AI Systems - Production Patterns**:
+- Three dominant architectures now standard in production deployments:
+  1. Hierarchical orchestration (manager + worker agents)
+  2. Peer-to-peer collaboration (specialized agents negotiating)
+  3. Market-based allocation (bid/ask for task assignment)
 
-### 4. Recent arXiv AGI Papers (May 2026)
+**Agentic AI Enterprise Adoption**:
+- 91% of marketing teams now using AI agent tools
+- 5 core agent patterns standardized: ReAct, Plan-Execute, Reflection, Multi-Agent, Tool-Augmented
 
-#### ASH: Agents that Self-Hone via Embodied Learning (arXiv:2605.14211v1)
-- Self-improving embodied agents from unlabeled internet video
-- Inverse Dynamics Model learns from own trajectories
-- Achieves ~11.2/12 milestones in Pokemon Emerald (vs ~6-6.5 for baselines)
-- **Key for AGI**: Scalable self-improvement without labeled rewards
+---
 
-#### FutureSim: Replaying World Events to Evaluate Adaptive Agents (arXiv:2605.15188v1)
-- Benchmark for evaluating adaptive AI agents using real-world chronological events
-- Agents must forecast world events beyond knowledge cutoff
-- Best models achieve only ~25% accuracy - significant room for improvement
+### Key arXiv Papers (Past 2 Weeks)
 
-#### GroupMemBench: Multi-Party Agent Memory (arXiv:2605.14498v1)
-- Exposes critical weakness: current memory systems perform poorly in multi-user group settings
-- Strongest model only 46% accuracy, 27% knowledge-update accuracy
-- **Gap identified**: Multi-user agent memory is unsolved
+#### 1. **[2605.14211v1] ASH: Agents that Self-Hone via Embodied Learning** ⭐ HIGH PRIORITY
+**Link**: https://arxiv.org/abs/2605.14211v1
 
-#### PQR: Framework to Elicit QA Agent Failures (arXiv:2605.16551v1)
-- Generates diverse, realistic queries that trigger agent failures
-- Found 23-78% more unhelpful responses than baseline methods
-- Critical for building more robust QA agents
+- **Core Idea**: Self-improving embodied agent learning from unlabeled, noisy internet video without reward shaping or expert demonstrations
+- **Innovation**: Inverse Dynamics Model (IDM) trained from agent's own trajectories → extracts supervision from relevant internet video
+- **Long-term memory**: Unsupervised identification and retention of key moments from large-scale video
+- **Results**: 
+  - Pokemon Emerald: 11.2/12 milestones (vs 6.0-6.5 baselines)
+  - Zelda Minish Cap: 9.9/12 milestones
+- **Relevance**: Scalable approach to long-horizon tasks via self-supervised IDM + retrieval-augmented memory
+- **Action**: Implement self-honing loop in our framework
 
-### 5. Trending Open-Source AI Agent Projects (GitHub 2026)
+#### 2. **[2605.18401v1] SkillsVote: Lifecycle Governance of Agent Skills**
+**Link**: https://arxiv.org/abs/2605.18401v1
 
-| Project | Focus | Key Feature |
-|---------|-------|-------------|
-| **caveman** (63k+ stars) | Token-efficient agents | ~75% output token reduction, multi-provider support |
-| **nanobot v0.2.0** | Multi-provider resilient agents | Fallback mechanisms, state machine, plugin architecture |
-| **elephant-agent** | Self-evolving personal AI | Long-term memory, reflective iteration |
-| **LeAgent** | Local-first office automation | 100+ offline tools, visual workflows, Apache 2.0 |
-| **aidless/ai-agent-playground** | Production-grade autonomous | 11-engine framework, self-correction, security benchmarks |
-| **xavani-agent** | Local AI gateway | 169 skills, zero telemetry, MIT license |
+- **Core Idea**: Governance framework for agent skills with lifecycle: Collection → Recommendation → Evolution
+- **Skill definition**: Experience schema combining executable scripts with non-executable guidance
+- **Offline evolution**: +7.9pp on Terminal-Bench 2.0
+- **Online evolution**: +2.6pp on SWE-Bench Pro
+- **Key insight**: Governed external skill libraries enhance frozen agents without parameter updates
+- **Relevance**: Aligns with our skill acquisition module - add governance layer
 
-### 6. Enterprise Agent Platforms
-- **SAP AI Agent Hub**: Vendor-agnostic agent governance
-- **Epicor Prism**: ERP-native agents with human-in-the-loop
-- **Augury AI Workforce**: Role-based factory floor agents
-- **LiteLLM Agent Platform**: Kubernetes-based agent sandboxes
+#### 3. **[2605.16551v1] PQR: Framework to Elicit QA Agent Failures**
+**Link**: https://arxiv.org/abs/2605.16551v1
 
-## Research Implications for Our AGI Project
+- **Core Idea**: Generate diverse, realistic user queries that trigger agent failures
+- **Components**: Query refinement module + Prompt refinement module
+- **Result**: Uncovers 23-78% more unhelpful responses than prior methods
+- **Relevance**: Add adversarial testing to our validation framework
 
-### Opportunities
-1. **Multi-agent collaboration** - Nature papers show teams outperform individuals
-2. **Self-improvement loops** - ASH demonstrates embodied learning without labels
-3. **Memory systems** - GroupMemBench shows multi-user memory is unsolved
-4. **Planning & orchestration** - Symphony spec for autonomous coding agents
+#### 4. **[2605.15188v1] FutureSim: Replaying World Events to Evaluate Adaptive Agents**
+**Link**: https://arxiv.org/abs/2605.15188v1
 
-### Technical Priorities
-1. Implement multi-agent coordination layer
-2. Build self-reflection and improvement mechanisms
-3. Design robust multi-user memory system
-4. Create planning/orchestration capabilities
+- **Core Idea**: Grounded simulation replaying real-world events chronologically
+- **Benchmark**: Agents interact with Jan-Mar 2026 timeline, predict beyond knowledge cutoff
+- **Results**: Top agent ~25% accuracy, many worse than no-prediction baseline
+- **Relevance**: Test-time adaptation benchmark for long-horizon prediction
 
-## Next Research Focus
-- Monitor arXiv for agent planning papers
-- Track multi-agent consensus mechanisms
-- Watch for open-source self-improvement agent implementations
+#### 5. **[2605.14498v1] GroupMemBench: Multi-Party Conversation Memory**
+**Link**: https://arxiv.org/abs/2605.14498v1
+
+- **Core Idea**: Benchmark for LLM agent memory in multi-party (not just dyadic) conversations
+- **Challenge categories**: Multi-hop reasoning, knowledge updates, term ambiguity, temporal reasoning
+- **Results**: Best systems ~46% accuracy; knowledge update only 27.1%
+- **Relevance**: Our A2A protocol needs multi-party memory support
+
+#### 6. **[2605.14968v1] GraphFlow: Formally Verifiable Visual Workflows**
+**Link**: https://arxiv.org/abs/2605.14968v1
+
+- **Core Idea**: Visual workflows as executable specifications with formal semantics
+- **Compile-time**: Preconditions, postconditions, proof-checking
+- **Runtime**: Append-only log, contract enforcement, replay/retries
+- **Pilot**: 8,728 workflow runs, 97.08% completion across 3 clinical sites
+- **Relevance**: Add formal verification to our workflow DAG module
+
+---
+
+### Trending Open Source AI Agent Repositories (May 2026)
+
+| Repo | Stars | Language | Key Innovation |
+|------|-------|----------|--------------|
+| **HKUDS/nanobot** | 2.9k+ | Python | Ultra-lightweight core, MCP tools, chat channels |
+| **bytedance/deer-flow** | 5k+ | Python | LangGraph-based, sandbox-aware, sub-agent spawning |
+| **open-multi-agent/open-multi-agent** | 1.8k | TypeScript | Goal→DAG→parallelize→synthesize, 10 providers |
+| **lsdefine/GenericAgent** | 11.9k | Python | ~3K lines, 9 atomic tools, cross-model support |
+| **RightNow-AI/openfang** | 3k+ | Rust | Agent OS (not framework), 24/7 autonomous, 137k LOC |
+| **ooropuloo/KohakuTerrarium** | 1.5k | Python | "Creatures" (self-contained agents), TUI + web UI |
+| **aden-hive/hive** | 4.2k | Python | Production harness, graph-based DAG, crash recovery |
+| **JuliusBrussee/caveman** | 2.1k | JavaScript | Token compression, ~2x fewer tokens than Codex |
+| **HKUDS/OpenHarness** | 1.8k | Python | 43+ tools, ohmo personal agent, fork→code→test→PR |
+| **agent0ai/agent-zero** | 8.5k | Python | Portable SKILL.md, Linux-in-a-box, extensible tools |
+
+**Key Trends**:
+1. **Lightweight cores**: GenericAgent (~3K lines), Nanobot (ultra-light)
+2. **OS-level autonomy**: OpenFang (Agent OS), Agent Zero (Linux sandbox)
+3. **Token efficiency**: Caveman aggressive compression
+4. **Self-evolution**: GenericAgent, Ouroboros self-modification
+5. **Production hardening**: Hive with crash recovery, GraphFlow verification
+6. **MCP adoption**: Nanobot, multiple frameworks using Model Context Protocol
+
+---
+
+## Research Synthesis
+
+### Emerging Design Patterns (May 2026)
+
+1. **Self-Honing via IDM**: ASH shows learning from internet video via inverse dynamics models enables long-horizon improvement without expert demonstrations
+
+2. **Governed Skill Libraries**: SkillsVote demonstrates that skill lifecycle governance (collection→recommendation→evolution) beats uncurated skill accumulation
+
+3. **Formal Verification**: GraphFlow's compile-time proof-checking + runtime contract enforcement for mission-critical agent workflows
+
+4. **Multi-Party Memory**: GroupMemBench reveals current memory systems fail at group conversations - need speaker-grounded belief tracking
+
+5. **Embodied Video Learning**: ASH's approach to mining supervision from noisy internet video at scale
+
+6. **Failure Elicitation**: PQR's adversarial query generation for finding agent weaknesses
+
+### Priorities for Framework Development
+
+1. **🔥 IMMEDIATE**: Self-honing loop (ASH-inspired) - learn from execution traces
+2. **HIGH**: Skill governance layer - lifecycle management, voting, evolution
+3. **HIGH**: Multi-party memory for A2A protocol
+4. **MEDIUM**: Formal verification hooks for workflows
+5. **MEDIUM**: Adversarial testing harness (PQR-style)
+6. **LOW**: Video-based learning (requires infrastructure)
+
+---
+
+*Last Updated: 2026-05-23*
+*Next Update: 2026-05-24*
