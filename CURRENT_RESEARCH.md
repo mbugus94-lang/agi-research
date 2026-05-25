@@ -1,4 +1,119 @@
-# AGI Research Update - 2026-05-24
+# AGI Research Update - 2026-05-25
+
+## Key Research Findings
+
+### Industry News & Breakthroughs
+
+**Teams of AI Agents Boost Research Speed - Nature (May 2026)**
+- Two new systems use teams of AI agents to develop hypotheses, propose experiments and analyze data
+- Google DeepMind's Co-Scientist: Finds approved drugs for repurposing (leukaemia, liver fibrosis)
+- FutureHouse's Robin: Found ripasudil as candidate treatment for dry age-related macular degeneration
+- Quote: "It almost seems like an agentic, in silico implementation of the thought process in a scientist's head" - Vivek Natarajan, Google DeepMind
+- Significance: AI agents moving from single-task tools to collaborative research teams
+
+**Augury's Industrial AI Workforce (May 18, 2026)**
+- Role-based AI agents collaborating with human factory workers
+- Integration with Google Cloud and AVEVA for self-optimizing manufacturing
+- Agents adapt to specific workflows rather than requiring workers to adapt to technology
+
+**Dell Agentic AI Stack (May 18, 2026)**
+- Token consumption for AI reasoning risen 320x
+- Routing agent workloads to public cloud creates unsustainable costs
+- Deskside Agentic AI for local execution to reduce latency and cost
+
+**Agentic AI Foundation Growth (May 18, 2026)**
+- 43 new members added (total 190 organizations)
+- Open standard agentic AI stack development accelerating
+- Enterprise and government adoption of open agent standards
+
+### Key arXiv Papers (Past 2 Weeks)
+
+1. **[2605.14211v1] ASH: Agents that Self-Hone via Embodied Learning** (Relevant to our self-honing module)
+   - Self-improving agents learning from unlabeled internet video
+   - Inverse Dynamics Model (IDM) trained from own trajectories
+   - Results: 11.2/12 milestones vs 6.0-6.5 baselines in Pokemon/Zelda
+
+2. **[2605.14212v1] MetaAgent-X: Breaking Ceiling of Automatic Multi-Agent Systems**
+   - End-to-end RL framework for automatic multi-agent systems
+   - Jointly designs AND executes agent workflows
+   - ~21.7% gains over existing automatic MAS baselines
+   - Key: Both designer and executor improve during training
+
+3. **[2605.14163v1] Agentic Systems as Boosting Weak Reasoning Models**
+   - Committee of weak models boosts reasoning through verifier-backed selection
+   - GPT-5.4 nano: 67.0% single model → 76.4% with critic-comparator (k=8)
+   - Oracle best-of-8 upper bound: 79.0%
+   - Key insight: More agents expose latent correct solutions
+
+4. **[2605.14392v1] Self-Evolving Reasoning via Verifiable Environment Synthesis**
+   - EvoEnv: Model builds and refines its own training environments
+   - Creates stable solve-verify asymmetry
+   - Performance: 72.4 → 74.8 (3.3% relative gain)
+   - Key: Sustainable self-improvement requires constructing worlds beyond current capability
+
+5. **[2605.14324v1] Super-intelligence Survival Guide: Verification via Proof-Carrying Output**
+   - Formal verification approach to AGI safety
+   - Proof-carrying outputs to certify super-intelligent system decisions
+   - IACR ePrint 2026/994
+
+6. **[2605.14880v1] Building Embodied EvoAgent: Brain-inspired Paradigm**
+   - Bridges multimodal LLMs with world models
+   - Left-hemisphere: instruction understanding, visual interpretation
+   - Right-hemisphere: spatial perception, environment dynamics
+   - Corpus callosum communication via dynamic slots
+
+### Trending Open-Source AI Agent Repositories
+
+1. **google/adk-python v2.0.0** (GA Release)
+   - Multi-Agent Workflow Engine: model-agnostic execution graphs
+   - Dynamic Agent Collaboration: native inter-agent routing
+   - Non-linear, conditional, cyclical agent execution
+   - Parallel sub-agents, hierarchical teams, dynamic scheduling
+
+2. **microsoft/agent-framework v1.6.0**
+   - agent-framework-core: Shell tool for local/Docker execution
+   - agent-framework-monty: CodeAct provider package
+   - agent-framework-foundry: Hosted tool factories
+   - agent-framework-a2a: Updated transport with immediate return
+
+3. **paradigmxyz/centaur**
+   - Self-hosted framework for shared AI agents (teams)
+   - Slack-native agent conversations
+   - Real execution in isolated Kubernetes sandboxes
+   - 462 stars, 54 forks - active development
+
+4. **craft-ai-agents/craft-agents-oss v0.9.5**
+   - TypeScript framework for AI agents
+   - 6K+ stars, UX polish for compact mode
+   - MCP/branching stability improvements
+
+5. **rayboto/easy-agent**
+   - Terminal-native Claude Code-style agent
+   - 31-phase roadmap for complete rebuild
+   - Stage 21 complete: CLI, streaming, tool execution, sandboxing, sub-agents
+
+6. **teodororo/trae-agent**
+   - Multi-LLM support (OpenAI, Anthropic, Doubao, Azure, etc.)
+   - Trajectory recording for debugging and analysis
+   - Lakeview: concise summarization of agent steps
+
+### Key Research Insights
+
+1. **Multi-Agent Synergy > Single Agent**: MetaAgent-X and Weak Reasoning papers show coordinated agents significantly outperform single agents
+
+2. **Verification is Critical**: Proof-carrying outputs and verifiable environment synthesis emerging as safety/quality mechanisms
+
+3. **Self-Honing from Experience**: ASH demonstrates unsupervised learning from execution traces enables continuous improvement
+
+4. **Brain-Inspired Architectures**: EvoAgent shows value of separating reasoning (LLM) from world modeling
+
+5. **Environment Synthesis**: EvoEnv's approach of having agents construct their own training environments is a path to sustainable self-improvement
+
+6. **Enterprise Agent Adoption**: 40% of enterprise apps will embed AI agents by end 2026 (Gartner prediction from recent research)
+
+7. **Token Cost Crisis**: 320x increase in token consumption for reasoning - driving edge/local execution solutions
+
+---
 
 ## Key Research Findings
 
