@@ -1,3 +1,138 @@
+# AGI Research Update - 2026-05-26
+
+## Key Research Findings
+
+### Industry News & Breakthroughs
+
+**AI Agents Reshape Enterprise Computing (May 2026)**
+- AMD CEO Lisa Su and 01.AI founder Kai-Fu Lee at AMD AI DevDay Shanghai
+- Transition from generative AI chatbots to autonomous AI agent systems
+- AI agents as the next major shift in enterprise computing architecture
+- Significance: Major hardware vendors (AMD, NVIDIA) pivoting toward agent-optimized infrastructure
+
+**Multi-Agent AI Systems in Enterprise (May 2026)**
+- 40% of enterprise apps will embed AI agents by end of 2026 (up from <5% in 2025)
+- Multi-agent systems = multiple specialized AI agents with defined roles working together
+- Central orchestrator coordinates specialist agents: research, draft, validate, act
+- Significance: Enterprise moving from single AI to coordinated agent teams
+
+**Best AI Agent Frameworks 2026 (Production Tested)**
+- LangGraph: Stateful, graph-based agent workflows
+- CrewAI: Role-based team automation
+- AutoGen: Multi-agent conversations
+- MetaGPT: Software development automation (simulates full product team)
+- Significance: Framework consolidation around specific use cases
+
+### Key arXiv Papers (May 26, 2026)
+
+1. **[2605.18401v1] SkillsVote: Lifecycle Governance of Agent Skills** ⭐ BUILDS ON THIS
+   - Collection → Recommendation → Evolution pipeline
+   - Treats skills as experience schema (executable + guidance)
+   - Offline evolution: +7.9pp on Terminal-Bench 2.0
+   - Online evolution: +2.6pp on SWE-Bench Pro
+   - Key: Governed external skill libraries enhance frozen agents
+
+2. **[2605.15567v1] Position: AI Needs Meta Intelligence - Metacognitive AI**
+   - AI systems should monitor internal states adaptively
+   - Allocate computational resources based on problem difficulty
+   - Framework for designing metacognition-enabled AI
+   - Case study: Federated Learning with improved efficiency
+
+3. **[2605.18401v1] SOLAR: Self-Optimizing Open-Ended Autonomous Agent**
+   - Lifelong learning and continual adaptation agent
+   - Parameter-level meta-learning treating weights as exploration environment
+   - Multi-level RL framework for test-time adaptation
+   - Addresses concept drift and gradient-based adaptation costs
+   - Key: Episodic memory buffer for valid modification strategies
+
+4. **[2605.14212v1] MetaAgent-X: End-to-End RL for Multi-Agent Systems**
+   - Jointly optimizes designer AND executor of MAS
+   - Script-based MAS generation with rollout collection
+   - +21.7% gains over automatic MAS baselines
+   - Key: Stagewise co-evolution effective for training stability
+
+5. **[2605.14163v1] Agentic Systems as Boosting Weak Reasoning**
+   - Committee of weak models through verifier-backed critics
+   - GPT-5.4 nano single: 67.0% → 76.4% with critic-comparator
+   - Key: Many correct patches exist in weak model pools, selection is challenge
+
+6. **[2605.11605v1] ACC: Compiling Agent Trajectories for Long-Context**
+   - Converts multi-turn tool use into long-context QA
+   - Direct supervision without additional annotation
+   - Qwen3-30B-A3B: 68.3 MRCR (+18.1), 77.5 GraphWalks (+7.6)
+   - Key: Task-adaptive attention restructuring with expert specialization
+
+### Trending Open-Source AI Agent Repositories
+
+1. **agent-substrate/substrate** (Go)
+   - Kubernetes-based scalable agent ecosystem
+   - gVisor for OCI containers at kernel level
+   - Agent Development Kit (ADK) for persistent memory
+   - MCP for durable sandboxed tool servers
+   - Ultra-high scalability, low latency focus
+
+2. **paradigmxyz/centaur** (Python, 462 stars)
+   - Self-hosted secure AI agent platform for teams
+   - Slack-native conversations with thread support
+   - Real isolated K8s sandbox with dev tools
+   - Durable workflows (sleep, resume, child agents)
+   - Bring-your-own harness (Amp, Claude Code, Codex)
+
+3. **rekursiv-ai/sagent** (Python)
+   - Strongly typed, Python-first agent orchestration
+   - Self-mutating coding agents
+   - Recursive agent-to-agent messaging (tree coordination)
+   - Multi-provider (Claude, Codex, Gemini, OpenAI, Moonshot)
+
+4. **sirbrasscat/GenericAgent**
+   - Minimal self-evolving autonomous agent (~3K lines)
+   - 9 atomic tools, <30K context window
+   - Layered memory, high model compatibility
+   - WeChat bot frontend, million-scale Skill Library
+
+5. **ndqkhanh/lyra** (16+ providers, 135+ packages)
+   - Production-grade with kernel-enforced TDD gate
+   - Hierarchical memory with dream consolidation
+   - Multi-agent debate with tree search
+   - Automatic prompt/harness evolution
+   - Claude-style terminal interface
+
+6. **strukto-ai/mirage** (TypeScript)
+   - Unified virtual filesystem for AI agents
+   - Mounts S3, Google Drive, Gmail, Slack as single hierarchy
+   - Works with OpenAI Agents SDK, Vercel AI SDK, LangChain
+   - Filesystem/bash semantics for LLM reasoning
+
+7. **agentiumOS/agentium** (TypeScript)
+   - Model-agnostic agent orchestration (18+ toolkits)
+   - Workflows with typed state and retry policies
+   - Hybrid vector + BM25 knowledge base
+   - Teams: coordinate/route/broadcast/collaborate
+
+8. **niefa-xyz/niefa** (TypeScript)
+   - Plain-language objective → execution plan
+   - x402 paid endpoints, per-agent filesystem
+   - Real-time streaming, graceful degradation
+   - Self-hostable, MIT-licensed
+
+### Research Insights & Implications
+
+1. **Skill Governance Critical**: SkillsVote shows governed skill libraries enhance frozen agents - external knowledge evolution without model retraining
+
+2. **Self-Optimization Trend**: SOLAR and GenericAgent represent shift toward agents that optimize their own learning process, not just task execution
+
+3. **Infrastructure Maturing**: Agent Substrate and Centaur show production-grade infrastructure emerging for agent deployment
+
+4. **Metacognition Rising**: Position paper argues for meta-level control - agents monitoring their own reasoning and resource allocation
+
+5. **Filesystem Abstraction**: Mirage demonstrates need for unified data access layer across diverse backends
+
+6. **Sandbox Security**: Multiple projects (Centaur, Lyra) emphasizing kernel-level isolation for agent execution
+
+7. **Long-Context Compilation**: ACC shows trajectories can become training data - agents learning from their own execution traces
+
+---
+
 # AGI Research Update - 2026-05-25
 
 ## Key Research Findings
