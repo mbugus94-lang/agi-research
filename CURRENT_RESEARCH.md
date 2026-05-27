@@ -1,3 +1,93 @@
+# AGI Research Update - Current
+
+## Key Research Findings - May 27, 2026
+
+### Industry Breakthroughs
+1. **OpenAI Solves 80-Year-Old Erdős Math Problem**
+   - Solved Paul Erdős's planar unit distance problem (posed 1946)
+   - Used "ingenious ideas" combining different branches of mathematics
+   - Validated by mathematician Thomas Bloom
+   - Significance: Evidence of AI's emerging "intuition" and creative reasoning
+
+2. **DeepMind CEO Predicts AGI by 2030**
+   - Demis Hassabis: "We're in the foothills of the singularity"
+   - Calls current AI agents a "practice run" for AGI
+   - Society has only a few years to prepare
+   - Range tightened due to confidence in current path
+
+3. **Google I/O 2026: Gemini Spark Launch**
+   - Always-on autonomous AI agent running 24/7
+   - Operates even when user's devices are off
+   - "Meta model" orchestrating other AI models in real-time
+   - Signals shift from chatbots to autonomous agents
+
+4. **AI Will Make Nobel-Prize Winning Discovery Within 12 Months**
+   - Anthropic co-founder Jack Clark's prediction
+   - Bipedal robots helping tradespeople within 2 years
+   - AI-run companies generating millions in 18 months
+   - Warning: "Non-zero chance of killing everyone on the planet"
+
+### Key arXiv Papers
+1. **[2605.14968v1] GraphFlow: Formally Verifiable Visual Workflows**
+   - Architecture for formally verifiable visual workflows
+   - Enables reliable agentic AI automation with formal guarantees
+   - Focus on safety and correctness verification
+   - Graph-based workflow representations with verification techniques
+
+### Trending Open-Source Agent Repositories
+1. **microsoft/agent-framework v1.6.0** - Python/.NET agent framework with:
+   - Shell tool with local/Docker execution
+   - Monty-backed CodeAct provider
+   - Foundry hosted tool factories
+   - A2A non-streaming transport
+
+2. **open-multi-agent/open-multi-agent v1.4.2** - TypeScript multi-agent orchestration:
+   - Goals → task DAGs with live tracing
+   - Narrative puzzle arbitration (5-agent conflict resolution)
+   - Doubao/Volcengine Ark and Zhipu GLM providers
+
+3. **agentiumOS/agentium** - TypeScript-native multi-agent framework:
+   - 18+ built-in toolkits with dynamic credential management
+   - Teams for multi-agent coordination (coordinate, route, broadcast, collaborate)
+   - Workflows with typed state, conditions, parallelism, retry policies
+   - Knowledge base with vector search + BM25 reciprocal rank fusion
+
+4. **MCamner/mq-agent** - Terminal-native Python agent orchestrator:
+   - Planner, Executor, Verifier, Memory, Safety architecture
+   - Explicit approval gates, safe terminal workflows
+   - Repo audit, release planning, AI-assisted CI/debug
+
+5. **rattleai/nexus** - AI-first multi-tenant SaaS framework:
+   - Multi-tenant PostgreSQL with row-level security
+   - Agent runtime with sandboxed tool execution
+   - MCP server auto-derived from FastAPI routes
+   - RAG pipeline for document ingestion
+
+6. **garyqlin/gbase** - Python self-improving agent framework:
+   - Recursive Self-Improvement (RSI) with full-evolution cycles
+   - Agents rewrite their own system prompts
+   - 40+ auto-registered tools
+   - Quality gates with multi-step review pipelines
+
+7. **aniketkarne/aco-system** - Multi-agent software development team:
+   - 6 specialized agents: requirements → planning → architecture → implementation → QA → human review
+   - Shared database pipeline (no message passing)
+   - Architect agent performs deterministic validation before code writing
+   - Ships real PRs through GitHub Issues
+
+### Research Synthesis
+- **Formal verification** becoming critical for agent workflows (GraphFlow)
+- **Self-evolution** is dominant theme across multiple frameworks (gbase, agentium)
+- **Multi-agent teams** with specialized roles are the new standard (aco-system, nexus)
+- **Safety gates** and explicit verification becoming standard practice
+- **Terminal-native** agents emerging as a distinct category (mq-agent)
+- **Production-grade** frameworks now include tenancy, sandboxing, observability
+
+### Build Direction
+Based on GraphFlow paper: Add formal verification capabilities to workflow DAG system - enable safety/correctness guarantees for agent workflows through pre/post condition checking and invariant preservation.
+
+---
+
 # AGI Research Update - 2026-05-26
 
 ## Key Research Findings
