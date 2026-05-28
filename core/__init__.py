@@ -1,36 +1,29 @@
-"""Core AGI components"""
+"""
+Core AGI System Components
 
-from .agent import BaseAgent, AgentState, AgentResult, Thought, Observation
-from .memory import MemorySystem, WorkingMemory, EpisodicMemory, SemanticMemory, MemoryEntry
-from .planner import Planner, Plan, Task, TaskStatus
-from .reflection import (
-    Reflector, ExecutionTrace, Pattern, Insight, InsightType, ReflectionScope,
-    TraceAnalyzer, InsightGenerator, create_reflector, quick_reflect
-)
+This module provides the foundational components for building AGI-capable agents:
+- BaseAgent: Core agent with EXPLORE/VERIFY/PLAN/EXECUTE/REFLECT cycle
+- MemoryManager: Hierarchical memory (working, episodic, semantic)
+- Planner: Task decomposition and parallel execution planning
+- ReflectionEngine: Self-correction and learning from execution
+"""
+
+from .agent import BaseAgent, AgentState, Thought, Action, ExecutionResult
+from .memory import MemoryManager, MemoryEntry
+from .planner import Planner, PlanNode, ExecutionPlan
+from .reflection import ReflectionEngine, ReflectionResult
 
 __all__ = [
     "BaseAgent",
     "AgentState",
-    "AgentResult",
     "Thought",
-    "Observation",
-    "MemorySystem",
-    "WorkingMemory",
-    "EpisodicMemory",
-    "SemanticMemory",
+    "Action",
+    "ExecutionResult",
+    "MemoryManager",
     "MemoryEntry",
     "Planner",
-    "Plan",
-    "Task",
-    "TaskStatus",
-    "Reflector",
-    "ExecutionTrace",
-    "Pattern",
-    "Insight",
-    "InsightType",
-    "ReflectionScope",
-    "TraceAnalyzer",
-    "InsightGenerator",
-    "create_reflector",
-    "quick_reflect",
+    "PlanNode",
+    "ExecutionPlan",
+    "ReflectionEngine",
+    "ReflectionResult",
 ]

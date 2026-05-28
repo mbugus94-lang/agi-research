@@ -1,1 +1,1 @@
-"""Experiments and validation tests"""
+"""Experiments - Validation tests and hypothesis testing."""

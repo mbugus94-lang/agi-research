@@ -1,462 +1,299 @@
 """
-Memory Systems Implementation
+Memory System Implementation
 
-Three-tier memory architecture:
-- Working Memory: Short-term, active context
-- Episodic Memory: Experiences and interactions
-- Semantic Memory: Facts and learned knowledge
-
-References:
-- Personalized AGI via Neuroscience-Inspired Learning (arXiv:2504.20109v1)
-- Tri-Memory Continual Learning system
+Hierarchical memory: Working → Episodic → Semantic
+Implements persistent storage with retrieval mechanisms.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
 import json
+import sqlite3
+from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, asdict
+from datetime import datetime
+from pathlib import Path
 import hashlib
-from collections import deque
 
 
 @dataclass
 class MemoryEntry:
-    """Base memory entry"""
+    """A single memory entry."""
     id: str
-    content: Any
-    timestamp: float
-    memory_type: str  # "working", "episodic", "semantic"
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    importance: float = 0.5  # 0.0 to 1.0
-    access_count: int = 0
-    last_accessed: float = 0.0
+    content: str
+    memory_type: str  # working, episodic, semantic
+    timestamp: datetime
+    tags: List[str]
+    importance: float  # 0-1
+    embeddings: Optional[List[float]] = None
+    metadata: Dict = None
+    
+    def __post_init__(self):
+        if self.metadata is None:
+            self.metadata = {}
 
 
-class WorkingMemory:
+class MemoryManager:
     """
-    Short-term memory for active context.
+    Hierarchical memory system for agents.
     
-    Limited capacity, fast access.
-    Inspired by cognitive working memory (4±1 chunks).
-    """
-    
-    def __init__(self, capacity: int = 7):
-        self.capacity = capacity
-        self.entries: deque = deque(maxlen=capacity)
-        self.context: Dict[str, Any] = {}
-        
-    def store(self, key: str, value: Any) -> None:
-        """Store in working context."""
-        self.context[key] = {
-            "value": value,
-            "timestamp": datetime.now().timestamp()
-        }
-    
-    def retrieve(self, key: str) -> Optional[Any]:
-        """Retrieve from working context."""
-        if key in self.context:
-            entry = self.context[key]
-            entry["timestamp"] = datetime.now().timestamp()  # Update access time
-            return entry["value"]
-        return None
-    
-    def add_entry(self, entry: MemoryEntry) -> None:
-        """Add entry to working memory buffer.
-        
-        When capacity is exceeded, oldest entries (left side) are evicted.
-        """
-        entry.memory_type = "working"
-        # Append to right side; oldest entries on left will be evicted if needed
-        self.entries.append(entry)
-    
-    def get_recent(self, n: int = 5) -> List[MemoryEntry]:
-        """Get n most recent entries.
-        
-        Most recent entries are on the right side of deque.
-        """
-        # Get last n items from the right side (most recent)
-        return list(self.entries)[-n:] if len(self.entries) >= n else list(self.entries)
-    
-    def clear(self) -> None:
-        """Clear working memory (e.g., between tasks)."""
-        self.entries.clear()
-        self.context.clear()
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "capacity": self.capacity,
-            "current_size": len(self.entries),
-            "context_keys": list(self.context.keys())
-        }
-
-
-class EpisodicMemory:
-    """
-    Memory of experiences and interactions.
-    
-    Stores episodes (experiences) with temporal indexing.
-    Implements importance-based retention and retrieval.
+    Levels:
+    - Working: Short-term, session-specific
+    - Episodic: Past experiences and actions
+    - Semantic: Facts, concepts, learned knowledge
     """
     
-    def __init__(self, max_entries: int = 1000):
-        self.max_entries = max_entries
-        self.episodes: List[MemoryEntry] = []
-        self.index: Dict[str, List[str]] = {}  # Tag -> entry IDs
+    def __init__(self, db_path: str = ":memory:"):
+        self.db_path = db_path
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._init_db()
         
-    def store_episode(
+        # In-memory working memory (fastest)
+        self.working_memory: List[MemoryEntry] = []
+        self.working_capacity = 10
+    
+    def _init_db(self):
+        """Initialize SQLite database."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS memories (
+                id TEXT PRIMARY KEY,
+                content TEXT NOT NULL,
+                memory_type TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                tags TEXT,
+                importance REAL,
+                embeddings TEXT,
+                metadata TEXT
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_type ON memories(memory_type)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_timestamp ON memories(timestamp)
+        """)
+        self.conn.commit()
+    
+    def store(
         self,
-        content: Any,
-        tags: Optional[List[str]] = None,
+        content: str,
+        memory_type: str = "episodic",
+        tags: List[str] = None,
         importance: float = 0.5,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> MemoryEntry:
-        """
-        Store a new episode.
-        
-        Args:
-            content: The experience content
-            tags: Categorization tags
-            importance: 0.0 to 1.0 retention priority
-            metadata: Additional context
-        """
-        entry_id = hashlib.md5(
-            f"{content}{datetime.now().timestamp()}".encode()
-        ).hexdigest()[:12]
-        
+        metadata: Dict = None
+    ) -> str:
+        """Store a new memory entry."""
+        entry_id = self._generate_id(content)
         entry = MemoryEntry(
             id=entry_id,
             content=content,
-            timestamp=datetime.now().timestamp(),
-            memory_type="episodic",
-            metadata=metadata or {},
+            memory_type=memory_type,
+            timestamp=datetime.now(),
+            tags=tags or [],
             importance=importance,
-            last_accessed=datetime.now().timestamp()
+            metadata=metadata or {}
         )
         
-        # Add tags
-        if tags:
-            for tag in tags:
-                if tag not in self.index:
-                    self.index[tag] = []
-                self.index[tag].append(entry_id)
+        # Store in working memory if high importance or recent
+        if memory_type == "working" or importance > 0.8:
+            self._add_to_working_memory(entry)
         
-        self.episodes.append(entry)
+        # Persist to database
+        self._persist_entry(entry)
         
-        # Prune if exceeding capacity
-        if len(self.episodes) > self.max_entries:
-            self._prune()
-        
-        return entry
+        return entry_id
     
-    def retrieve_similar(
+    async def store_action(self, action, result):
+        """Store an action-result pair (episodic memory)."""
+        content = f"Action: {action.tool} | Result: {result.success}"
+        metadata = {
+            "tool": action.tool,
+            "params": action.params,
+            "success": result.success,
+            "output": str(result.output) if result.output else None,
+            "error": result.error
+        }
+        return self.store(
+            content=content,
+            memory_type="episodic",
+            tags=["action", action.tool],
+            importance=0.7 if result.success else 0.9,  # Failed actions more important
+            metadata=metadata
+        )
+    
+    def retrieve(
         self,
-        context: Dict[str, Any],
+        query: str = None,
+        memory_type: str = None,
+        tags: List[str] = None,
+        limit: int = 10,
+        since: datetime = None
+    ) -> List[MemoryEntry]:
+        """Retrieve memories matching criteria."""
+        # First check working memory (fast)
+        if memory_type == "working" or memory_type is None:
+            results = self._search_working_memory(query, tags)
+            if results:
+                return results[:limit]
+        
+        # Then query database
+        return self._query_database(query, memory_type, tags, limit, since)
+    
+    def retrieve_relevant(
+        self,
+        context: str,
         limit: int = 5
     ) -> List[MemoryEntry]:
-        """
-        Retrieve episodes similar to current context.
+        """Retrieve memories relevant to current context."""
+        # Simple keyword matching (replace with embedding similarity)
+        keywords = context.lower().split()
         
-        Simple implementation: match tags and recency.
-        Future: vector similarity search
-        """
-        # Score episodes by relevance
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT * FROM memories ORDER BY importance DESC, timestamp DESC"
+        )
+        rows = cursor.fetchall()
+        
         scored = []
-        for entry in self.episodes:
-            score = self._calculate_relevance(entry, context)
-            scored.append((score, entry))
+        for row in rows:
+            content = row[1].lower()
+            score = sum(1 for kw in keywords if kw in content)
+            scored.append((score, row))
         
-        # Sort by score and return top results
-        scored.sort(key=lambda x: x[0], reverse=True)
-        results = [entry for _, entry in scored[:limit]]
-        
-        # Update access metadata
-        for entry in results:
-            entry.access_count += 1
-            entry.last_accessed = datetime.now().timestamp()
-        
-        return results
+        scored.sort(reverse=True)
+        return [self._row_to_entry(row) for _, row in scored[:limit]]
     
-    def retrieve_by_tag(self, tag: str, limit: int = 10) -> List[MemoryEntry]:
-        """Retrieve episodes by tag."""
-        entry_ids = self.index.get(tag, [])
-        entries = [e for e in self.episodes if e.id in entry_ids]
-        return entries[-limit:]  # Most recent
+    def consolidate(self):
+        """
+        Consolidate working memory to episodic.
+        Called periodically to free working memory slots.
+        """
+        for entry in self.working_memory:
+            if entry.memory_type == "working":
+                # Convert to episodic
+                entry.memory_type = "episodic"
+                self._persist_entry(entry)
+        
+        # Clear working memory
+        self.working_memory = []
     
-    def _calculate_relevance(
+    def get_episodic_summary(self, n_recent: int = 10) -> str:
+        """Get summary of recent episodes."""
+        entries = self.retrieve(memory_type="episodic", limit=n_recent)
+        return "\n".join([
+            f"[{e.timestamp.strftime('%H:%M')}] {e.content}"
+            for e in entries
+        ])
+    
+    def _add_to_working_memory(self, entry: MemoryEntry):
+        """Add to working memory with capacity management."""
+        self.working_memory.append(entry)
+        
+        # Evict least important if over capacity
+        if len(self.working_memory) > self.working_capacity:
+            self.working_memory.sort(key=lambda e: e.importance)
+            evicted = self.working_memory.pop(0)
+            # Ensure it's persisted
+            self._persist_entry(evicted)
+    
+    def _search_working_memory(
         self,
-        entry: MemoryEntry,
-        context: Dict[str, Any]
-    ) -> float:
-        """Calculate relevance score for an episode."""
-        score = 0.0
-        
-        # Importance factor
-        score += entry.importance * 0.3
-        
-        # Recency factor (exponential decay)
-        age_hours = (datetime.now().timestamp() - entry.timestamp) / 3600
-        recency = max(0, 1 - (age_hours / 168))  # Decay over 1 week
-        score += recency * 0.3
-        
-        # Tag matching
-        context_tags = context.get("tags", [])
-        entry_tags = set()
-        for tag, ids in self.index.items():
-            if entry.id in ids:
-                entry_tags.add(tag)
-        
-        tag_overlap = len(set(context_tags) & entry_tags)
-        score += (tag_overlap / max(len(context_tags), 1)) * 0.4
-        
-        return score
-    
-    def _prune(self) -> None:
-        """Remove least important episodes when at capacity."""
-        # Sort by importance × recency
-        now = datetime.now().timestamp()
-        
-        def retention_priority(entry: MemoryEntry) -> float:
-            age = now - entry.timestamp
-            return entry.importance * max(0, 1 - age / (7 * 24 * 3600))
-        
-        self.episodes.sort(key=retention_priority)
-        # Remove bottom 10%
-        remove_count = max(1, len(self.episodes) // 10)
-        removed = self.episodes[:remove_count]
-        self.episodes = self.episodes[remove_count:]
-        
-        # Clean up index
-        removed_ids = {e.id for e in removed}
-        for tag in list(self.index.keys()):
-            self.index[tag] = [id for id in self.index[tag] if id not in removed_ids]
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "max_entries": self.max_entries,
-            "current_entries": len(self.episodes),
-            "tag_count": len(self.index),
-            "avg_importance": sum(e.importance for e in self.episodes) / max(len(self.episodes), 1)
-        }
-
-
-class SemanticMemory:
-    """
-    Memory for facts, concepts, and learned knowledge.
-    
-    Structured knowledge storage with categorization.
-    """
-    
-    def __init__(self):
-        self.facts: Dict[str, Dict[str, Any]] = {}  # Key -> fact data
-        self.concepts: Dict[str, Dict[str, Any]] = {}  # Concept definitions
-        self.procedures: Dict[str, Dict[str, Any]] = {}  # How-to knowledge
-        
-    def store_fact(
-        self,
-        key: str,
-        value: Any,
-        category: str = "general",
-        confidence: float = 1.0
-    ) -> None:
-        """Store a factual piece of knowledge."""
-        self.facts[key] = {
-            "value": value,
-            "category": category,
-            "confidence": confidence,
-            "timestamp": datetime.now().timestamp(),
-            "access_count": 0
-        }
-    
-    def retrieve_fact(self, key: str) -> Optional[Any]:
-        """Retrieve a fact by key."""
-        if key in self.facts:
-            self.facts[key]["access_count"] += 1
-            return self.facts[key]["value"]
-        return None
-    
-    def store_concept(
-        self,
-        name: str,
-        definition: str,
-        attributes: Optional[Dict[str, Any]] = None,
-        relations: Optional[List[str]] = None
-    ) -> None:
-        """Store a concept definition."""
-        self.concepts[name] = {
-            "definition": definition,
-            "attributes": attributes or {},
-            "relations": relations or [],
-            "timestamp": datetime.now().timestamp()
-        }
-    
-    def retrieve_concept(self, name: str) -> Optional[Dict[str, Any]]:
-        """Retrieve a concept by name."""
-        return self.concepts.get(name)
-    
-    def store_procedure(
-        self,
-        name: str,
-        steps: List[str],
-        preconditions: Optional[List[str]] = None,
-        postconditions: Optional[List[str]] = None
-    ) -> None:
-        """Store a procedural skill."""
-        self.procedures[name] = {
-            "steps": steps,
-            "preconditions": preconditions or [],
-            "postconditions": postconditions or [],
-            "timestamp": datetime.now().timestamp()
-        }
-    
-    def retrieve_procedure(self, name: str) -> Optional[Dict[str, Any]]:
-        """Retrieve a procedure by name."""
-        return self.procedures.get(name)
-    
-    def search_facts(self, query: str) -> List[Tuple[str, Any]]:
-        """Search facts by partial key match."""
-        results = []
-        query_lower = query.lower()
-        for key, data in self.facts.items():
-            if query_lower in key.lower():
-                results.append((key, data["value"]))
-        return results
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "fact_count": len(self.facts),
-            "concept_count": len(self.concepts),
-            "procedure_count": len(self.procedures)
-        }
-
-
-class MemorySystem:
-    """
-    Unified memory system combining three tiers.
-    
-    Based on neuroscience-inspired Tri-Memory Continual Learning:
-    - Fast learning (working memory)
-    - Consolidation (episodic → semantic)
-    - Long-term retention (semantic)
-    """
-    
-    def __init__(
-        self,
-        working_capacity: int = 7,
-        episodic_capacity: int = 1000
-    ):
-        self.working = WorkingMemory(capacity=working_capacity)
-        self.episodic = EpisodicMemory(max_entries=episodic_capacity)
-        self.semantic = SemanticMemory()
-        
-    def store_working(self, key: str, value: Any) -> None:
-        """Store in working memory."""
-        self.working.store(key, value)
-    
-    def retrieve_working(self, key: str) -> Optional[Any]:
-        """Retrieve from working memory."""
-        return self.working.retrieve(key)
-    
-    def store_episode(
-        self,
-        content: Any,
-        tags: Optional[List[str]] = None,
-        importance: float = 0.5,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> MemoryEntry:
-        """Store an episodic memory."""
-        return self.episodic.store_episode(content, tags, importance, metadata)
-    
-    def retrieve_episodes(
-        self,
-        context: Dict[str, Any],
-        limit: int = 5
+        query: str = None,
+        tags: List[str] = None
     ) -> List[MemoryEntry]:
-        """Retrieve relevant episodic memories."""
-        return self.episodic.retrieve_similar(context, limit)
+        """Search working memory."""
+        results = []
+        for entry in self.working_memory:
+            match = True
+            if query and query.lower() not in entry.content.lower():
+                match = False
+            if tags and not any(t in entry.tags for t in tags):
+                match = False
+            if match:
+                results.append(entry)
+        
+        return sorted(results, key=lambda e: e.importance, reverse=True)
     
-    def store_fact(
+    def _query_database(
         self,
-        key: str,
-        value: Any,
-        category: str = "general",
-        confidence: float = 1.0
-    ) -> None:
-        """Store a fact in semantic memory."""
-        self.semantic.store_fact(key, value, category, confidence)
+        query: str = None,
+        memory_type: str = None,
+        tags: List[str] = None,
+        limit: int = 10,
+        since: datetime = None
+    ) -> List[MemoryEntry]:
+        """Query persistent storage."""
+        cursor = self.conn.cursor()
+        
+        conditions = []
+        params = []
+        
+        if memory_type:
+            conditions.append("memory_type = ?")
+            params.append(memory_type)
+        
+        if since:
+            conditions.append("timestamp > ?")
+            params.append(since.isoformat())
+        
+        if query:
+            conditions.append("content LIKE ?")
+            params.append(f"%{query}%")
+        
+        sql = "SELECT * FROM memories"
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        sql += " ORDER BY importance DESC, timestamp DESC LIMIT ?"
+        params.append(limit)
+        
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+        
+        # Filter by tags in Python (SQLite doesn't support array operations easily)
+        entries = [self._row_to_entry(row) for row in rows]
+        
+        if tags:
+            entries = [e for e in entries if any(t in e.tags for t in tags)]
+        
+        return entries[:limit]
     
-    def retrieve_fact(self, key: str) -> Optional[Any]:
-        """Retrieve a fact."""
-        return self.semantic.retrieve_fact(key)
+    def _persist_entry(self, entry: MemoryEntry):
+        """Save entry to database."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """INSERT OR REPLACE INTO memories 
+               (id, content, memory_type, timestamp, tags, importance, embeddings, metadata)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                entry.id,
+                entry.content,
+                entry.memory_type,
+                entry.timestamp.isoformat(),
+                json.dumps(entry.tags),
+                entry.importance,
+                json.dumps(entry.embeddings) if entry.embeddings else None,
+                json.dumps(entry.metadata)
+            )
+        )
+        self.conn.commit()
     
-    def consolidate(self) -> int:
-        """
-        Consolidate episodic memories into semantic knowledge.
-        
-        High-importance, frequently accessed episodes become facts.
-        Returns number of consolidated entries.
-        """
-        consolidated = 0
-        threshold_importance = 0.8
-        threshold_access = 3
-        
-        for episode in self.episodic.episodes:
-            if (episode.importance >= threshold_importance and 
-                episode.access_count >= threshold_access):
-                
-                # Create fact key from content summary
-                content_str = str(episode.content)
-                key = f"learned_{episode.id}"
-                
-                self.semantic.store_fact(
-                    key=key,
-                    value=episode.content,
-                    category="consolidated",
-                    confidence=min(1.0, episode.importance)
-                )
-                consolidated += 1
-        
-        return consolidated
+    def _row_to_entry(self, row) -> MemoryEntry:
+        """Convert database row to MemoryEntry."""
+        return MemoryEntry(
+            id=row[0],
+            content=row[1],
+            memory_type=row[2],
+            timestamp=datetime.fromisoformat(row[3]),
+            tags=json.loads(row[4]) if row[4] else [],
+            importance=row[5],
+            embeddings=json.loads(row[6]) if row[6] else None,
+            metadata=json.loads(row[7]) if row[7] else {}
+        )
     
-    def get_context_for_task(self, task: str, tags: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Gather relevant context for a task from all memory tiers."""
-        context = {
-            "working": {},
-            "episodic": [],
-            "semantic": {},
-            "task": task
-        }
-        
-        # Get working memory context
-        context["working"] = dict(self.working.context)
-        
-        # Get relevant episodes
-        episode_context = {"tags": tags or [], "task": task}
-        context["episodic"] = [
-            {"content": e.content, "tags": self._get_tags_for_entry(e)}
-            for e in self.episodic.retrieve_similar(episode_context, limit=5)
-        ]
-        
-        # Search for relevant facts
-        task_keywords = task.lower().split()
-        relevant_facts = {}
-        for keyword in task_keywords:
-            for key, value in self.semantic.search_facts(keyword):
-                relevant_facts[key] = value
-        context["semantic"] = relevant_facts
-        
-        return context
+    def _generate_id(self, content: str) -> str:
+        """Generate unique ID for memory entry."""
+        hash_input = f"{content}{datetime.now().isoformat()}"
+        return hashlib.sha256(hash_input.encode()).hexdigest()[:16]
     
-    def _get_tags_for_entry(self, entry: MemoryEntry) -> List[str]:
-        """Get tags for an entry."""
-        tags = []
-        for tag, ids in self.episodic.index.items():
-            if entry.id in ids:
-                tags.append(tag)
-        return tags
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "working": self.working.to_dict(),
-            "episodic": self.episodic.to_dict(),
-            "semantic": self.semantic.to_dict()
-        }
+    def close(self):
+        """Close database connection."""
+        self.conn.close()

@@ -1,125 +1,112 @@
 """
 Web Search Skill
 
-Capability for information retrieval via web search.
-Implements the skill interface for the agent framework.
+MCP-style tool for web search capabilities.
 """
 
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass
-
-
-@dataclass
-class SearchResult:
-    """Single search result"""
-    title: str
-    url: str
-    snippet: str
-    source: str
+from typing import Dict, List, Optional
+import json
 
 
 class WebSearchSkill:
-    """
-    Skill for searching the web.
-    
-    Integrates with Zo's web search capability.
-    """
+    """Web search skill with results caching."""
     
     def __init__(self):
-        self.name = "web_search"
-        self.description = "Search the web for information"
-        self.capabilities = ["search", "research", "find information"]
+        self.cache = {}
+        self.rate_limit_remaining = 100
     
-    def can_handle(self, action: str, context: Dict[str, Any]) -> bool:
-        """
-        Check if this skill can handle the action.
-        
-        Matches:
-        - Actions starting with "search"
-        - Actions containing "find", "lookup", "research"
-        - Goal-related context keywords
-        """
-        action_lower = action.lower()
-        
-        # Direct matches
-        if any(action_lower.startswith(prefix) for prefix in ["search", "lookup", "find"]):
-            return True
-        
-        if "research" in action_lower or "information" in action_lower:
-            return True
-        
-        # Check context
-        goal = context.get("goal", "").lower()
-        if any(term in goal for term in ["research", "find", "search", "lookup"]):
-            return True
-        
-        return False
-    
-    def execute(self, action: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def search(
+        self,
+        query: str,
+        time_range: str = "week",
+        max_results: int = 10
+    ) -> Dict:
         """
         Execute web search.
         
-        Note: In actual execution, this would integrate with Zo's web_search tool.
-        For the skill framework, we define the interface.
+        Args:
+            query: Search query string
+            time_range: "day", "week", "month", "year", "anytime"
+            max_results: Maximum results to return
+        
+        Returns:
+            Dict with search results
         """
-        # Extract search query from action
-        query = self._extract_query(action, context)
+        # Check cache
+        cache_key = f"{query}:{time_range}:{max_results}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
         
-        if not query:
-            return {
-                "success": False,
-                "error": "Could not extract search query",
-                "action": action
-            }
+        # Note: Actual implementation would call search API
+        # This is the skill interface
         
-        # This would call the actual web search
-        # For now, return the query that would be searched
-        return {
-            "success": True,
+        result = {
             "query": query,
-            "note": "Search query ready for execution",
-            "results": [],  # Would be populated by actual search
-            "result_count": 0,
-            "metadata": {
-                "time_range": context.get("time_range", "anytime"),
-                "search_type": "general"
-            }
+            "time_range": time_range,
+            "results": [],
+            "total_found": 0,
+            "cached": False
+        }
+        
+        # Cache result
+        self.cache[cache_key] = result
+        
+        return result
+    
+    async def research_deep(
+        self,
+        topic: str,
+        depth: int = 3
+    ) -> Dict:
+        """
+        Deep research on a topic with multiple searches.
+        
+        Args:
+            topic: Research topic
+            depth: Number of search iterations
+        
+        Returns:
+            Aggregated research results
+        """
+        all_results = []
+        
+        # Initial search
+        initial = await self.search(topic, time_range="month")
+        all_results.extend(initial.get("results", []))
+        
+        # Follow-up searches based on findings
+        # (Simplified - would analyze results for follow-up queries)
+        
+        return {
+            "topic": topic,
+            "depth": depth,
+            "results": all_results,
+            "summary": f"Research on {topic} completed with {len(all_results)} sources"
         }
     
-    def _extract_query(self, action: str, context: Dict[str, Any]) -> Optional[str]:
-        """Extract search query from action string."""
-        # Try to extract query after common prefixes
-        prefixes = ["search:", "search ", "lookup:", "lookup ", "find:", "find "]
-        
-        action_lower = action.lower()
-        for prefix in prefixes:
-            if prefix in action_lower:
-                parts = action.split(":", 1) if ":" in action else action.split(" ", 1)
-                if len(parts) > 1:
-                    return parts[1].strip()
-        
-        # Fall back to using the goal
-        goal = context.get("goal", "")
-        if goal:
-            return goal
-        
-        return None
-    
-    def learn_from(self, experience: Dict[str, Any]) -> None:
-        """
-        Learn from search experience.
-        
-        Could improve:
-        - Query extraction patterns
-        - Search parameter selection
-        - Result filtering
-        """
-        # Record for future improvement
-        pass
-    
-    def to_dict(self) -> Dict[str, Any]:
+    def get_schema(self) -> Dict:
+        """Get MCP tool schema."""
         return {
-            "name": self.name,
-            "description": self.description,
-            "capabilities": self.capabilities
+            "name": "web_search",
+            "description": "Search the web for information",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query"
+                    },
+                    "time_range": {
+                        "type": "string",
+                        "enum": ["day", "week", "month", "year", "anytime"],
+                        "default": "week"
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "default": 10,
+                        "maximum": 50
+                    }
+                },
+                "required": ["query"]
+            }
         }

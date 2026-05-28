@@ -1,354 +1,363 @@
 """
 Base Agent Implementation
 
-Core agent loop implementing ReAct pattern:
-Reason → Act → Observe → Reflect → Repeat
-
-References:
-- vasilyevdm/ai-agent-handbook: ReAct, Plan+Execute, Reflection patterns
-- NVIDIA AI-Q Blueprint: Two-tier routing (shallow/fast vs deep/complex)
+Architecture based on System-1 (LLM) + System-2 (Coordination) pattern.
+Implements EXPLORE → VERIFY → PLAN → EXECUTE → REFLECT cycle.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Callable
-from enum import Enum
 import json
-import time
+import asyncio
+from typing import Any, Dict, List, Optional, Callable
+from dataclasses import dataclass, field
+from enum import Enum
 from datetime import datetime
 
 
 class AgentState(Enum):
     IDLE = "idle"
+    EXPLORING = "exploring"
+    VERIFYING = "verifying"
     PLANNING = "planning"
     EXECUTING = "executing"
-    OBSERVING = "observing"
     REFLECTING = "reflecting"
-    COMPLETE = "complete"
     ERROR = "error"
 
 
 @dataclass
-class Observation:
-    """Result of an action"""
-    timestamp: float
-    action: str
-    result: Any
-    success: bool
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
 class Thought:
-    """Reasoning step"""
-    step: int
+    """A single thought/reasoning step."""
     content: str
-    type: str  # "plan", "action", "reflection", "decision"
-    timestamp: float
+    step_type: str  # explore, verify, plan, execute, reflect
+    timestamp: datetime = field(default_factory=datetime.now)
+    confidence: float = 0.5
 
 
 @dataclass
-class AgentResult:
-    """Final execution result"""
-    goal: str
+class Action:
+    """An action to be executed."""
+    tool: str
+    params: Dict[str, Any]
+    expected_outcome: str
+    requires_approval: bool = False
+
+
+@dataclass
+class ExecutionResult:
+    """Result of executing an action."""
     success: bool
     output: Any
-    thoughts: List[Thought]
-    observations: List[Observation]
-    execution_time: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    error: Optional[str] = None
+    execution_time_ms: int = 0
 
 
 class BaseAgent:
     """
-    Base agent implementing the ReAct (Reason, Act, Observe, Reflect) loop.
+    Base agent with System-2 coordination layer.
     
-    Architecture inspired by:
-    - NVIDIA AI-Q: Two-tier routing (simple vs complex)
-    - Microsoft multi-agent: Orchestration patterns
-    - Conductor production patterns: Durable execution
+    Key features:
+    - EXPLORE/VERIFY/PLAN/EXECUTE/REFLECT cycle
+    - MCP-style tool integration
+    - Hierarchical memory integration
+    - Self-correction capabilities
     """
     
     def __init__(
         self,
-        name: str = "agent",
-        max_iterations: int = 10,
-        skills: Optional[List[Any]] = None,
-        planner: Optional[Any] = None,
-        memory: Optional[Any] = None,
-        reflector: Optional[Any] = None
+        name: str = "base_agent",
+        llm_client = None,  # External LLM client
+        memory_manager = None,
+        planner = None,
+        reflection_engine = None,
+        max_iterations: int = 10
     ):
         self.name = name
-        self.max_iterations = max_iterations
-        self.skills = skills or []
-        self.planner = planner
-        self.memory = memory
-        self.reflector = reflector
-        
         self.state = AgentState.IDLE
+        self.llm_client = llm_client
+        self.memory = memory_manager
+        self.planner = planner
+        self.reflection = reflection_engine
+        self.max_iterations = max_iterations
+        
+        # Tools registry (MCP-style)
+        self.tools: Dict[str, Callable] = {}
+        
+        # Reasoning trace
         self.thoughts: List[Thought] = []
-        self.observations: List[Observation] = []
-        self.current_iteration = 0
         
-    def think(self, context: Dict[str, Any]) -> Thought:
-        """
-        Reasoning step: analyze situation and decide next action.
-        
-        Implements two-tier routing:
-        - Simple tasks: Direct action selection
-        - Complex tasks: Full planning with decomposition
-        """
-        self.state = AgentState.PLANNING
-        
-        # Determine if task needs full planning or direct action
-        if self._is_simple_task(context):
-            content = self._select_direct_action(context)
-            thought_type = "action"
-        else:
-            if self.planner:
-                plan = self.planner.create_plan(context)
-                content = f"Plan: {plan}"
-            else:
-                content = self._basic_reasoning(context)
-            thought_type = "plan"
-        
-        thought = Thought(
-            step=self.current_iteration,
-            content=content,
-            type=thought_type,
-            timestamp=time.time()
-        )
-        self.thoughts.append(thought)
-        return thought
+        # Sub-agents for delegation
+        self.sub_agents: Dict[str, 'BaseAgent'] = {}
     
-    def act(self, thought: Thought, context: Dict[str, Any]) -> Observation:
-        """
-        Execute the planned action using available skills.
-        """
-        self.state = AgentState.EXECUTING
-        
-        # Extract action from thought
-        action = self._parse_action(thought.content)
-        
-        # Find appropriate skill
-        skill = self._select_skill(action, context)
-        
-        if skill:
-            try:
-                result = skill.execute(action, context)
-                success = True
-            except Exception as e:
-                result = {"error": str(e)}
-                success = False
-        else:
-            result = {"error": f"No skill found for action: {action}"}
-            success = False
-        
-        observation = Observation(
-            timestamp=time.time(),
-            action=action,
-            result=result,
-            success=success
-        )
-        self.observations.append(observation)
-        return observation
-    
-    def observe(self, observation: Observation) -> Dict[str, Any]:
-        """
-        Process observation and update context.
-        """
-        self.state = AgentState.OBSERVING
-        
-        # Update context with observation
-        context_update = {
-            "last_observation": observation.result,
-            "last_action_success": observation.success,
-            "step": self.current_iteration
+    def register_tool(self, name: str, func: Callable, schema: Dict = None):
+        """Register a tool following MCP protocol."""
+        self.tools[name] = {
+            "func": func,
+            "schema": schema or {}
         }
-        
-        # Store in memory if available
-        if self.memory:
-            self.memory.store_episode({
-                "action": observation.action,
-                "result": observation.result,
-                "success": observation.success,
-                "timestamp": observation.timestamp
-            })
-        
-        return context_update
     
-    def reflect(self, context: Dict[str, Any]) -> Optional[Thought]:
+    def register_sub_agent(self, name: str, agent: 'BaseAgent'):
+        """Register a sub-agent for delegation."""
+        self.sub_agents[name] = agent
+    
+    async def run(self, task: str, context: Dict = None) -> Dict:
         """
-        Reflect on progress and decide whether to continue or terminate.
-        
-        Returns None if task is complete, otherwise returns reflection thought.
+        Main agent loop: EXPLORE → VERIFY → PLAN → EXECUTE → REFLECT
         """
-        self.state = AgentState.REFLECTING
+        self.state = AgentState.EXPLORING
+        self.thoughts = []
         
-        if self.reflector:
-            reflection = self.reflector.evaluate(
-                goal=context.get("goal"),
-                thoughts=self.thoughts,
-                observations=self.observations,
-                context=context
-            )
+        iteration = 0
+        result = None
+        
+        while iteration < self.max_iterations:
+            iteration += 1
+            
+            # EXPLORE: Gather information and understand the task
+            exploration = await self._explore(task, context)
+            self._add_thought(exploration, "explore")
+            
+            # VERIFY: Validate understanding and check assumptions
+            verification = await self._verify(exploration)
+            self._add_thought(verification, "verify")
+            
+            if not verification.get("valid", True):
+                # Need more exploration
+                context = self._update_context(context, verification)
+                continue
+            
+            # PLAN: Create action sequence
+            self.state = AgentState.PLANNING
+            plan = await self._plan(task, exploration, verification)
+            self._add_thought(str(plan), "plan")
+            
+            # EXECUTE: Run the plan
+            self.state = AgentState.EXECUTING
+            execution_results = await self._execute_plan(plan)
+            
+            # REFLECT: Evaluate and potentially iterate
+            self.state = AgentState.REFLECTING
+            reflection = await self._reflect(execution_results, task)
+            self._add_thought(str(reflection), "reflect")
             
             if reflection.get("complete", False):
-                return None
-            
-            thought = Thought(
-                step=self.current_iteration,
-                content=reflection.get("insight", "Continue execution"),
-                type="reflection",
-                timestamp=time.time()
-            )
-            self.thoughts.append(thought)
-            return thought
-        
-        # Basic reflection: check if goal achieved or max iterations
-        if self._is_goal_achieved(context) or self.current_iteration >= self.max_iterations:
-            return None
-        
-        thought = Thought(
-            step=self.current_iteration,
-            content="Continue to next step",
-            type="reflection",
-            timestamp=time.time()
-        )
-        self.thoughts.append(thought)
-        return thought
-    
-    def run(self, goal: str, initial_context: Optional[Dict[str, Any]] = None) -> AgentResult:
-        """
-        Execute the full ReAct loop.
-        
-        Pattern: ReAct (Reason, Act, Observe, Reflect)
-        Reference: Yao et al. "ReAct: Synergizing Reasoning and Acting in Language Models"
-        """
-        start_time = time.time()
-        
-        context = initial_context or {}
-        context["goal"] = goal
-        context["agent_name"] = self.name
-        
-        self.state = AgentState.EXECUTING
-        
-        while self.current_iteration < self.max_iterations:
-            # 1. REASON: Think about next action
-            thought = self.think(context)
-            
-            # 2. ACT: Execute the action
-            observation = self.act(thought, context)
-            
-            # 3. OBSERVE: Process result
-            context_update = self.observe(observation)
-            context.update(context_update)
-            
-            # 4. REFLECT: Evaluate progress
-            reflection = self.reflect(context)
-            if reflection is None:
+                result = {
+                    "success": True,
+                    "output": execution_results,
+                    "reflection": reflection,
+                    "thoughts": self.thoughts,
+                    "iterations": iteration
+                }
                 break
             
-            self.current_iteration += 1
+            # Update context for next iteration
+            context = self._update_context(context, reflection)
         
-        execution_time = time.time() - start_time
-        
-        # Determine success
-        success = any(obs.success for obs in self.observations)
-        
-        # Compile output
-        output = self._compile_output()
-        
-        self.state = AgentState.COMPLETE if success else AgentState.ERROR
-        
-        return AgentResult(
-            goal=goal,
-            success=success,
-            output=output,
-            thoughts=self.thoughts,
-            observations=self.observations,
-            execution_time=execution_time,
-            metadata={
-                "iterations": self.current_iteration,
-                "agent_name": self.name,
-                "final_state": self.state.value
+        if result is None:
+            result = {
+                "success": False,
+                "error": "Max iterations reached",
+                "thoughts": self.thoughts,
+                "iterations": iteration
             }
-        )
-    
-    def _is_simple_task(self, context: Dict[str, Any]) -> bool:
-        """
-        Two-tier routing: determine if task can be handled without full planning.
-        """
-        goal = context.get("goal", "")
-        # Simple heuristics for quick classification
-        simple_indicators = ["quick", "simple", "lookup", "search", "check"]
-        complex_indicators = ["complex", "multi-step", "analyze", "research", "build"]
         
-        goal_lower = goal.lower()
-        simple_score = sum(1 for s in simple_indicators if s in goal_lower)
-        complex_score = sum(1 for c in complex_indicators if c in goal_lower)
-        
-        return simple_score > complex_score
+        self.state = AgentState.IDLE
+        return result
     
-    def _select_direct_action(self, context: Dict[str, Any]) -> str:
-        """Select immediate action for simple tasks."""
-        goal = context.get("goal", "")
-        # Direct mapping for common simple tasks
-        if "search" in goal.lower():
-            return f"web_search: {goal}"
-        elif "calculate" in goal.lower() or "compute" in goal.lower():
-            return f"calculate: {goal}"
+    async def _explore(self, task: str, context: Dict = None) -> Dict:
+        """
+        EXPLORE phase: Gather information about the task.
+        Uses LLM to break down and understand requirements.
+        """
+        prompt = f"""Explore this task to understand what needs to be done.
+
+Task: {task}
+Context: {json.dumps(context or {}, indent=2)}
+
+Available tools: {list(self.tools.keys())}
+
+Provide a structured exploration including:
+1. Task decomposition - what are the sub-tasks?
+2. Information gaps - what do we need to know?
+3. Initial hypotheses - what approaches might work?
+4. Confidence level (0-1)
+
+Respond as JSON with keys: decomposition, gaps, hypotheses, confidence"""
+        
+        # Mock LLM call - replace with actual implementation
+        return {
+            "decomposition": ["analyze task", "gather info", "execute"],
+            "gaps": [],
+            "hypotheses": ["standard approach should work"],
+            "confidence": 0.7
+        }
+    
+    async def _verify(self, exploration: Dict) -> Dict:
+        """
+        VERIFY phase: Check exploration validity.
+        Implements RCA (Recursive Causal Audit) pattern.
+        """
+        # Check if we have enough information
+        gaps = exploration.get("gaps", [])
+        confidence = exploration.get("confidence", 0)
+        
+        valid = len(gaps) == 0 and confidence > 0.6
+        
+        return {
+            "valid": valid,
+            "gaps": gaps,
+            "confidence": confidence,
+            "reason": "sufficient information" if valid else "need more exploration"
+        }
+    
+    async def _plan(self, task: str, exploration: Dict, verification: Dict) -> List[Action]:
+        """
+        PLAN phase: Create action sequence.
+        Coordinates with planner module if available.
+        """
+        if self.planner:
+            return await self.planner.create_plan(task, exploration, self.tools)
+        
+        # Default simple planning
+        decomposition = exploration.get("decomposition", [])
+        actions = []
+        
+        for step in decomposition:
+            actions.append(Action(
+                tool="llm_generate",
+                params={"prompt": step},
+                expected_outcome=f"Complete: {step}"
+            ))
+        
+        return actions
+    
+    async def _execute_plan(self, plan) -> List[ExecutionResult]:
+        """Execute a plan of actions."""
+        results = []
+        
+        # Handle ExecutionPlan from Planner
+        if hasattr(plan, 'parallel_groups'):
+            # Execute by parallel groups
+            for group in plan.parallel_groups:
+                # Execute all nodes in group concurrently
+                group_results = await asyncio.gather(*[
+                    self._execute_action(plan.nodes[node_id])
+                    for node_id in group
+                    if node_id in plan.nodes
+                ])
+                results.extend(group_results)
+                
+                # Update node statuses
+                for i, node_id in enumerate(group):
+                    if node_id in plan.nodes:
+                        plan.nodes[node_id].status = plan.nodes[node_id].status.COMPLETED if group_results[i].success else plan.nodes[node_id].status.FAILED
+                        if self.memory:
+                            await self.memory.store_action(plan.nodes[node_id], group_results[i])
         else:
-            return f"process: {goal}"
+            # Handle list of Action objects (legacy or simple plans)
+            for action in plan:
+                result = await self._execute_action(action)
+                results.append(result)
+                
+                # Store in memory if available
+                if self.memory:
+                    await self.memory.store_action(action, result)
+        
+        return results
     
-    def _basic_reasoning(self, context: Dict[str, Any]) -> str:
-        """Basic reasoning when no planner is available."""
-        return f"Analyze goal and determine approach: {context.get('goal')}"
+    async def _execute_action(self, node) -> ExecutionResult:
+        """Execute a single action with error handling."""
+        import time
+        start = time.time()
+        
+        # Handle both Action objects and PlanNode objects
+        if hasattr(node, 'tool'):
+            tool_name = node.tool
+            params = node.params if hasattr(node, 'params') else {}
+        else:
+            tool_name = node
+            params = {}
+        
+        tool_info = self.tools.get(tool_name)
+        if not tool_info:
+            return ExecutionResult(
+                success=False,
+                output=None,
+                error=f"Tool not found: {tool_name}",
+                execution_time_ms=int((time.time() - start) * 1000)
+            )
+        
+        try:
+            func = tool_info["func"]
+            if asyncio.iscoroutinefunction(func):
+                output = await func(**params)
+            else:
+                output = func(**params)
+            
+            return ExecutionResult(
+                success=True,
+                output=output,
+                execution_time_ms=int((time.time() - start) * 1000)
+            )
+        except Exception as e:
+            return ExecutionResult(
+                success=False,
+                output=None,
+                error=str(e),
+                execution_time_ms=int((time.time() - start) * 1000)
+            )
     
-    def _parse_action(self, thought_content: str) -> str:
-        """Extract action from thought content."""
-        # Simple parsing - in production use structured output
-        if "Plan:" in thought_content:
-            return thought_content.split("Plan:")[1].strip()
-        elif ":" in thought_content:
-            return thought_content.split(":", 1)[1].strip()
-        return thought_content
-    
-    def _select_skill(self, action: str, context: Dict[str, Any]) -> Optional[Any]:
-        """Select appropriate skill for action."""
-        for skill in self.skills:
-            if skill.can_handle(action, context):
-                return skill
-        return None
-    
-    def _is_goal_achieved(self, context: Dict[str, Any]) -> bool:
-        """Check if goal has been achieved."""
-        # Check last observation for success indicators
-        if self.observations:
-            last = self.observations[-1]
-            if last.success and "complete" in str(last.result).lower():
-                return True
-        return False
-    
-    def _compile_output(self) -> Dict[str, Any]:
-        """Compile final output from execution."""
+    async def _reflect(self, results: List[ExecutionResult], original_task: str) -> Dict:
+        """
+        REFLECT phase: Evaluate execution and determine next steps.
+        Implements reactive self-correction.
+        """
+        all_success = all(r.success for r in results)
+        any_errors = any(r.error for r in results)
+        
+        if self.reflection:
+            return await self.reflection.evaluate(results, original_task)
+        
+        # Default reflection
+        if all_success:
+            return {
+                "complete": True,
+                "success": True,
+                "summary": "All actions completed successfully",
+                "improvements": []
+            }
+        
+        # Reactive self-correction
+        errors = [r.error for r in results if r.error]
         return {
-            "thoughts": [
-                {"step": t.step, "type": t.type, "content": t.content}
-                for t in self.thoughts
-            ],
-            "observations": [
-                {"action": o.action, "success": o.success, "result": o.result}
-                for o in self.observations
-            ],
-            "final_observation": self.observations[-1].result if self.observations else None
+            "complete": False,
+            "success": False,
+            "errors": errors,
+            "retry_suggested": True,
+            "improvements": ["retry failed actions", "consider alternative approach"]
         }
     
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize agent state."""
-        return {
-            "name": self.name,
-            "state": self.state.value,
-            "iterations": self.current_iteration,
-            "thought_count": len(self.thoughts),
-            "observation_count": len(self.observations)
-        }
+    def _add_thought(self, content: Any, step_type: str):
+        """Add a thought to the reasoning trace."""
+        if isinstance(content, dict):
+            content = json.dumps(content, indent=2)
+        self.thoughts.append(Thought(
+            content=str(content),
+            step_type=step_type
+        ))
+    
+    def _update_context(self, context: Dict, new_info: Dict) -> Dict:
+        """Update context with new information."""
+        if context is None:
+            context = {}
+        context.update(new_info)
+        return context
+    
+    def get_trace(self) -> List[Dict]:
+        """Get the full reasoning trace."""
+        return [
+            {
+                "content": t.content,
+                "type": t.step_type,
+                "timestamp": t.timestamp.isoformat()
+            }
+            for t in self.thoughts
+        ]
