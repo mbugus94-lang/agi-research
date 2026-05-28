@@ -7,6 +7,144 @@
 
 ## Build Log
 
+### 2026-05-28 - Scheduled Run: Initial AGI Framework - System-1/System-2 Architecture
+**Status**: ✅ COMPLETE - 4/4 tests passed
+
+**Research Summary (May 28, 2026)**:
+
+**Industry News & Breakthroughs**:
+- **DeepMind CEO on AGI Timeline (May 26, 2026)**
+  - Demis Hassabis predicts AGI by 2030
+  - "We're in the foothills of the singularity"
+  - AI agents are a "practice run" for AGI
+  - Society has only a few years to prepare
+
+- **AI 'Could Make a Postgrad as Productive as a Lab'** (May 26, 2026)
+  - Hassabis: AI will allow single PhD student's output to match whole laboratory
+  - "Free our PhD students, our postdocs, to do higher-level work"
+
+- **Google I/O 2026**: Gemini Spark - always-on autonomous AI agent running 24/7
+
+- **SpaceX, Nvidia, OpenAI, Anthropic**: May 20, 2026 as potential AI's "everything changed" moment
+
+**Key arXiv Papers (Past 2 Weeks)**:
+
+1. **[2512.05765v2] AGI Requires a Coordination Layer on Top of Pattern Repositories**
+   - Core claim: LLMs provide System-1 substrate (pattern repositories)
+   - Key bottleneck: missing System-2 coordination layer
+   - Proposed: UCCT (Unified Contextual Control Theory), RCA (Recursive Causal Audit), MACI coordination stack
+   - Multi-agent integration via diversity and control
+   - **This paper directly motivated today's architecture**
+
+2. **[2605.25931] Explore Before You Solve: Speed–Depth Trade-off in Epistemic Agents for ARC-AGI-3**
+   - AERA (Adaptive Epistemic Reasoning Agent) framework
+   - EXPLORE / VERIFY / PLAN framework
+   - RHAE (Resource-Harmonic Average Efficiency) metric
+   - Critique: current benchmarks fail to require genuine exploration
+
+3. **[2605.26329v1] JobBench: Aligning Agent Work With Human Will**
+   - 130 agentic tasks across 35 occupations
+   - Best result: Claude Opus 4.7 with 45.9% rubric-averaged score
+   - Shift from replacement potential to augmentation and human alignment
+
+4. **[2605.24069v1] When the Manual Lies: MCP Poisoning Attacks for LLM Agents**
+   - First security benchmark for MCP-enabled agents
+   - 32 real-world test cases across 6 risk dimensions
+   - Reactive Self-Correction proposed as defense
+
+5. **[2510.07962v2] LightReasoner: Can Small Language Models Teach Large Language Models Reasoning?**
+   - Small models reveal high-value reasoning moments
+   - ~90% time reduction, ~80% fewer problems, ~99% fewer tokens
+   - Expert-amateur contrast for reasoning distillation
+
+**Trending Open Source AI Agent Repositories**:
+- **CrewAI** (52k+ stars): Multi-agent orchestration with role-based crews
+- **OpenAI Agents SDK** (26k+ stars): Provider-agnostic framework
+- **Pydantic AI** (17.3k+ stars): Python agent framework with type safety
+- **OpenHarness** (13k+ stars): Personal AI orchestration with tool-use, memory, governance
+- **Microsoft Agent Framework** (10.8k+ stars): Cross-language enterprise framework
+
+**Build Task: Initial AGI Framework with System-1/System-2 Architecture**
+
+**Motivation**: Directly inspired by arXiv:2512.05765v2 - "AGI Requires a Coordination Layer on Top of Pattern Repositories". The paper argues:
+1. LLMs provide System-1 substrate (pattern repositories)
+2. System-2 coordination layer is the missing piece for AGI
+3. Coordination should bind patterns to constraints, verify usage, preserve state, regulate convergence
+4. UCCT, RCA, MACI are key coordination mechanisms
+
+Today's implementation establishes the foundation for this architecture.
+
+**Key Components**:
+
+1. **BaseAgent**: Core agent with System-1/System-2 architecture
+   - System-1: LLM as pattern repository (fast, intuitive)
+   - System-2: Coordination layer (EXPLORE/VERIFY/PLAN/EXECUTE/REFLECT)
+   - MCP-style tool registry for extensibility
+   - Sub-agent delegation support
+
+2. **EXPLORE / VERIFY / PLAN / EXECUTE / REFLECT Cycle**:
+   - EXPLORE: Gather information, decompose task
+   - VERIFY: Validate understanding (RCA pattern)
+   - PLAN: Create execution DAG
+   - EXECUTE: Run with parallelization
+   - REFLECT: Evaluate and iterate
+
+3. **MemoryManager**: Hierarchical memory system
+   - Working: Short-term, session-specific
+   - Episodic: Past experiences and actions
+   - Semantic: Facts, concepts, learned knowledge
+   - SQLite persistence with keyword retrieval
+
+4. **Planner**: Task decomposition and parallel execution
+   - Creates task DAG from exploration results
+   - Parallel group identification
+   - RHAE (Resource-Harmonic Average Efficiency) estimation
+   - Tool selection based on task requirements
+
+5. **ReflectionEngine**: Self-correction and learning
+   - Reactive self-correction (security focus)
+   - RCA (Recursive Causal Audit) for trace verification
+   - Performance pattern recognition
+   - Failure analysis and improvement suggestions
+
+6. **Skills** (MCP-style tools):
+   - WebSearchSkill: Search with caching
+   - CodeGenerationSkill: Code gen and analysis
+
+**Test Coverage**: 4/4 tests passed ✅
+- Basic Agent Execution: State transitions, tool registration, full cycle
+- Memory Integration: Store/retrieve, tag filtering, relevance search
+- Planner: Plan creation, DAG construction, efficiency estimation
+- Reflection Engine: Result evaluation, trace verification, improvement suggestions
+
+**Files Created**:
+- `core/agent.py`: 363 lines - Base agent with System-1/System-2 cycle
+- `core/memory.py`: 299 lines - Hierarchical memory with SQLite
+- `core/planner.py`: 221 lines - DAG planning with parallel groups
+- `core/reflection.py`: 321 lines - Self-correction and RCA verification
+- `core/__init__.py`: 29 lines - Clean module exports
+- `skills/web_search.py`: 112 lines - MCP-style web search skill
+- `skills/code_generation.py`: 157 lines - Code generation skill
+- `experiments/test_agent_basic.py`: 238 lines - 4 comprehensive tests
+- `README.md`: 31 lines - Project overview
+- `ARCHITECTURE.md`: 66 lines - System design documentation
+- `CURRENT_RESEARCH.md`: 91 lines - Research findings and priorities
+
+**Research Synthesis**:
+- System-1/System-2 architecture provides theoretical foundation
+- EXPLORE-before-PLAN pattern critical for novel task performance
+- Coordination layer enables verifiable, controllable agent behavior
+- MCP protocol becoming standard for tool integration
+- Reactive self-correction essential for security (MCP poisoning defense)
+
+**Next Priority**: LLM Client Integration
+- Implement OpenAI/Anthropic LLM client for System-1
+- Connect exploration, planning, and reflection to actual LLM calls
+- Add streaming response support
+- Implement tool-use via LLM function calling
+
+---
+
 ### 2026-05-27 - Scheduled Run: Formal Workflow Verification System (GraphFlow-Inspired)
 **Status**: ✅ COMPLETE - 25/25 tests passed
 
