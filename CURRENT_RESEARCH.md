@@ -1,91 +1,137 @@
-# AGI Research Findings - 2026-05-28
+# AGI Research Findings - 2026-05-29
 
 ## Research Summary
 
-### 1. Latest AGI Research (Past Week)
+### Industry News & Breakthroughs
 
-**DeepMind CEO on AGI Timeline (May 26, 2026)**
-- Demis Hassabis predicts AGI by 2030
-- AI agents described as a "practice run" for AGI
-- Society has only a few years to prepare for AGI
-- Current agentic era is a "societal stress test" for more powerful systems
-- Source: Axios, Nobel Prize Dialogue London
+- **RSI is the new AGI** (TechCrunch, May 28, 2026)
+  - Recursive Self-Improvement (RSI) becoming the new focus beyond AGI
+  - Alex Karpathy using agent swarms to train LLMs on simple tasks (Auto-Research)
+  - Incremental improvements on GPT-2 scale model - "not novel, ground-breaking yet"
+  - Many researchers following the RSI dream
 
-**Key Quote:** *"You can imagine the agentic era in this next year is a little bit like a practice run"* - Demis Hassabis
+- **DeepMind CEO Predicts AGI by 2030, Possibly 2029** (May 26-28, 2026)
+  - Demis Hassabis at Google I/O 2026: "We're in the foothills of the singularity"
+  - AI agents are a "practice run" for far more powerful systems
+  - Society has only a few years to prepare
+  - "Next-generation AI agents should be seen as a social stress test"
 
-### 2. AI Agent Architecture 2026
+- **AI Could Make a Postgrad as Productive as a Lab** (May 26, 2026)
+  - Hassabis: Single PhD student's output could match entire laboratory
+  - "Free our PhD students, postdocs, to do higher-level work"
+  - Science on brink of AI-driven discovery era
 
-**Multi-Agent Systems Trending:**
-- **OpenAI Agents SDK** (26k+ stars) - Lightweight, provider-agnostic framework
-- **Pydantic AI** (17.3k stars) - Python agent framework with type safety
-- **CrewAI** (52k+ stars) - Multi-agent orchestration with role-based crews
-- **Microsoft Agent Framework** (10.8k stars) - Multi-language enterprise framework
-- **Hive/OpenHarness** (13k+ stars) - Personal AI orchestration with tool-use, memory, governance
+- **Fujitsu Self-Evolving Multi-AI Agent Technology** (May 25, 2026)
+  - Multiple AI agents perform tasks as a team
+  - Continuously learn from execution results, human feedback, policy changes
+  - Can automate building business-specific LLMs
 
-**Key Architecture Patterns:**
-- MCP (Model Context Protocol) becoming standard for tool integration
-- Agent-to-Agent (A2A) protocols emerging
-- Training-free multimodal orchestration gaining traction
-- Focus on coordination layers atop LLM pattern repositories
+### Key arXiv Papers (Past 2 Weeks)
 
-### 3. arXiv Papers (Past 2 Weeks)
+1. **[2605.15567v1] Position: Artificial Intelligence Needs Meta Intelligence** ⭐ BUILDS ON THIS
+   - Core claim: Metacognition (self-monitoring of internal states) should be general design principle
+   - Proposes metacognitive strategies inspired by psychology and resource-rational AI
+   - Federated Learning case study: improved learning efficiency, effectiveness, security
+   - Introduces software framework for metacognition-enabled AI applications
+   - **This paper directly motivates today's build**
 
-**"AGI Requires a Coordination Layer on Top of Pattern Repositories"**
-- Core claim: LLMs provide System-1 substrate, but System-2 coordination is the bottleneck
-- Proposed: UCCT (Unified Contextual Control Theory), RCA (Recursive Causal Audit), MACI coordination stack
-- Multi-agent integration via diversity, control, and persistence
+2. **[2605.20873v1] PlanningBench: Generating Scalable and Verifiable Planning Data**
+   - Framework to generate scalable, diverse, verifiable planning data for LLMs
+   - 30+ task types, subtasks, constraint families, difficulty factors
+   - RL on verified PlanningBench data improves performance on unseen benchmarks
+   - Current models struggle with coupled constraints; deterministic solutions yield clearer rewards
 
-**"Explore Before You Solve: The Speed–Depth Trade-off in Epistemic Agents for ARC-AGI-3"**
-- AERA (Adaptive Epistemic Reasoning Agent) framework
-- EXPLORE / VERIFY / PLAN methodology
-- RHAE metric for quantifying speed-depth trade-offs
-- Critique: current benchmarks fail to require genuine exploration
+3. **[2605.18401v1] SkillsVote: Lifecycle Governance of Agent Skills**
+   - Lifecycle governance: Collection → Recommendation → Evolution
+   - Offline evolution: +7.9pp on Terminal-Bench 2.0
+   - Online evolution: +2.6pp on SWE-Bench Pro
+   - Governed external skill libraries enhance frozen agents
 
-**"JobBench: Aligning Agent Work With Human Will"**
-- 130 agentic tasks across 35 occupations
-- Best result: Claude Opus 4.7 with 45.9% rubric-averaged score
-- Shift from replacement potential to augmentation and human alignment
+4. **[2605.18753v1] DashAttention: Differentiable and Adaptive Sparse Hierarchical Attention**
+   - Adaptive, differentiable alpha-entmax for variable key-value block selection
+   - Matches full attention at ~75% sparsity
+   - GPU-aware Triton implementation with substantial speedups
 
-**"When the Manual Lies: MCP Poisoning Attacks for LLM Agents"**
-- Security benchmark for MCP-enabled agents
-- 32 real-world test cases across 6 risk dimensions
-- Reactive Self-Correction proposed as defense
+5. **[2605.16551v1] PQR: Framework to Generate Diverse Queries Eliciting QA Agent Failures**
+   - Iterative two-module system: query refinement + prompt refinement
+   - 23-78% more unhelpful responses detected vs baselines
+   - Targets specific agent objectives (helpfulness, safety)
 
-**"LightReasoner: Can Small Language Models Teach Large Language Models Reasoning?"**
-- Small models reveal high-value reasoning moments
-- ~90% time reduction, ~80% fewer problems, ~99% fewer tokens
-- Expert-amateur contrast for reasoning distillation
+6. **[2605.19064v1] Toward AI-Powered Computational Testbed for Workforce Policy**
+   - LLM-powered generative agents for workforce simulation
+   - Forecast cognitive, emotional, behavioral responses to organizational changes
+   - Agents seeded with HR records, psychometrics, digital activity data
 
-### 4. Trending Open Source Repos
+7. **Building Embodied EvoAgent: Brain-inspired Paradigm** (ACM Multimedia 2026)
+   - Left-hemisphere: embodied context-augmented MLLM
+   - Right-hemisphere: perceptual context-guided world model
+   - Corpus callosum-style dynamic communication slots
+   - Project: feliciaxyao.github.io/EvoAgent/
 
-| Repo | Stars | Focus |
-|------|-------|-------|
-| crewAI | 52k+ | Multi-agent orchestration |
-| openai-agents-python | 26k+ | Lightweight multi-agent |
-| pydantic-ai | 17.3k+ | Type-safe Python agents |
-| OpenHarness | 13k+ | Personal AI orchestration |
-| Microsoft Agent Framework | 10.8k+ | Enterprise multi-language |
+8. **OptiSMR: Unified Framework for Structured Reasoning and Self-Repairing MAS**
+   - Multi-agent system for optimization modeling
+   - 8.3% average improvement in solution accuracy
+   - Handles LP, NLP, MIP, CO across 16 domains
 
-## Build Priority for Next Run
+9. **Functional Task Networks: Cortex-Inspired Spatial Parameter Isolation**
+   - Binary mask over components for continual learning
+   - No task ID required at inference
+   - Reduces forgetting from +7.37 to +0.07 nats
 
-**PHASE 3 CHOICE: A) Implement missing core component - Base Agent**
+10. **From Observed Reasoning to Stable Skills: Memory Substrate for Skill Graduation**
+    - Cognitive Memory Manager (CMM) observes coding sessions
+    - Extracts reasoning patterns as DAG
+    - Curates recurring patterns into SKILL.md files
+    - 61% reduction in assistant messages, 71% fewer files modified
 
-Based on research findings, the next priority is implementing a base agent with:
-1. System-1 (LLM) + System-2 (coordination layer) architecture
-2. MCP support for tool integration
-3. Basic memory persistence
-4. EXPLORE/VERIFY/PLAN reasoning cycle
+### Trending Open-Source AI Agent Repositories (2026)
 
-## Hypotheses to Test
+| Repository | Stars | Key Features |
+|------------|-------|--------------|
+| **oh-my-openagent** | 60K | 9 published packages, TypeScript, workspace architecture |
+| **caveman** | 63K | Prompt compression, efficiency, cross-agent memory |
+| **CowAgent** | 45K | Multi-model, multi-channel, memory + knowledge |
+| **agent-zero** | 18K | Python framework, actively released |
+| **Hermes Agent** | 15K | 22 messaging platforms, 808 commits in v0.14.0 |
+| **paradigmxyz/centaur** | 462 | Self-hosted, Kubernetes sandbox |
+| **elephant-agent** | 530 | Personal-model first, self-evolving |
+| **quarqlabs/agent-oss** | 300+ | Memory-first, local, strict attribution |
+| **nv-tlabs/Gamma-World** | New | Multi-agent world model, real-time rollout |
+| **JuliusBrussee/caveman** | 63K | caveman-code, cavemem, cavekit ecosystem |
 
-1. Coordination layer significantly improves agent reliability on multi-step tasks
-2. Small model reasoning distillation can improve efficiency without quality loss
-3. Reactive self-correction reduces vulnerability to MCP poisoning
-4. Explore-before-plan pattern improves novel task performance
+### Synthesis: Key Trends
 
-## Next Research Focus
+1. **Metacognition as Design Principle**: Self-monitoring AI becoming mainstream
+2. **Self-Evolving Agents**: Continuous learning from execution, not just training
+3. **Multi-Agent Ecosystems**: Team-based agent coordination
+4. **Memory-First Architectures**: Long-context, persistent, verifiable recall
+5. **Security & Governance**: MCP poisoning defense, skill lifecycle governance
+6. **Planning Benchmarks**: Verifiable, scalable planning data generation
+7. **RSI over AGI**: Focus shifting to recursive self-improvement capabilities
 
-- ARC-AGI-3 benchmark developments
-- NVIDIA Hermes self-improving agent framework
-- Security benchmarks for agent systems
-- Reasoning distillation techniques
+### Implications for Our Framework
+
+**Priority 1**: Metacognitive monitoring (today's build)
+- Self-monitoring of confidence, resources, internal states
+- Adaptive resource allocation based on task complexity
+- Real-time performance tracking
+
+**Priority 2**: PlanningBench-style task generation
+- Verifiable planning data for agent training
+- Difficulty calibration
+- Constraint-based synthesis
+
+**Priority 3**: Skill lifecycle governance
+- Collection → Recommendation → Evolution
+- Evidence-gated updates
+- Offline/online evolution
+
+**Priority 4**: Multi-agent world models
+- Brain-inspired communication
+- Real-time coordination
+- Shared environment simulation
+
+---
+
+*Last updated: 2026-05-29 by AGI Research & Build Agent*
+*Next update: Research synthesis and metacognitive monitoring integration*
