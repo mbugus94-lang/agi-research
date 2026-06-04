@@ -1,4 +1,77 @@
+### 2026-06-04 - Scheduled Run: Context-Oriented Memory Cache (PEEK-Inspired)
+**Status**: ✅ COMPLETE - 36/36 tests passed
 
+**Research Summary (June 4, 2026)**:
+
+**Industry News**:
+- **Supermicro + Arm AGI CPU** (Jun 2, 2026): New rack-scale infrastructure for agentic AI
+- **AI Agent Architecture Consensus**: PRAO loop (Perceive→Reason→Act→Observe) is the dominant production pattern; 40% of enterprise apps will embed agents by end of 2026 (Gartner); only 31% of enterprises have a production agent today
+- **"Context Layer" emerging** as canonical enterprise agent stack concept (semantic definitions, entity resolution, governance, lineage, memory)
+
+**Key arXiv Papers**:
+- **[2605.19932v1] PEEK: Context Map as an Orientation Cache for Long-Context LLM Agents** ⭐ BUILDS ON THIS
+  - Authors: Gu, Zhang, Khattab, Madden
+  - Reusable orientation cache capturing what context contains, how it's organized, and what was historically useful
+  - 3 components: Distiller + Cartographer + Evictor
+  - 6.3-34.0% accuracy/efficiency gains; 1.7-5.8x cost reduction vs ACE
+- **[2605.30280v2] Qwen-VLA**: Unifies vision-language-action across manipulation, navigation, trajectory prediction
+- **[2605.28774v1] AXPO**: Closes Thinking-Acting Gap; +1.8pp Pass@1 with 4x fewer params
+- **[2605.16727v1] PopuLoRA**: Co-evolving LoRA populations for reasoning self-play
+- **[2605.14177v1] PGR**: Prospection-Guided Retrieval via Tree-of-Thought
+- **[2605.06647v1] SIRA**: Superintelligent Retrieval Agent as single corpus-discriminative action
+- **[2605.28779v1] Abstraction Gap in VLMs**: Many models high text but low chain scores
+
+**Trending Open-Source Repos**:
+- shyftlabs/continuum v0.0.1: 9 multi-agent patterns, durable execution
+- negai-ai/AgentClaw: declarative Python framework with @workflow.node decorators
+- polyant-ai/polyant: TS monorepo, NestJS+Next.js, multi-channel
+- agentiumOS/agentium v2.3.1: 15+ packages, OpenTelemetry observability
+- HKUDS/nanobot v0.2.1: 84 PRs merged, 29 contributors
+- yuntiaoOS/GenericAgent: 3K LOC self-evolving agent
+- agent-substrate/substrate: Kubernetes-based high-density agent substrate
+
+**Build Task: Context-Oriented Memory Cache (PEEK-Inspired)**
+
+**Motivation**: Long-context LLM agents re-process the same context across recurring tasks — expensive (token cost) and slow. PEEK proposes a reusable context map that captures (a) what context contains, (b) how it's organized, and (c) which elements have been useful historically. The agent orients itself through the cache instead of re-reading raw context. Decoupled from any LLM provider or vector DB, designed to plug into existing tiered_memory / enhanced_memory / metacognitive_monitor pipeline.
+
+**Key Components**:
+1. **ContextEntry** - reusable cache entry (FACT/SCHEMA/PATTERN/INSTRUCTION/TOOL_TRACE/SUMMARY) with token_cost, priority, hit_count, miss_count, last_accessed, value_density
+2. **Distiller** - extracts reusable patterns from execution traces: facts (keyword markers), tool_traces (tool:/use: prefixes), schemas (markdown), summaries (>120 chars)
+3. **Cartographer** - translates DistillationResult into cache edits: ADD/UPDATE/NOOP with priority boost on re-seen keys
+4. **Evictor** - LRU/LFU/COST_AWARE/HYBRID policies to bring cache under token budget
+5. **ContextMap** - the orientation cache with get/put/remove, ingest_trace, _enforce_budget, top_entries, stats (hits/misses/saves/evictions/saved_tokens_total)
+6. **ContextOrientedAgent** - thin wrapper with consult(key) and remember(trace) for BaseAgent integration
+
+**Test Coverage**: 36/36 tests passed ✅
+- Distiller: 8 tests (facts, tools, schemas, summaries, dedup, empty, dict msgs, object msgs)
+- Cartographer: 4 tests (add, update, noop filter, dedup)
+- Evictor: 5 tests (no-op, LRU, LFU, COST_AWARE, HYBRID)
+- ContextMap: 10 tests (put/get, miss, update, remove, budget, ingest, dedup, top entries, saved tokens, describe, clear)
+- Convenience: 2 tests (create_cache, create_agent)
+- Agent wrapper: 3 tests (consult, remember, summary)
+- Integration: 3 tests (recurring tasks save tokens, budget under pressure, invalidation)
+
+**Research Synthesis**:
+- PEEK-style orientation caches are a 6-34% efficiency win for long-context agents
+- Token-budget aware caching is essential as enterprise agent token consumption has grown 320x
+- The "context layer" pattern (semantics + identity + governance + lineage + memory) is becoming the canonical enterprise agent stack
+- Caches can be metacognition-hooks: hit_rate and saved_tokens feed the metacognitive monitor
+- Distiller + Cartographer + Evictor cleanly separates "what was learned" from "what stays in the cache" - testable, deterministic, LLM-agnostic
+
+**Files Changed**:
+- `core/context_cache.py`: 744 lines - PEEK-inspired orientation cache
+- `experiments/test_context_cache.py`: 372 lines - 36 comprehensive tests
+- `CURRENT_RESEARCH.md`: Updated with June 4, 2026 research findings
+- `AGENTS.md`: This build log entry
+
+**Next Priority**:
+- Integrate with `tiered_memory`: route long-context orientation entries through tiered memory
+- Wire into `metacognitive_monitor`: feed cache hit_rate + saved_tokens into calibration tracking
+- Hook into `reflection`: post-run ingestion of successful execution traces
+- L2/L3 tier promotion: orientation entries should graduate to long-term memory after N hits
+- LLM-backed Distiller: replace heuristic line-classifier with an LLM prompt that yields richer kinds
+
+---
 ### 2026-05-29 - Scheduled Run: Metacognitive Monitor (arXiv:2605.15567v1)
 **Status**: ✅ COMPLETE - 14/14 tests passed
 
