@@ -12,6 +12,17 @@ from .agent import BaseAgent, AgentState, Thought, Action, ExecutionResult
 from .memory import MemoryManager, MemoryEntry
 from .planner import Planner, PlanNode, ExecutionPlan
 from .reflection import ReflectionEngine, ReflectionResult
+from .evidence_ledger import (
+    Claim,
+    ClaimStatus,
+    ClaimVerification,
+    Evidence,
+    EvidenceKind,
+    EvidenceLedger,
+    EvidencePolarity,
+    LedgerSummary,
+    create_ledger,
+)
 
 __all__ = [
     "BaseAgent",
@@ -26,4 +37,13 @@ __all__ = [
     "ExecutionPlan",
     "ReflectionEngine",
     "ReflectionResult",
+    "Claim",
+    "ClaimStatus",
+    "ClaimVerification",
+    "Evidence",
+    "EvidenceKind",
+    "EvidenceLedger",
+    "EvidencePolarity",
+    "LedgerSummary",
+    "create_ledger",
 ]

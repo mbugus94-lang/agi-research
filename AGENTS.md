@@ -1,3 +1,86 @@
+### 2026-06-05 - Scheduled Run: Causal Evidence Ledger (WISE + SciReports-inspired)
+**Status**: ✅ COMPLETE - 33/33 tests passed
+
+**Research Summary (June 5, 2026)**:
+
+**Industry News**:
+- **NVIDIA Vera Rubin** (May 31, GTC Taipei): 10x agent throughput at scale; Spectrum-X Ethernet Photonics in production; the agent workload now anchors a hardware generation.
+- **Skift Data + AI Summit** (Jun 3, 2026): Sierra reports 95%+ pilot→production (vs MIT's 90% stuck in demo); Evolve took a guest-facing AI resolution platform 30%→60% in <120 days. Travel becomes a production-mode canary.
+- **IBM Agentic Operating Model** (Think 2026, May 30): four pillars - agents + data + automation + hybrid. Sovereign Core embeds governance at the infrastructure runtime, not the app layer.
+- **Cooler Master + Spingence "Digital Brain"** (GTC Taipei, Jun 4): closed-loop AI manufacturing - visual inspection agents + thermal sim + digital twins + enterprise knowledge.
+- **White House Executive Order** (Jun 2, 2026): "Promoting Advanced AI Innovation and Security" - treats frontier AI as critical operational infrastructure. Compliance pressure on agent builders for the rest of 2026.
+- **Leiden Declaration on AI and Mathematics** (Jun 2, 2026): 16 experts, 130+ signatories, IMU endorsement. Concern: reliability of AI-generated proofs, attribution, peer-review integrity. Direct echo of the evidence-grounded reasoning theme.
+
+**Key arXiv / OpenReview Papers**:
+- **CaveAgent** (OpenReview p3dlOhpqKD) ⭐ BUILDS ON THIS: dual-stream LLM agent - semantic reasoning + persistent Python runtime; persists DataFrames, DB connections across turns; up to +13.5% multi-turn retail, 28-51% token reduction. OSS models hit 94.0-94.7% on BFCL.
+- **WISE** (OpenReview T8HuiP3yM9): Causal Event Graph connecting observations, task relevance, and causal structure. Opportunistic Task Scheduler dynamically re-prioritizes on causally relevant opportunities. Reinforces the "causal ledger" idea.
+- **Lexical Hints of Accuracy in LLM Reasoning Chains** (Sci Reports s41598-026-55000-2): words like "guess", "stuck", "hard" are the strongest predictors of incorrect answers. CoT length only helps on intermediate-difficulty tasks. Post-hoc calibration > self-reported confidence.
+- **Theory of Space** (OpenReview c2cxLvsdUp): Active-Passive Gap - GPT-5.2 drops 57.1→46.0 when forced to gather information. Belief Inertia: false priors persist, especially in vision-based models.
+- **SR-Scientist** (OpenReview 5xwLFGdeWU): treats the LLM as an agent writing code, evaluating it, iterating; 6-35% over baselines across four scientific disciplines.
+- **EvoMaster** (OpenReview lidiprht3N): ~100 LOC to deploy self-evolving scientific agents; SOTA on Humanity's Last Exam (41.1%), MLE-Bench Lite (75.8%), BrowseComp (73.3%).
+
+**Trending Open-Source Repos**:
+- piotrwachowski/durable-agents (alpha, Jun 2026): Temporal-based durable execution, DeepAgents-style DX, sub-agent delegation
+- nemori-ai/langchain-dynamic-workflow v0.2.0 (Jun 3): deterministic scripted multi-agent orchestration for LangChain deepagents, AST security gate
+- LatticeAI v2.0.0: self-hosted Agentic Workspace Platform with Plugin SDK, Workflow Designer, Multi-Agent Runtime 2.0 (Planner/Executor/Reviewer/Researcher/Release)
+- voocel/agentcore v1.6.10: minimal composable Go library, work-stealing via IdleClaim, subagent nesting cap
+- agruai/multiagent-business-automation: LangGraph + Neo4j + Qdrant + Redis for business workflows with HITL approval gates
+- code-yeongyu/oh-my-openagent v4.6.0: TypeScript multi-agent SWE framework with hardened prompt dispatch
+- zhayujie/CowAgent 2.1.0: multi-channel (Telegram/Discord/Slack/WeChat), i18n, streaming output
+- yaodub/cast: self-hosted multi-user multi-agent harness, design-driven agent builder
+
+**Build Task: Causal Evidence Ledger (WISE + SciReports + CaveAgent-inspired)**
+
+**Motivation**: Today's agent cycle makes claims and inferences but has no substrate that records *which evidence* supports, refutes, or is missing for each claim. The week's research makes the case sharper than ever:
+- WISE: durable memory of *why* an action helped beats a stack of ungrounded text
+- CaveAgent: stateful runtime objects are a substrate for verifiable feedback
+- Theory of Space: foundation models suffer from belief inertia and ungrounded active inference
+- Lexical hints paper: post-hoc calibration beats self-reported confidence
+- Leiden Declaration: the math community is asking for evidence-grounded AI claims
+
+The ledger closes the loop between the agent's reasoning (`Thought` stream), its tools (`Action`/`ExecutionResult`), and its reflection (`ReflectionEngine`). Reflection now has a substrate to call "this step's claim is ungrounded" or "this claim is refuted by tool output" instead of guessing.
+
+**Key Components**:
+1. **Claim** - proposition with author, tags, depends_on lineage, status, notes
+2. **Evidence** - supports/refutes edge with kind (observation/tool_trace/memory/external/inference/user), weight, confidence, source
+3. **ClaimStatus** - UNGROUNDED / SUPPORTED / CONTRADICTED / DISPUTED / EXPIRED
+4. **EvidenceLedger** - substrate with assert_claim, add_support/add_refute, verify (single + bulk), lineage (DFS), descendants (BFS), related_evidence (lexical Jaccard), summary, calibration_signals
+5. **verify()** - deterministic scoring: weighted_support vs weighted_refute with `weight × confidence` clipping; ties → DISPUTED, both-zero → UNGROUNDED, stale positives → EXPIRED
+6. **calibration_signals()** - emits ungrounded_rate, contradiction_rate, disputed_rate, mean_confidence, expired_rate - feeds `MetacognitiveMonitor.assess_current_state()` directly
+
+**Test Coverage**: 33/33 tests passed ✅
+- ClaimCRUD: 6 tests (assert, idempotent by id, tags/depends_on, remove drops evidence, remove unknown, all_claims)
+- Evidence + verification: 8 tests (no-evidence, only support, only refute, mixed lead, disputed tie, confidence clip, remove, zero-weight)
+- Freshness: 3 tests (fresh by default, expired after window, ungrounded becomes expired stale)
+- Lineage: 5 tests (lineage ancestors, cycle-safe, descendants, related_evidence match, threshold filter)
+- Summary: 4 tests (empty, counts each status, weakest, audit trail)
+- Serialization: 3 tests (dict round trip, json round trip, audit cap)
+- Calibration signals: 2 tests (empty, reflects state)
+- Integration: 2 tests (full workflow, claim reuse with new evidence)
+
+**Research Synthesis**:
+- A causal evidence ledger is the substrate for *calibration*: signal > confidence
+- Lineage + descendants + depends_on = causal graph that reflection and the metacognitive monitor can walk
+- `calibration_signals()` is the bridge to `metacognitive_monitor`: ungrounded_rate feeds the calibration tracker
+- The ledger is LLM-agnostic and deterministic - no behavior change, just data the other modules can consume
+- The simplest "is this claim grounded?" check in the codebase is now `ledger.verify(claim_id).status`
+- The stateful-runtime pattern from CaveAgent and the causal-graph pattern from WISE converge on a single substrate
+
+**Files Changed**:
+- `core/evidence_ledger.py`: 763 lines - new substrate
+- `experiments/test_evidence_ledger.py`: 428 lines - 33 comprehensive tests
+- `core/__init__.py`: added public exports (Claim, EvidenceLedger, ClaimStatus, etc.)
+- `CURRENT_RESEARCH.md`: replaced with 2026-06-05 entry
+- `AGENTS.md`: this build log entry
+
+**Next Priority**:
+- Wire `verify_trace` in `core/reflection.py` to consult the ledger and report evidence coverage per reasoning step
+- Feed `calibration_signals()` into `MetacognitiveMonitor.assess_current_state()` as additional calibration input
+- Bridge to `ContextMap`: convert SUPPORTED claims + their evidence into a single INSTRUCTION / SCHEMA entry (token-cheap verification memo)
+- `BaseAgent` integration: expose `agent.ledger.assert_claim`, `add_support`, `add_refute`, `verify_all` from the cycle
+- LLM-backed classifier for EvidenceKind: replace "user_statement" / "inference" heuristics with a small prompt
+
+---
 ### 2026-06-04 - Scheduled Run: Context-Oriented Memory Cache (PEEK-Inspired)
 **Status**: ✅ COMPLETE - 36/36 tests passed
 

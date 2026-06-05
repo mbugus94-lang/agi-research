@@ -1,241 +1,145 @@
-# AGI Research Findings - 2026-06-04
+# AGI Research Findings - 2026-06-05
 
 ## Research Summary
 
 ### Industry News & Breakthroughs
 
-- **RSI is the new AGI** (TechCrunch, May 28, 2026)
-  - Recursive Self-Improvement (RSI) becoming the new focus beyond AGI
-  - Alex Karpathy using agent swarms to train LLMs on simple tasks (Auto-Research)
-  - Incremental improvements on GPT-2 scale model - "not novel, ground-breaking yet"
-  - Many researchers following the RSI dream
+- **NVIDIA Vera Rubin ramps into full production for "agentic AI factories"** (May 31, 2026, GTC Taipei)
+  - 10x agent throughput at scale vs Grace Blackwell
+  - Spectrum-X Ethernet Photonics in production - co-packaged optics for million-GPU AI factories
+  - Rack-scale compute density push: Supermicro+Arm AGI CPU (Jun 2) and Spingence+Cooler Master follow the same playbook
+  - Signal: the agent workload is large enough to anchor an entire hardware generation
 
-- **Supermicro + Arm AGI CPU for Agentic AI** (June 2, 2026)
-  - New class of rack-scale infrastructure designed for agentic AI workload orchestration
-  - Compute density improvements for enterprise data center economics
-  - "Increasing compute demands of modern agentic AI require a new class of rack-scale infrastructure"
+- **Skift Data + AI Summit 2026: agent production-mode inflection point** (Jun 3, 2026)
+  - Sierra: 95%+ of pilots reach production (vs MIT's 90% stuck in demo)
+  - Evolve: guest-facing AI resolution went 30% → 60% in <120 days
+  - Quote: "If you build an agent, you are accountable for what that agent does" - TUI / Amex GBT
+  - Travel domain is the canary: integration with operational systems + accountability ownership
 
-- **AI Agent Architecture Consensus: LLM + Memory + Planning + Tools** (Jun 1, 2026)
-  - PRAO (Perceive → Reason → Act → Observe) loop is dominant production pattern
-  - ReAct (Thought → Action → Observation) remains core interaction pattern
-  - Gartner: 40% of enterprise apps will embed AI agents by end of 2026
-  - AI agents market: $7.6B (2025) → $10.9B (2026)
-  - 79% of enterprises say they adopted agents — only 31% have one running in production
+- **IBM Agentic Operating Model (Think 2026, May 30, 2026)**
+  - Four pillars: agents + data + automation + hybrid
+  - IBM Sovereign Core: governance embedded at infrastructure runtime level, not as app-layer config
+  - Distinguishes IBM from hyperscaler competitors on operational sovereignty
 
-- **"Context Layer" emerging as canonical enterprise agent stack concept** (Jun 2026)
-  - Combines: semantic definitions, entity resolution, governance, lineage, memory
-  - Solves 4 recurring problems: fragmented definitions, tribal knowledge, entity identity, traceability
+- **NVIDIA GTC Taipei: Cooler Master + Spingence global "Digital Brain"** (Jun 4, 2026)
+  - Closed-loop AI manufacturing: visual inspection agents + thermal simulation + digital twins + enterprise knowledge
+  - Physical AI / Industrial agents integrate R&D, production, and simulation
+  - Manufacturing becomes a multi-agent substrate, not a single-agent task
 
-- **Mistral's path to profitability** (Jun 2026)
-  - €11.7B valuation, $400M ARR, $1B target for end of 2026
-  - Open-weight + European AI sovereignty positioning
+- **White House Executive Order: "Promoting Advanced AI Innovation and Security"** (Jun 2, 2026)
+  - Treats frontier AI as critical operational infrastructure
+  - Pushes data sovereignty + governance + procurement constraints into private sector
+  - Agent builders will feel the compliance pull for the rest of 2026
 
-### Key arXiv Papers (Past 2 Weeks)
+- **Leiden Declaration on AI and Mathematics** (Jun 2, 2026)
+  - 16 experts, 130+ signatories, endorsed by the International Mathematical Union
+  - Concerns: reliability of AI-generated proofs, attribution, peer-review integrity
+  - Reinforces theme of evidence-grounded reasoning: claims must carry their proofs
 
-1. **[2605.19932v1] PEEK: Context Map as an Orientation Cache for Long-Context LLM Agents** ⭐ BUILDS ON THIS
-   - Authors: Zhuohan Gu, Qizheng Zhang, Omar Khattab, Samuel Madden
-   - Core idea: maintain a reusable orientation cache ("context map") that captures what context contains, how it's organized, and which elements have been useful historically
-   - 3 components: Distiller (extracts transferable knowledge), Cartographer (translates to edits), Evictor (priority-based token budget enforcement)
-   - Claims: 6.3-34.0% accuracy/efficiency gains over baselines; 1.7-5.8x cost reductions vs ACE
-   - Generalizes across LMs (incl. OpenAI Codex)
+### Key arXiv / OpenReview Papers (Past 2 Weeks)
+
+1. **CaveAgent: Transforming LLMs into Stateful Runtime Operators** (OpenReview p3dlOhpqKD) ⭐ BUILDS ON THIS
+   - Dual-stream: semantic reasoning stream + persistent Python runtime stream
+   - Persists DataFrames, DB connections, etc. across turns as runtime objects
+   - Up to +13.5% on multi-turn retail (Tau²-bench), 28-51% token reduction
+   - Open-source models reach 94.0-94.7% on BFCL, competitive with closed-source peers
    - **This paper directly motivates today's build**
 
-2. **[2605.30280v2] Qwen-VLA: Unifying Vision-Language-Action Modeling**
-   - DiT-based action decoder for continuous action/trajectory output
-   - Embodiment-aware prompt conditioning for diverse robot platforms
-   - Unifies manipulation, navigation, and trajectory prediction
-   - 97.9% LIBERO, 76.9% real-world ALOHA OOD success
+2. **WISE: Long-Horizon Agent in Minecraft with Why-Which Reasoning** (OpenReview T8HuiP3yM9)
+   - Causal Event Graph: explicit causal links between observations and task goals
+   - Opportunistic Task Scheduler: re-prioritizes when causally relevant opportunities arise
+   - Multi-scale progressive exploration: spatially comprehensive observation
+   - Reinforces the "causal ledger" idea: durable memory of *why* an action helped
 
-3. **[2605.28774v1] AXPO: Agent Explorative Policy Optimization for Multimodal Agentic Reasoning**
-   - Closes the "Thinking-Acting Gap" in agentic RL
-   - Fixes thinking prefix, resamples tool call, uses uncertainty-based prefix selection
-   - +1.8pp Pass@1, +1.8pp Pass@4 at 8B scale
-   - 8B+SFT+AXPO > 32B base on Pass@4 with 4x fewer params
+3. **Lexical Hints of Accuracy in LLM Reasoning Chains** (Sci Reports s41598-026-55000-2)
+   - Words like "guess", "stuck", "hard" are the strongest predictors of incorrect answers
+   - Intra-CoT sentiment volatility helps, but less so
+   - CoT length only helps on intermediate-difficulty tasks
+   - Reinforces value of post-hoc calibration signals over self-reported confidence
 
-4. **[2605.28779v1] The Abstraction Gap in Vision-Language Causal Reasoning**
-   - Dual-probe methodology: Text-Only vs Chain-Text probes
-   - CAGE benchmark: 49,500 questions across 5,500 images
-   - Many VLMs show high text scores (6-8) but low chain scores (<2.5)
-   - Fine-tuning on chain-annotated data does NOT close the gap
+4. **Theory of Space: Active Spatial Belief Construction in Foundation Models** (OpenReview c2cxLvsdUp)
+   - Active-Passive Gap: GPT-5.2 drops 57.1 → 46.0 when forced to gather information
+   - Belief Inertia: false priors persist, especially in vision-based models
+   - Identifies the bottleneck our evidence ledger is designed to surface
 
-5. **[2605.16727v1] PopuLoRA: Co-Evolving LLM Populations for Reasoning Self-Play**
-   - Population-based asymmetric self-play with shared frozen base
-   - LoRA weight-space evolution operators (mutations + crossovers)
-   - Outperforms single-agent baseline on HumanEval+, MBPP+, AIME 24/25, MATH-500
-   - Even the weakest population member beats baseline on aggregate
+5. **SR-Scientist: Scientific Equation Discovery with Agentic AI** (OpenReview 5xwLFGdeWU)
+   - Treats the LLM as an agent writing code, evaluating it, iterating
+   - Outperforms baselines by 6-35% across four scientific disciplines
+   - End-to-end RL over long-horizon tool use
 
-6. **[2605.14177v1] PGR: Prospection-Guided Retrieval of Memory with Language Models**
-   - Decouples retrieval from memory storage
-   - Generates Prospection Tree-of-Thought for imagined future steps
-   - ~3x recall on MemoryQuest over strong baselines
-   - 89-98% preference in LLM judging vs baselines
+6. **EvoMaster: Foundational Evolving Agent Framework for Agentic Science at Scale** (OpenReview lidiprht3N)
+   - Self-evolving, trial-and-error learning in scientific inquiry
+   - ~100 LOC to deploy capable self-evolving scientific agents
+   - SOTA on Humanity's Last Exam (41.1%), MLE-Bench Lite (75.8%), BrowseComp (73.3%)
 
-7. **[2605.06647v1] SIRA: Superintelligent Retrieval Agent**
-   - Retrieval as a single corpus-discriminative action (not multi-round exploration)
-   - Outperforms dense retrievers and multi-round agent baselines on 10 BEIR benchmarks
-   - No retriever fine-tuning, no embedding indexes required
+### Trending Open-Source Repos (multi-agent focus)
 
-8. **[2605.22759v1] Foundation Model for Wearable Health Data**
-   - 1T+ minutes unlabeled sensor signals, 5M participants
-   - "Classroom" of LLM agents explores downstream heads on embeddings
-   - 1,860 clinician ratings for safety
+- **piotrwachowski/durable-agents** (alpha, June 2026): Python, Temporal-based durable execution, DeepAgents-style DX, sub-agent delegation, crash-proof resumable multi-agent
+- **nemori-ai/langchain-dynamic-workflow** (v0.2.0, Jun 3 2026): Deterministic scripted multi-agent orchestration for LangChain deepagents, AST security gate, content-hash journal
+- **LatticeAI v2.0.0** (TaeSooPark-PTS): Self-hosted Agentic Workspace Platform - Plugin SDK, Workflow Designer, Multi-Agent Runtime 2.0 (Planner/Executor/Reviewer/Researcher/Release)
+- **voocel/agentcore v1.6.10**: Minimal composable Go library, work-stealing via IdleClaim, subagent nesting cap
+- **agruai/multiagent-business-automation**: LangGraph + Neo4j + Qdrant + Redis multi-agent for business workflows with HITL approval gates
+- **code-yeongyu/oh-my-openagent v4.6.0**: TypeScript multi-agent SWE framework, hardened prompt dispatch, Codex/LazyCodex install paths
+- **zhayujie/CowAgent 2.1.0**: Multi-channel (Telegram/Discord/Slack/WeChat), i18n, streaming output, task cancellation
+- **yaodub/cast**: Self-hosted multi-user multi-agent harness, design-driven agent builder, Claude integration
 
-9. **[2605.15567v1] Position: Artificial Intelligence Needs Meta Intelligence** ⭐ BUILDS ON THIS
-   - Core claim: Metacognition (self-monitoring of internal states) should be general design principle
-   - Proposes metacognitive strategies inspired by psychology and resource-rational AI
-   - Federated Learning case study: improved learning efficiency, effectiveness, security
-   - Introduces software framework for metacognition-enabled AI applications
-   - **This paper directly motivates today's build**
+## Build Task: Causal Evidence Ledger (WISE + SciReports-inspired)
 
-10. **[2605.20873v1] PlanningBench: Generating Scalable and Verifiable Planning Data**
-    - Framework to generate scalable, diverse, verifiable planning data for LLMs
-    - 30+ task types, subtasks, constraint families, difficulty factors
-    - RL on verified PlanningBench data improves performance on unseen benchmarks
-    - Current models struggle with coupled constraints; deterministic solutions yield clearer rewards
+**Motivation**: Today's agent cycle makes claims and inferences, but has no substrate that records *which evidence* supports, refutes, or is missing for each claim. Research this week makes the case sharper than ever:
 
-11. **[2605.18401v1] SkillsVote: Lifecycle Governance of Agent Skills**
-    - Lifecycle governance: Collection → Recommendation → Evolution
-    - Offline evolution: +7.9pp on Terminal-Bench 2.0
-    - Online evolution: +2.6pp on SWE-Bench Pro
-    - Governed external skill libraries enhance frozen agents
+- **WISE** (Causal Event Graph): durable memory of why an action helped beats a stack of ungrounded text
+- **CaveAgent**: stateful runtime objects are a substrate for verifiable feedback signals
+- **Theory of Space**: foundation models suffer from belief inertia and ungrounded active inference
+- **Lexical hints paper**: post-hoc calibration beats self-reported confidence as a grounding signal
+- **Leiden Declaration**: the math community is asking for evidence-grounded AI claims, not vibes
 
-12. **[2605.18753v1] DashAttention: Differentiable and Adaptive Sparse Hierarchical Attention**
-    - Adaptive, differentiable alpha-entmax for variable key-value block selection
-    - Matches full attention at ~75% sparsity
-    - GPU-aware Triton implementation with substantial speedups
+The ledger closes the loop between the agent's reasoning (`Thought` stream), its tools (`Action`/`ExecutionResult`), and its reflection (`ReflectionEngine`). Reflection now has a substrate to call "this step's claim is ungrounded" or "this claim is refuted by tool output" instead of guessing.
 
-### Trending Open-Source AI Agent Repositories (Jun 2026)
+### Key Components
 
-- **shyftlabs/continuum v0.0.1** (May 26, 2026): Python framework; 9 multi-agent patterns; durable execution with exactly-once guarantees; cost-aware multi-model inference
-- **negai-ai/AgentClaw**: Declarative Python framework turning ideas into reusable Claw capabilities; @workflow.node / @toolkit.tool decorators; scheduling, dashboard, state persistence
-- **polyant-ai/polyant**: TypeScript monorepo; NestJS engine + Next.js admin panel; multi-channel (Telegram/Slack/WhatsApp); OpenAI-compatible API
-- **agentiumOS/agentium v2.3.1** (Jun 3, 2026): TS-native; 15+ packages; OpenTelemetry/Prometheus/Langfuse observability; edge/IoT support
-- **HKUDS/nanobot v0.2.1** (Jun 2026): Lightweight agent framework; 84 PRs / 29 contributors; expanded providers and channels
-- **yuntiaoOS/GenericAgent**: ~3K LOC self-evolving agent; 9 atomic tools; arXiv report on token-efficient self-evolving agents
-- **AgenticX v0.4.1** (May 2026): 15+ LLM providers; SSE reattach; loop-detector/compactor/offloader hooks
-- **agent-substrate/substrate**: Kubernetes-based framework for high-density agent workloads; gVisor sandboxes; MCP support
+1. **Claim** - proposition with author, tags, depends_on lineage, status, notes
+2. **Evidence** - supports/refutes edge with kind (observation/tool_trace/memory/external/inference/user), weight, confidence, source
+3. **ClaimStatus** - UNGROUNDED / SUPPORTED / CONTRADICTED / DISPUTED / EXPIRED
+4. **EvidenceLedger** - substrate with assert_claim, add_support/add_refute, verify (single + bulk), lineage (DFS), descendants (BFS), related_evidence (lexical Jaccard), summary, calibration_signals
+5. **verify()** - deterministic scoring: weighted_support vs weighted_refute with `weight × confidence` clipping; ties → DISPUTED, both-zero → UNGROUNDED, stale positives → EXPIRED
+6. **calibration_signals()** - emits ungrounded_rate, contradiction_rate, disputed_rate, mean_confidence, expired_rate - feed directly into MetacognitiveMonitor
 
-### Synthesis: Key Trends
+### Test Coverage: 33/33 tests passed ✅
 
-1. **Metacognition as Design Principle**: Self-monitoring AI becoming mainstream
-2. **Self-Evolving Agents**: Continuous learning from execution, not just training
-3. **Multi-Agent Ecosystems**: Team-based agent coordination
-4. **Memory-First Architectures**: Long-context, persistent, verifiable recall
-5. **Security & Governance**: MCP poisoning defense, skill lifecycle governance
-6. **Planning Benchmarks**: Verifiable, scalable planning data generation
-7. **RSI over AGI**: Focus shifting to recursive self-improvement capabilities
-
-### Implications for Our Framework
-
-**Priority 1**: Metacognitive monitoring (May 29 build) ✅
-- Self-monitoring of confidence, resources, internal states — `core/metacognitive_monitor.py`
-- Adaptive resource allocation based on task complexity
-- Real-time performance tracking
-
-**Priority 2**: Context-oriented memory cache (today's build) ⭐
-- PEEK-style orientation cache to cut long-context cost on recurring tasks
-- Distiller + Cartographer + Evictor pipeline
-- Integrates with metacognitive monitor via saved-tokens accounting
-
-**Priority 3**: PlanningBench-style task generation
-- Verifiable planning data for agent training
-- Difficulty calibration
-- Constraint-based synthesis
-
-**Priority 4**: Skill lifecycle governance
-- Collection → Recommendation → Evolution
-- Evidence-gated updates
-- Offline/online evolution
-
-**Priority 5**: Multi-agent world models
-- Brain-inspired communication
-- Real-time coordination
-- Shared environment simulation
-
----
-
-## Today's Build: Context-Oriented Memory Cache (PEEK-Inspired)
-
-**Date**: 2026-06-04
-**Paper**: arXiv:2605.19932v1 (PEEK: Context Map as an Orientation Cache for Long-Context LLM Agents)
-**Status**: ✅ COMPLETE - 36/36 tests passed
-
-### Motivation
-
-Long-context LLM agents re-process the same context across recurring tasks.
-This is expensive (token cost) and slow. PEEK proposes a reusable "context
-map" that captures (a) what the context contains, (b) how it's organized, and
-(c) which elements have historically been useful. The agent orients itself
-through the cache instead of re-reading raw context.
-
-The paper claims 6.3-34.0% accuracy/efficiency gains and 1.7-5.8x cost
-reductions vs ACE prompt-learning. We implement a PEEK-style orientation
-cache that is decoupled from any particular LLM provider or vector DB and
-plugs into our existing `tiered_memory` / `enhanced_memory` /
-`metacognitive_monitor` pipeline.
-
-### Components Implemented
-
-1. **ContextEntry** - reusable entry in the orientation cache
-   - kind: FACT, SCHEMA, PATTERN, INSTRUCTION, TOOL_TRACE, SUMMARY
-   - token_cost, priority, hit_count, miss_count, last_accessed
-   - value_density = hits / token_cost (for ranking)
-2. **AccessRecord** - audit log of cache activity
-3. **Distiller** - extracts reusable patterns from execution traces
-   - facts (keyword markers like "is", "are", "equals")
-   - tool_traces (lines starting with "tool:", "use ", etc.)
-   - schemas (markdown structure markers)
-   - summaries (long narrative lines > 120 chars)
-4. **Cartographer** - translates DistillationResult into cache edits
-   - ADD for new keys, UPDATE for re-seen keys (raises priority)
-   - NOOP for content too short
-5. **Evictor** - brings cache within token budget
-   - LRU, LFU, COST_AWARE, HYBRID policies
-   - Hybrid scores recency + frequency - cost penalty
-6. **ContextMap** - the orientation cache
-   - get/put/remove with hit/miss tracking
-   - ingest_trace() runs full Distiller + Cartographer pipeline
-   - _enforce_budget() applies eviction
-   - top_entries() ranked by value density
-   - stats() returns hits/misses/saves/evictions/saved_tokens_total
-7. **ContextOrientedAgent** - thin integration wrapper
-   - consult(key) - lookup with hit tracking
-   - remember(trace) - ingest after successful run
-   - summary() - exposes stats for metacognitive monitor
-
-### Test Coverage (36/36 passed)
-
-- Distiller: 8 tests (facts, tools, schemas, summaries, dedup, empty, dict messages, object messages)
-- Cartographer: 4 tests (add, update, noop filter, dedup)
-- Evictor: 5 tests (no-op, LRU, LFU, COST_AWARE, HYBRID)
-- ContextMap: 10 tests (put/get, miss, update, remove, budget, ingest, dedup, top entries, saved tokens, describe, clear)
-- Convenience: 2 tests (create_cache, create_agent)
-- Agent wrapper: 3 tests (consult, remember, summary)
-- Integration: 3 tests (recurring tasks, budget pressure, invalidation)
+- ClaimCRUD: 6 tests (assert, idempotent by id, tags/depends_on, remove drops evidence, remove unknown, all_claims)
+- Evidence + verification: 8 tests (no-evidence, only support, only refute, mixed lead, disputed tie, confidence clip, remove, zero-weight)
+- Freshness: 3 tests (fresh by default, expired after window, ungrounded becomes expired stale)
+- Lineage: 5 tests (lineage ancestors, cycle-safe, descendants, related_evidence match, threshold filter)
+- Summary: 4 tests (empty, counts each status, weakest, audit trail)
+- Serialization: 3 tests (dict round trip, json round trip, audit cap)
+- Calibration signals: 2 tests (empty, reflects state)
+- Integration: 2 tests (full workflow, claim reuse with new evidence)
 
 ### Research Synthesis
 
-- PEEK-style orientation caches are a 6-34% efficiency win for long-context agents
-- Token-budget aware caching is essential as enterprise agent token consumption has grown 320x
-- The "context layer" pattern (semantics + identity + governance + lineage + memory) is becoming the canonical enterprise agent stack
-- Caches can be metacognition-hooks: hit_rate and saved_tokens feed the metacognitive monitor for adaptive resource allocation
-- Distiller + Cartographer + Evictor cleanly separates "what was learned" from "what stays in the cache" - testable, deterministic, and LLM-agnostic
+- A causal evidence ledger is the substrate for *calibration*: signal > confidence
+- Lineage + descendants + depends_on = causal graph that reflection and the metacognitive monitor can walk
+- `calibration_signals()` is the bridge to `metacognitive_monitor`: ungrounded_rate feeds the calibration tracker
+- The ledger is LLM-agnostic and deterministic - no behavior change, just data the other modules can consume
+- The simplest "is this claim grounded?" check in the codebase is now `ledger.verify(claim_id).status`
+- The stateful-runtime pattern from CaveAgent and the causal-graph pattern from WISE converge on a single substrate
 
 ### Files Changed
 
-- `core/context_cache.py`: 744 lines - PEEK-inspired orientation cache
-- `experiments/test_context_cache.py`: 372 lines - 36 comprehensive tests
-- `CURRENT_RESEARCH.md`: Updated with 2026-06-04 research findings
-- `AGENTS.md`: This build log entry
+- `core/evidence_ledger.py`: 763 lines - new substrate
+- `experiments/test_evidence_ledger.py`: 428 lines - 33 tests
+- `core/__init__.py`: added public exports
+- `CURRENT_RESEARCH.md`: this entry
+- `AGENTS.md`: build log entry (next commit)
 
-### Next Priority
+## Next Priority
 
-- **Integrate with `tiered_memory`**: route long-context orientation entries through tiered memory
-- **Wire into `metacognitive_monitor`**: feed cache hit_rate + saved_tokens into calibration tracking
-- **Hook into `reflection`**: post-run ingestion of successful execution traces
-- **L2 / L3 tier promotion**: orientation entries should graduate to long-term memory after N hits
-- **LLM-backed Distiller**: replace heuristic line-classifier with an LLM prompt that yields richer kinds
+- Wire `verify_trace` in `core/reflection.py` to consult the ledger and report evidence coverage per reasoning step
+- Feed `calibration_signals()` into `MetacognitiveMonitor.assess_current_state()` as additional calibration input
+- Bridge to `ContextMap`: convert SUPPORTED claims + their evidence into a single INSTRUCTION / SCHEMA entry (token-cheap verification memo)
+- `BaseAgent` integration: expose `agent.ledger.assert_claim`, `add_support`, `add_refute`, `verify_all` from the cycle
+- LLM-backed classifier for EvidenceKind: replace "user_statement" / "inference" heuristics with a small prompt
 
 ---
 
-*Last updated: 2026-06-04 by AGI Research & Build Agent*
+*Last updated: 2026-06-05 by AGI Research & Build Agent*
