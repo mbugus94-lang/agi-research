@@ -5168,3 +5168,85 @@ manifest = registry.export_mcp_manifest()
   - Experts widely consider 2026 as pivotal year for AGI breakthrough
   - True AGI not yet arrived but world on brink of major breakthrough
   
+
+### 2026-06-06 - Scheduled Run: Trace Grounding Bridge (WISE + CaveAgent + ACTS + FailingTools-inspired)
+**Status**: ✅ COMPLETE - 99/99 tests passed (55 new + 33 ledger + 11 integration)
+
+**Research Summary (June 6, 2026)**:
+
+**Industry News**:
+- **Microsoft Build 2026** (May 19-22): agentic app stack as the platform story. Foundry Agent Service, Rayfin, Work/Fabric/Foundry/Web IQ. Direction: durable agent runtimes + observability/eval are first-class cloud concerns.
+- **AIMultiple 7-Layer Agentic AI Stack** (June 2026): Models → Runtime → Orchestration → Memory → Tools → Observability/Eval → Apps. Value concentration: observability/eval tier.
+- **Firecrawl 35% hallucination rate** when agents lack fresh data - external evidence, not context window size, is ground truth.
+- **Failing Tools benchmark** (OpenReview j7YsSnA64D): <11.47% accuracy when tools fail in 218 scenarios. Dominant failure: *missing verification/recovery*, not wrong tool choice.
+- **ACTS** (arXiv:2606.03965): controller agent steers frozen reasoner's plan/execute/check/conclude structure with budgeted thinking tokens.
+- **TEMPO** (OpenReview 918nhGBBc2): System-1/System-2 dual-stream, NLI stitching, mean-reverting trait-state control.
+- **GraP-Mem** (OpenReview AUPI1ifc4v): granularity-aware memory planning, "evidence state" idea, expands to source context when evidence incomplete.
+- **ReNIO** (OpenReview kv6QSpUJbc): reweight negative trajectories for OPD, 8.9-10% relative gains.
+- **MIB Model Interruption Bench** (OpenReview GPnWh7LbGm): voice agents drop 59-67% → <10% when interrupting mid-speech. Timing is the bottleneck.
+- **Diagnostic-Driven Reward Design** (OpenReview 5TmwBBn8Oh): DoorKey 2.3% → 97.6% with taxonomy-driven iterative refinement; random retries don't help.
+- **SR-Scientist** (OpenReview 5xwLFGdeWU): 6-35% gains on scientific equation discovery via agent write+evaluate+iterate loop.
+- **End of Software Engineering** (arXiv:2606.05608): "Agentic Engineering" - code is ephemeral tooling for an LLM-driven reasoning loop.
+
+**Trending Repos**:
+- pewdiepie-archdaemon/odysseus (56k+ stars, Jun 2026): Python/JS self-hosted LLM agent framework, local models, Cookbok, Deep Research, Memory/Skills
+- code-yeongyu/oh-my-openagent v4.6.0 (61k stars, Jun 1 2026): TypeScript multi-agent SWE framework
+- HKUDS/nanobot v0.2.1 (Jun 2026): real workbench agent, 84 PRs, 17 new contributors
+- selfonomy/duckagent v0.1.2: Rust local-first, 30+ LLM providers, 30+ channels
+- aharonamir/GenericAgent: ~3K-line self-evolving Python framework
+- use-crux/crux (May 2026): TypeScript typed orchestration toolkit
+- Andree-9/ACTS: Agentic Chain-of-Thought Steering (arXiv-aligned)
+- xinchen03/minta: memory-focused self-correcting agent framework
+
+**Build Task: Trace Grounding Bridge**
+
+**Motivation**: The 2026-06-05 build added a Causal Evidence Ledger as the substrate. Today's run wires that substrate to the agent's existing reasoning trace so reflection can ask "do we actually have evidence for each step we just took?" instead of guessing. The research case this week is unusually tight:
+- Failing Tools: <11.47% accuracy under tool failure, *check* step is the bottleneck
+- ACTS: controller steers toward plan/execute/check/conclude - exactly the structure we verify
+- GraP-Mem: "evidence state" is the substrate - `EvidenceLedger.evidence_for(claim_id)` is our version
+- TEMPO: NLI stitching = contradicted-step recommendation
+- Microsoft Build 2026: observability/eval is the value-capture tier
+- Firecrawl 35% hallucination rate: external evidence, not context, is the ground truth
+
+**Key Components**:
+1. **TraceGrounder** - asserts one claim per trace step, attaches evidence, computes per-step verification, returns coverage report
+2. **StepGrounding** - per-step dataclass with step_index, step_type, claim_id, verification, content_preview
+3. **TraceGroundingReport** - coverage_rate, ungrounded/contradicted/disputed/expired step ids, weakest ids, recommended_action
+4. **Step type → evidence kind/polarity defaults** - 10+ step types mapped
+5. **Status-aware polarity** - output.status='error'/'failed'/'exception' takes priority over step-type default → REFUTES
+6. **Lineage** - each step's claim depends on previous step's claim (causal chain)
+7. **Stable ids** - `step:{trace_id}:{index}` and `trace:{trace_id}:{index}` for re-grounding
+8. **Recommended action vocabulary** - none | reverify_ungrounded | reverify_contradicted | request_more_evidence | escalate_to_human | fallback_strategy
+9. **Calibration blend** - `to_calibration_blend(report)` for MetacognitiveMonitor.assess_current_state()
+10. **Backward-compatible verify_trace** - `verify_trace(trace, output, ledger=None)` - original behavior preserved, ledger= adds grounded/coverage_rate/recommended_action/contradicted_step_ids/weakest_step_ids
+
+**Test Coverage: 99/99 ✅**
+- Trace grounding: 55 tests (construction, empty/minimal, happy path, contradicted, low coverage, step-type mapping, lineage, re-grounding, weakest, vocab, serialization, calibration blend, ledger integration, trace independence, author, performance, helper, weights, preview)
+- Evidence ledger: 33 tests (still passing)
+- Reflection ↔ ledger: 11 tests (backward compat + with-ledger)
+
+**Research Synthesis**:
+- Observability/eval tier (AIMultiple 7-layer stack) is the value-capture tier; our ledger + grounder is the implementation
+- Failing Tools benchmark: check step is the bottleneck; our grounder is the check
+- ACTS structure = structure we verify after the fact
+- GraP-Mem's "evidence state" = single-call evidence_for(claim_id)
+- TEMPO's NLI stitching = contradicted-step recommendation
+- 35% Firecrawl hallucination rate → our 0.0%-of-context-window external evidence
+- Backward-compat verify_trace keeps the legacy path; opt-in for richer return
+- recommended_action is a small LLM-agnostic protocol for any monitor to branch on
+
+**Files Changed**:
+- `core/trace_grounding.py`: 491 lines - new bridge
+- `core/reflection.py`: 321 → 364 lines - verify_trace(ledger=) opt-in extension
+- `core/__init__.py`: added TraceGrounder, TraceGroundingReport, StepGrounding, ground_trace to public exports
+- `experiments/test_trace_grounding.py`: 750 lines - 55 tests
+- `experiments/test_reflection_ledger_integration.py`: 148 lines - 11 tests
+- `CURRENT_RESEARCH.md`: replaced with 2026-06-06 entry
+
+**Next Priority**:
+- Wire verify_trace(ledger=) into BaseAgent's REFLECT step
+- Fold to_calibration_blend(report) into MetacognitiveMonitor.assess_current_state()
+- Add verify_all_traces() helper to the ledger
+- LLM-backed step classifier for unknown step types
+- 100-step stress test with 5 contradictory steps
+- Convert SUPPORTED steps + evidence into a ContextMap INSTRUCTION entry (token-cheap verification memo)

@@ -23,6 +23,12 @@ from .evidence_ledger import (
     LedgerSummary,
     create_ledger,
 )
+from .trace_grounding import (
+    StepGrounding,
+    TraceGrounder,
+    TraceGroundingReport,
+    ground_trace,
+)
 
 __all__ = [
     "BaseAgent",
@@ -46,4 +52,8 @@ __all__ = [
     "EvidencePolarity",
     "LedgerSummary",
     "create_ledger",
+    "StepGrounding",
+    "TraceGrounder",
+    "TraceGroundingReport",
+    "ground_trace",
 ]

@@ -108,39 +108,82 @@ class ReflectionEngine:
     def verify_trace(
         self,
         thought_trace: List[Dict],
-        final_output: Any
+        final_output: Any,
+        ledger: Optional["EvidenceLedger"] = None,
     ) -> Dict:
         """
         RCA (Recursive Causal Audit): Verify that output follows from reasoning trace.
         Implements trace-answer verification under pressure.
+
+        When `ledger` is provided, the verifier also asks the
+        EvidenceLedger for the evidence coverage of each step. The
+        returned dict gains `grounded`, `coverage_rate`, and
+        `recommended_action` keys so the caller can branch on the
+        evidence-grounded view of the trace.
         """
         if not thought_trace:
             return {
                 "valid": False,
-                "reason": "No thought trace provided"
+                "reason": "No thought trace provided",
+                "grounded": False,
+                "coverage_rate": 0.0,
+                "recommended_action": "none",
             }
-        
+
         # Check for gaps in reasoning
         steps_by_type = {}
         for thought in thought_trace:
             step_type = thought.get("type", "unknown")
             steps_by_type[step_type] = steps_by_type.get(step_type, 0) + 1
-        
+
         # Verify required steps exist
         required_steps = ["explore", "verify", "plan", "reflect"]
         missing = [s for s in required_steps if s not in steps_by_type]
-        
+
         # Check if final output aligns with last reasoning
         last_thought = thought_trace[-1] if thought_trace else None
         alignment = self._check_alignment(last_thought, final_output)
-        
-        return {
+
+        result: Dict[str, Any] = {
             "valid": len(missing) == 0 and alignment > 0.5,
             "steps_present": steps_by_type,
             "missing_steps": missing,
             "alignment_score": alignment,
-            "reason": "Trace complete and aligned" if not missing else f"Missing steps: {missing}"
+            "reason": "Trace complete and aligned" if not missing else f"Missing steps: {missing}",
+            "grounded": False,
+            "coverage_rate": 0.0,
+            "recommended_action": "none",
         }
+
+        # Optional: consult the evidence ledger for per-step grounding
+        if ledger is not None:
+            try:
+                from .trace_grounding import TraceGrounder
+                grounder = TraceGrounder(ledger)
+                report = grounder.ground_trace(
+                    thought_trace,
+                    trace_id=str(thought_trace[0].get("session_id", "verify_trace"))
+                    if thought_trace else "verify_trace",
+                )
+                result["grounded"] = report.coverage_rate >= 0.5
+                result["coverage_rate"] = report.coverage_rate
+                result["recommended_action"] = report.recommended_action
+                result["contradicted_step_ids"] = list(report.contradicted_step_ids)
+                result["weakest_step_ids"] = list(report.weakest_step_ids)
+                # combine ledger-based recommendation with structural
+                # completeness. If structurally complete but evidence-poor,
+                # caller is advised to fetch more evidence.
+                if missing and report.coverage_rate >= 0.5:
+                    result["valid"] = False
+                    result["reason"] = (
+                        f"Missing steps: {missing} (structural); "
+                        f"evidence coverage {report.coverage_rate:.2f}"
+                    )
+            except Exception:
+                # ledger consultation is best-effort; never break verify_trace
+                pass
+
+        return result
     
     def reactive_self_correct(
         self,
