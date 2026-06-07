@@ -218,3 +218,132 @@ Reflection engine ↔ ledger integration (11 tests):
   - 16 experts, 130+ signatories, endorsed by the International Mathematical Union
   - Concerns: reliability of AI-generated proofs, attribution, peer-review integrity
   - Reinforces theme of evidence-grounded reasoning: claims must carry their proofs
+## Research Summary (June 7, 2026) - AGI Continuous Research & Build Agent Run
+
+### Industry News & Breakthroughs
+
+- **Anthropic "When AI Builds Itself" (Jun 4, 2026) — Marina Favaro & Jack Clark** ⭐ BUILDS ON THIS
+  - Argues recursive self-improvement (RSI) is the next threshold for frontier AI
+  - Direct quote: *"AI that can build itself would be a major development in the history of technology ... but it 'could come sooner than most institutions are prepared for'"*
+  - Anthropic reports Claude now writes **~80% of Anthropic's production code**, and Claude agents completed an open-ended AI safety research project end-to-end (humans selected topic + rubric, agents proposed hypotheses, ran experiments, iterated)
+  - Calls for a coordinated "brake pedal" — a throttle that well-resourced frontier labs can apply *if* multiple peers agree
+  - Same week: Anthropic files confidentially for IPO at **$965B valuation**, $47B revenue run rate, $65B fundraise oversubscribed
+  - Implication for our repo: the era of "the agent rewrites its own core" is being treated as a near-term operational concern, not a thought experiment. Our `core/recursive_self_improvement.py` exists to make that rewrite path *gated, auditable, and reversible* — not to enable it.
+
+- **Microsoft Build 2026 — Microsoft Execution Container (MXC)**
+  - Dedicated runtime containment for agentic AI workloads
+  - Pairs with the MDASH multi-agent vulnerability research platform
+  - Reinforces the AIMultiple 7-layer stack thesis: runtime + observability/eval is where the economics live
+
+- **NVIDIA Vera Rubin agentic AI factories (GTC Taipei)**
+  - 10x agent throughput vs Grace Blackwell, Spectrum-X Ethernet Photonics in production
+  - Agent workloads now anchor a hardware generation
+
+- **Microsoft unveils MAI-Code-1-Flash + MAI-Thinking-1**
+  - Microsoft's first proprietary coding model + reasoning model, in-house to reduce OpenAI dependency
+  - Signals vertical-integration pressure across the agent stack
+
+- **Tencent hires ex-OpenAI Yao Shunyu as Chief AI Scientist; explicit AGI goal**
+  - China is bringing the U.S. AGI-vision lock, stock, and barrel
+
+- **Leiden Declaration on AI and Mathematics (Jun 2, 2026)** — 130+ signatories
+  - Concern: AI-generated proofs lack reliable attribution and peer-review integrity
+  - Reinforces our evidence-ledger + trace-grounding approach: claims must carry their proofs
+
+- **AIMultiple 7-layer agentic stack + Firecrawl 35% hallucination rate** (carried over)
+  - When agents lack fresh external data, they hallucinate ~35% more
+  - The substrate problem is *external evidence*, not context window size
+
+### Key arXiv / OpenReview Papers (Past 2 Weeks)
+
+1. **AEL — Agent Evolving Learning for Open-Ended Environments** (OpenReview dtPo105y8x) ⭐ BUILDS ON THIS
+   - Two-timescale framework: fast Thompson Sampling bandit over memory-retrieval policies + slow diagnose-before-prescribe reflection that injects a new policy when performance plateaus
+   - Sharpe +27% on a sequential portfolio task; +18% accuracy on support-ticket routing vs reflection-free bandit; +51% vs best prior baseline
+   - Mechanism insight: reflection helps *when retrieval regimes must change*; neutral when the best policy is already stable
+   - Direct architectural analog: our `RSIController`'s scoring (fast) vs the `BrakePedal` + recursion-depth guard (slow)
+2. **SkillsVote — Lifecycle Governance of Agent Skills** (OpenReview kj068rI9Uh) ⭐ BUILDS ON THIS
+   - Collection -> Recommendation -> Evolution pipeline with **evidence-gated admission** (only successful reusable discoveries promote to updates)
+   - Online evolution during task streams + offline transfer via frozen libraries from historical trajectories
+   - +7.9pp on Terminal-Bench 2.0 and SWE-Bench Pro
+   - Reinforces our `core/skill_governance.py` from May 24
+3. **Membrane — Self-Evolving Contrastive Safety Memory** (OpenReview fTz8N43gD3)
+   - Contrastive Safety Memory cells: each stores a pair (block harmful query / permit similar benign query)
+   - 87-88% F1 under cross-attack transfer; benign refusal 7-14% vs 28-85% for prior work
+   - The contrastive-cell pattern is the same one we apply to the source tree: protect the substrate that protects us
+4. **EvoMaster — Self-Evolving Scientific Agents** (OpenReview lidiprht3N)
+   - ~100 LOC to deploy a self-evolving scientific agent
+   - SOTA on Humanity's Last Exam (41.1%), MLE-Bench Lite (75.8%), BrowseComp (73.3%)
+   - The "small but disciplined self-edit loop" thesis: small, evidence-gated proposals compound
+5. **R_FOLD — Bi-Level Context Management for Long-Horizon Tool-Using** (OpenReview Wlz2pfZwEu)
+   - Read-and-filter (chunk granularity) + fold (step-addressable trajectory summaries)
+   - 81.33% on BrowseComp-Plus at a 32k-token budget, robust to 4x trainer/sampler staleness
+6. **Failing Tools benchmark** (OpenReview j7YsSnA64D)
+   - <11.47% accuracy on 218 realistic tool-failure scenarios; the *missing verification* is the dominant failure mode
+7. **AEL's diagnose-before-prescribe** is the *slow* loop in our controller; the `score_and_route` is the *fast* loop
+8. **Microsoft Build 2026 MXC** validates the "agent runtime as first-class cloud concern" framing
+
+### Trending Open-Source Repos
+
+- **HKUDS/nanobot v0.2.1** — 84 merged PRs, 17 new contributors; expanded channels (Signal, Telegram, Discord, Matrix)
+- **code-yeongyu/oh-my-openagent v4.6.0** — TypeScript multi-agent SWE; hardened prompt dispatch
+- **selfonomy/duckagent v0.1.2** — Rust local-first runtime, 30+ LLM providers, 30+ channels
+- **zhayujie/CowAgent 2.1.0** — multi-model, multi-channel, i18n
+- **microsoft/agent-governance-toolkit v4.0.0** — TEE keystore, Entra-signed JWT, wire-protocol-aware policy eval; production-grade governance
+- **nemori-ai/langchain-dynamic-workflow v0.2.0** — deterministic scripted orchestration with AST security gate
+- **earendil-works/pi v0.78.1** — agent toolkit with MiniMax-M3 provider support (notable)
+
+## Build Task: Recursive Self-Improvement (RSI) Gate
+
+**Motivation**: The Anthropic "When AI Builds Itself" essay (Jun 4, 2026) is the loudest signal yet that recursive self-improvement is being treated as a near-term operational concern. The repo's stance (per `SAFETY.md`) has always been: self-modifications REQUIRE human review, no auto-apply, reversible, proposals written to disk first. But until today, we had no formal *gate* — the `SelfImprovementEngine` produced proposals but nothing in the loop policed them. Today's build closes that gap with a safety-bounded self-edit pipeline modeled on the Anthropic Institute's "brake pedal" framing, AEL's two-timescale separation, and SkillsVote's evidence-gated admission.
+
+**Key Components**:
+
+1. **`BrakePedal`** — three-state operator-controlled throttle (`BRAKED` / `DAMPED` / `OPEN`). BRAKED hides all proposals; DAMPED surfaces only LOW/MEDIUM; OPEN shows all but flags CRITICAL with `requires_attention=True`. Mirrors Anthropic's "brake pedal" call; mirrors AEL's slow/fast timescale split (the pedal is the slow timescale).
+2. **`RecursionDepthBudget`** — hard cap on inner-loop self-edit depth (default 2). The "self-edit -> re-analyze -> more self-edits" loop is a known RSI failure mode; AEL's two-timescale separation is the principled fix and we encode it as a hard cap. Raises `RecursionDepthExceeded` rather than silently spiraling.
+3. **`classify_risk(target_file)`** — promotes any proposal that touches the *self surface* (`core/safety_circuit_breaker.py`, `core/evidence_ledger.py`, `core/recursive_self_improvement.py`, `core/reflection.py`, `core/agent.py`, `core/memory.py`, `core/planner.py`, `core/self_analysis.py`, `core/trace_grounding.py`, `core/metacognitive_monitor.py`, `SAFETY.md`, `AGENTS.md`) to CRITICAL. The self surface is the substrate; we never let a self-edit touch it without an explicit attention flag.
+4. **`EvidenceRequirement.evaluate(claim_ids, ledger)`** — every self-edit must be grounded in at least one SUPPORTED claim in the `EvidenceLedger`, or it promotes risk and is audited. UNGROUNDED/UNKNOWN promotion is conservative (LOW -> MEDIUM floor; >=MEDIUM -> promoted). DISPUTED evidence is always attention-flagged.
+5. **`metacognitive_adjust(base, monitor)`** — folds the running `MetacognitiveMonitor` state into risk scoring. High cognitive load, low confidence, or an "escalate" recommendation promotes risk. Monitor failure also promotes. The shift is *additive only* (never demotes).
+6. **`RSIController` + `RSIProposal` + `RSIDecision`** — orchestrator. `score_and_route(proposal)` runs risk + evidence + metacog, then `decide()` consults the brake + `must_audit_critical` to emit a decision (queue / gate / attention). `persist(proposal, decision)` writes the audit trail to `proposals/` — *never auto-applies*. `score_batch(...)` wraps a whole batch in the recursion budget.
+
+**Self-surface protection** (the conservative posture): `classify_risk` returns CRITICAL for any of 13 explicit self-surface paths, and HIGH for any other `core/*.py` module. The nominal risk string in the proposal cannot demote below this floor.
+
+**CRITICAL special-case**: a CRITICAL proposal is *always visible* (so the operator can never silently miss it) and *always audited to disk* (so we have a paper trail of the most dangerous ideas the system ever generated), regardless of the brake state. This is the antithesis of "fail silent on the most dangerous proposals."
+
+**Test Coverage**: 54/54 tests passed ✅
+- `TestBrakePedal`: 7 tests (initial state, visibility matrix per state, CRITICAL attention invariant, transition history, no-op)
+- `TestRiskClassifier`: 7 tests (self-surface promotion, core/ rule, non-core defaults, None target, nominal string interaction, normalized path)
+- `TestRecursionBudget`: 4 tests (context manager, overflow raise, manual balance, clamp at zero)
+- `TestEvidenceRequirement`: 7 tests (no claims -> UNGROUNDED, ledger None -> UNKNOWN, SUPPORTED -> GROUNDED, DISPUTED trumps, CONTRADICTED -> DISPUTED, all ungrounded, ledger error -> UNGROUNDED)
+- `TestMetacognitiveAdjustment`: 6 tests (no monitor, high load promotes, low confidence promotes, escalate promotes, monitor failure promotes, saturation at CRITICAL)
+- `TestRSIController`: 21 tests (end-to-end score/decision under each brake state, critical attention invariant, evidence integration, persistence + filename sanitization, batch + recursion overflow, bridge from `SelfImprovementEngine`, brake-state snapshot, summary)
+- `TestIntegrationWithRealLedgerAndMonitor`: 1 test (real `EvidenceLedger` round-trip: assert_claim -> add_support -> GROUNDED)
+- `TestConservativePosture`: 2 tests (promotion never demotes; self-surface dominates nominal)
+
+**Research Synthesis**:
+- The Anthropic "brake pedal" call is the macro framing; our `BrakePedal` is the *implementable* version (3 states, not 2) and it lives in code, not in a blog post
+- AEL's two-timescale bandit is the *architectural* inspiration: `score_and_route` is the fast inner loop, `BrakePedal.transition` + `RecursionDepthBudget` is the slow outer loop
+- SkillsVote's "evidence-gated admission" is the *promotion rule* in `EvidenceRequirement.evaluate` — a self-edit only auto-qualifies for the proposal queue if a claim in the ledger is SUPPORTED
+- Membrane's contrastive safety memory inspires the *self-surface list* — we protect the substrate (the safety-critical files) the same way Membrane protects the safety memory itself
+- EvoMaster's "~100 LOC to deploy a self-evolving agent" is the *size discipline* — we keep the gate small (728 lines including extensive docstrings) and let the proposals be the unit of work
+- The `core/recursive_self_improvement.py` is *not* an auto-applier. It is a submission queue. The application step would require explicit human review per `SAFETY.md` — that gate stays outside the module on purpose
+- The whole thing is a *measurable* safety claim: "every self-edit the system ever generated is on disk, attributed, and routed through a documented risk + evidence + monitor pipeline"
+- The 13-file self-surface list is the most concrete expression of "protect the substrate" in the repo so far
+- CRITICAL proposals are a first-class audit case, not a special-case error: they always get a JSON file in `proposals/`, even when the brake is full BRAKED
+
+**Files Changed**:
+- `core/recursive_self_improvement.py`: 728 lines (new) — BrakePedal, RecursionDepthBudget, classify_risk, EvidenceRequirement, MetacognitiveAdjustment, RSIController, RSIProposal, RSIDecision, proposal_from_improvement_proposal
+- `experiments/test_recursive_self_improvement.py`: 671 lines (new) — 54 tests covering all components and integration with the real `EvidenceLedger` + `MetacognitiveMonitor`
+- `core/__init__.py`: added 17 public exports for the new module
+- `CURRENT_RESEARCH.md`: this entry
+
+## Next Priority
+
+- **Build a CLI / dashboard for the brake pedal**: surface the proposal queue, the audit trail, the recursion depth, and the brake state in a single `python -m core.recursive_self_improvement --review` view (or as a tiny `zo.space` route) so the operator can DAMPED -> OPEN with a single command and see the queue shift
+- **Wire `proposal_from_improvement_proposal` into the existing `SelfImprovementEngine.run_full_analysis`** so the next `run_full_analysis()` automatically routes its 4 stale proposals (the ones currently flagged "missing test" and "no vector search") through the new gate — and we get to see what the controller actually does with them
+- **Adversarial test pass**: generate 20 self-edits that try to touch the self surface, hide from the brake, or self-justify via a DISPUTED claim. Confirm the conservative posture holds in every case (the existing `TestConservativePosture` covers the rules; this is the property test)
+- **LLM-backed step classifier for EvidenceKind** (carried from 6-05): the heuristic step-type -> evidence-kind table is a 2026-Q3 follow-up; the current RSI gate doesn't depend on it
+- **A "human review" terminal**: a small wrapper that reads `proposals/*.json`, shows the audit fields, and writes the approved/rejected decision back into the JSON. This is the *only* path that should ever modify a file in the self surface
+
+---
+
+*Last updated: 2026-06-07 by AGI Research & Build Agent*

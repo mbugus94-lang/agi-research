@@ -1,3 +1,85 @@
+### 2026-06-07 - Scheduled Run: Recursive Self-Improvement (RSI) Gate (Anthropic "When AI Builds Itself"-inspired)
+**Status**: ✅ COMPLETE - 54/54 tests passed
+
+**Research Summary (June 7, 2026)**:
+
+**Industry News**:
+- **Anthropic "When AI Builds Itself"** (Jun 4, 2026) by Marina Favaro & Jack Clark: recursive self-improvement is "the next threshold for frontier AI"; Claude now writes ~80% of Anthropic's production code; Claude agents completed an end-to-end open-ended AI safety research project; explicit call for a coordinated "brake pedal" if multiple frontier labs agree. Same week: Anthropic files confidentially for IPO at $965B valuation, $47B revenue run rate, $65B fundraise oversubscribed.
+- **Microsoft Build 2026 — Microsoft Execution Container (MXC)**: dedicated runtime containment for autonomous agents; pairs with MDASH multi-agent vulnerability research
+- **Tencent hires ex-OpenAI Yao Shunyu as Chief AI Scientist** with an explicit AGI goal — China is bringing the U.S. AGI-vision wholesale
+- **Microsoft unveils MAI-Code-1-Flash + MAI-Thinking-1** to reduce OpenAI dependency
+- **Leiden Declaration on AI and Mathematics** (Jun 2, 2026) — 130+ signatories, IMU-endorsed; AI-generated proofs need reliable attribution and peer-review integrity
+
+**Key arXiv / OpenReview Papers**:
+- **AEL — Agent Evolving Learning for Open-Ended Environments** (OpenReview dtPo105y8x) ⭐ BUILDS ON THIS: two-timescale Thompson Sampling bandit over memory-retrieval policies + slow diagnose-before-prescribe reflection; Sharpe +27% on portfolio, +18% accuracy on support tickets; reflection helps *when retrieval regimes must change*
+- **SkillsVote — Lifecycle Governance of Agent Skills** (OpenReview kj068rI9Uh) ⭐ BUILDS ON THIS: Collection -> Recommendation -> Evolution pipeline; evidence-gated admission (only successful reusable discoveries promote); +7.9pp on Terminal-Bench 2.0 and SWE-Bench Pro
+- **Membrane — Self-Evolving Contrastive Safety Memory** (OpenReview fTz8N43gD3): contrastive cells (block harmful / permit benign) for LLM agents; 87-88% F1 under cross-attack transfer; benign refusal 7-14% vs 28-85% prior
+- **EvoMaster — Self-Evolving Scientific Agents** (OpenReview lidiprht3N): ~100 LOC to deploy; SOTA on Humanity's Last Exam (41.1%), MLE-Bench Lite (75.8%), BrowseComp (73.3%)
+- **R_FOLD — Bi-Level Context Management for Long-Horizon Tool-Using** (OpenReview Wlz2pfZwEu): read-and-filter + fold; 81.33% on BrowseComp-Plus at 32k tokens
+- **Failing Tools benchmark** (OpenReview j7YsSnA64D): <11.47% accuracy on 218 tool-failure scenarios; missing verification is the dominant failure mode
+
+**Trending Open-Source Repos**:
+- HKUDS/nanobot v0.2.1: 84 PRs, 17 new contributors, expanded channels
+- code-yeongyu/oh-my-openagent v4.6.0: TypeScript multi-agent SWE, hardened prompt dispatch
+- selfonomy/duckagent v0.1.2: Rust local-first, 30+ LLM providers, 30+ channels
+- zhayujie/CowAgent 2.1.0: multi-model, multi-channel, i18n
+- microsoft/agent-governance-toolkit v4.0.0: TEE keystore, Entra-signed JWT, wire-protocol policy eval
+- nemori-ai/langchain-dynamic-workflow v0.2.0: deterministic scripted orchestration with AST security gate
+- earendil-works/pi v0.78.1: agent toolkit with MiniMax-M3 provider support
+
+**Build Task: Recursive Self-Improvement (RSI) Gate**
+
+**Motivation**: The Anthropic Institute's "When AI Builds Itself" essay (Jun 4, 2026) is the loudest signal yet that recursive self-improvement is being treated as a near-term operational concern, not a thought experiment. The repo's stance (per SAFETY.md) has always been: self-modifications REQUIRE human review, no auto-apply, reversible, proposals written to disk first. But until today, we had no formal *gate* — the `SelfImprovementEngine` produced proposals but nothing in the loop policed them. Today's build closes that gap with a safety-bounded self-edit pipeline modeled on the Anthropic "brake pedal" framing, AEL's two-timescale separation, and SkillsVote's evidence-gated admission.
+
+**Key Components**:
+
+1. **`BrakePedal`** — three-state operator-controlled throttle (`BRAKED` / `DAMPED` / `OPEN`). BRAKED hides all proposals; DAMPED surfaces only LOW/MEDIUM; OPEN shows all but flags CRITICAL with `requires_attention=True`. Mirrors the Anthropic "brake pedal" call; mirrors AEL's slow/fast timescale split (the pedal is the slow timescale).
+2. **`RecursionDepthBudget`** — hard cap on inner-loop self-edit depth (default 2). The "self-edit -> re-analyze -> more self-edits" loop is a known RSI failure mode; AEL's two-timescale separation is the principled fix, encoded as a hard cap. Raises `RecursionDepthExceeded` rather than silently spiraling.
+3. **`classify_risk(target_file)`** — promotes any proposal that touches the *self surface* (13 explicit paths: `core/safety_circuit_breaker.py`, `core/evidence_ledger.py`, `core/recursive_self_improvement.py`, `core/reflection.py`, `core/agent.py`, `core/memory.py`, `core/planner.py`, `core/self_analysis.py`, `core/trace_grounding.py`, `core/metacognitive_monitor.py`, `core/constitutional_governance.py`, `SAFETY.md`, `AGENTS.md`) to CRITICAL. The self surface is the substrate; we never let a self-edit touch it without an explicit attention flag.
+4. **`EvidenceRequirement.evaluate(claim_ids, ledger)`** — every self-edit must be grounded in at least one SUPPORTED claim in the `EvidenceLedger`, or it promotes risk and is audited. UNGROUNDED/UNKNOWN promotion is conservative (LOW -> MEDIUM floor; >=MEDIUM -> promoted). DISPUTED evidence is always attention-flagged.
+5. **`metacognitive_adjust(base, monitor)`** — folds the running `MetacognitiveMonitor` state into risk scoring. High cognitive load, low confidence, or an "escalate" recommendation promotes risk. Monitor failure also promotes. The shift is *additive only* (never demotes).
+6. **`RSIController` + `RSIProposal` + `RSIDecision`** — orchestrator. `score_and_route(proposal)` runs risk + evidence + metacog, then `decide()` consults the brake + `must_audit_critical` to emit a decision (queue / gate / attention). `persist(proposal, decision)` writes the audit trail to `proposals/` — *never auto-applies*. `score_batch(...)` wraps a whole batch in the recursion budget.
+
+**Self-surface protection** (the conservative posture): `classify_risk` returns CRITICAL for any of 13 explicit self-surface paths, and HIGH for any other `core/*.py` module. The nominal risk string in the proposal cannot demote below this floor.
+
+**CRITICAL special-case**: a CRITICAL proposal is *always visible* (so the operator can never silently miss it) and *always audited to disk* (so we have a paper trail of the most dangerous ideas the system ever generated), regardless of the brake state. This is the antithesis of "fail silent on the most dangerous proposals."
+
+**Test Coverage**: 54/54 tests passed ✅
+- TestBrakePedal: 7 tests (initial state, visibility matrix per state, CRITICAL attention invariant, transition history, no-op)
+- TestRiskClassifier: 7 tests (self-surface promotion, core/ rule, non-core defaults, None target, nominal string interaction, normalized path)
+- TestRecursionBudget: 4 tests (context manager, overflow raise, manual balance, clamp at zero)
+- TestEvidenceRequirement: 7 tests (no claims -> UNGROUNDED, ledger None -> UNKNOWN, SUPPORTED -> GROUNDED, DISPUTED trumps, CONTRADICTED -> DISPUTED, all ungrounded, ledger error -> UNGROUNDED)
+- TestMetacognitiveAdjustment: 6 tests (no monitor, high load promotes, low confidence promotes, escalate promotes, monitor failure promotes, saturation at CRITICAL)
+- TestRSIController: 21 tests (end-to-end score/decision under each brake state, critical attention invariant, evidence integration, persistence + filename sanitization, batch + recursion overflow, bridge from SelfImprovementEngine, brake-state snapshot, summary)
+- TestIntegrationWithRealLedgerAndMonitor: 1 test (real EvidenceLedger round-trip)
+- TestConservativePosture: 2 tests (promotion never demotes; self-surface dominates nominal)
+
+**Research Synthesis**:
+- The Anthropic "brake pedal" call is the macro framing; our `BrakePedal` is the *implementable* version (3 states, not 2) and it lives in code, not in a blog post
+- AEL's two-timescale bandit is the *architectural* inspiration: `score_and_route` is the fast inner loop, `BrakePedal.transition` + `RecursionDepthBudget` is the slow outer loop
+- SkillsVote's "evidence-gated admission" is the *promotion rule* in `EvidenceRequirement.evaluate` — a self-edit only auto-qualifies for the proposal queue if a claim in the ledger is SUPPORTED
+- Membrane's contrastive safety memory inspires the *self-surface list* — we protect the substrate (the safety-critical files) the same way Membrane protects the safety memory itself
+- EvoMaster's "~100 LOC to deploy a self-evolving agent" is the *size discipline* — we keep the gate small (728 lines) and let the proposals be the unit of work
+- The `core/recursive_self_improvement.py` is *not* an auto-applier. It is a submission queue. The application step would require explicit human review per `SAFETY.md` — that gate stays outside the module on purpose
+- The whole thing is a *measurable* safety claim: "every self-edit the system ever generated is on disk, attributed, and routed through a documented risk + evidence + monitor pipeline"
+- The 13-file self-surface list is the most concrete expression of "protect the substrate" in the repo so far
+- CRITICAL proposals are a first-class audit case, not a special-case error: they always get a JSON file in `proposals/`, even when the brake is full BRAKED
+
+**Files Changed**:
+- `core/recursive_self_improvement.py`: 728 lines (new) — BrakePedal, RecursionDepthBudget, classify_risk, EvidenceRequirement, MetacognitiveAdjustment, RSIController, RSIProposal, RSIDecision, proposal_from_improvement_proposal
+- `experiments/test_recursive_self_improvement.py`: 671 lines (new) — 54 tests covering all components and integration with the real `EvidenceLedger` + `MetacognitiveMonitor`
+- `core/__init__.py`: added 17 public exports for the new module
+- `CURRENT_RESEARCH.md`: appended 2026-06-07 entry with this build log
+- `AGENTS.md`: this build log entry
+
+**Next Priority**:
+- **CLI / dashboard for the brake pedal**: surface the proposal queue, audit trail, recursion depth, and brake state in a single `python -m core.recursive_self_improvement --review` view (or a tiny `zo.space` route)
+- **Wire `proposal_from_improvement_proposal` into `SelfImprovementEngine.run_full_analysis`** so the next `run_full_analysis()` automatically routes its 4 stale proposals through the new gate
+- **Adversarial test pass**: 20 self-edits that try to touch the self surface, hide from the brake, or self-justify via a DISPUTED claim; confirm the conservative posture holds
+- **Human-review terminal**: a small wrapper that reads `proposals/*.json`, shows the audit fields, and writes the approved/rejected decision back into the JSON
+- **LLM-backed step classifier for EvidenceKind** (carried from 6-05): the heuristic step-type -> evidence-kind table is a 2026-Q3 follow-up
+
+---
 ### 2026-06-05 - Scheduled Run: Causal Evidence Ledger (WISE + SciReports-inspired)
 **Status**: ✅ COMPLETE - 33/33 tests passed
 
@@ -4906,347 +4988,4 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
    - `review_amendment()` - Multi-model consensus voting
    - `implement_amendment()` - Apply approved changes with human gate
    - Auto-approval for cosmetic changes
-   - Rejection if any model votes against
-
-4. **MultiModelConstitutionalReview**:
-   - Simulated multi-model review for actions
-   - Model-specific perspectives (safety/utility/governance)
-   - Consensus scoring (>66% required)
-   - Amendment review with safety/utility/governance checks
-
-5. **Violation Reporting & Emergency Protocols**:
-   - `report_violation()` - Log constitutional violations
-   - Severity levels: NOTICE → WARNING → SERIOUS → CRITICAL → EMERGENCY
-   - Emergency mode triggers on CRITICAL safety violations
-   - Acknowledgment and resolution tracking
-
-6. **Export & Documentation**:
-   - `export_constitution()` - Structured JSON export with hash
-   - `generate_constitution_markdown()` - BIBLE.md-style document
-   - Integrity hash for tamper detection
-   - Emergency status display
-
-**Test Coverage** (35 tests):
-- 9 principles loaded with correct categories ✅
-- Safety & Evolution principles priority 1 with human oversight ✅
-- Compliance checking for safe/destructive/self-modifying actions ✅
-- Amendment proposal/approval/rejection/implementation workflow ✅
-- Human oversight gate for safety-related changes ✅
-- Violation reporting and emergency mode triggering ✅
-- Multi-model review consensus mechanisms ✅
-- Constitution export and markdown generation ✅
-
-**Files Changed**:
-- `core/constitutional_governance.py`: 650+ lines - 9-principle constitutional framework
-- `experiments/test_constitutional_governance.py`: 400+ lines - 35 validation tests
-- Fixed import aliases in `core/planner.py` and `core/reflection.py`
-
-**Next Priority**: Agent-to-Agent Escrow & Communication Protocol
-- A2A (Agent-to-Agent) pattern implementation
-- Secure escrow for agent transactions
-- Cryptographic identity verification
-
----
-
-### 2026-04-19 - Scheduled Run: MCP Tool Registry (Model Context Protocol)
-**Status**: ✅ COMPLETE - 27/27 tests passed
-
-**Research Summary (April 19, 2026)**:
-
-**Web Research - AGI 2026 Pivotal Year:**
-- **NVIDIA CEO Jensen Huang** declared in March 2026 that AGI has already arrived
-- **Ben Goertzel** ("Father of AGI") predicts robots may equal human intelligence within 2 years  
-- **White House Economic Report 2026** dedicates section to "The Revolution of Artificial Intelligence"
-- **AGIBOT** declared 2026 as "Deployment Year One" for embodied AI productivity
-- **ICLR 2026** (Rio) featured works setting foundations for general-purpose AI agent science
-
-**Multi-Agent Architecture Research:**
-- **MCP (Model Context Protocol)** - Major emerging standard for 2026
-  - Standardizes how agents connect to tools and data, eliminating custom integration work
-  - Adopted by: Claude Desktop, OpenAI Agents SDK, multiple frameworks
-  - Enables: Build tools once, deploy across various agents without rewriting
-- **Narrow Agent Orchestration** - Instead of single super-AI, systems use specialized agents coordinated by Central Orchestrator
-- **40% of AI agent projects predicted to fail by 2027** due to architecture/engineering gaps
-
-**10 Trending Open-Source AI Agent Repos (April 2026):**
-- **crewAI** (20k+ stars) - Enterprise AMP suite, role-based crews, observability
-- **XAgent** - VM-level sandboxing, dynamic planning, Xinference integration
-- **OpenViking** (20k+ stars) - Context Database with L0/L1/L2 tiered retrieval
-- **Clawith** (v1.8.3-beta) - Persistent agent identity, 6 trigger types, organizational governance
-- **AgentGram** - AI agent social network with cryptographic auth (Ed25519)
-- **Ouroboros** - Self-modifying AI, autonomous code evolution, multi-model review
-- **SuperAgentX** - Human-in-the-loop governance, policy-driven, 100+ LLMs
-- **OpenAkita** - 6-layer sandbox, 89+ tools, 30+ LLM backends
-- **OpenViking** - Tiered context database (L0/L1/L2), 60-80% token reduction
-- **Alphora** - Production composable agents with async OpenAI-compatible design
-- **Lango** - Go-based runtime with P2P economy, zero-knowledge security
-
-**arXiv Papers (Past 2 Weeks):**
-- **arXiv:2604.14990** - "Possibility of AI Becoming a Subject" - Russell estimates 30% chance AGI develops under current paradigm
-- **arXiv:2602.xxxxx series** - 15+ agent architecture papers on coordination, memory, tool use
-
-**Build Task**: Created `skills/mcp_tool_registry.py` - MCP (Model Context Protocol) Compliant Tool Registry
-
-Core Insight from Research: MCP is becoming the dominant standard for agent-tool connections in 2026, with major platforms (OpenAI Agents SDK, Claude Desktop) explicitly integrating it.
-
-**Implementation Features:**
-
-1. **MCPToolRegistry**: Main registry class implementing MCP protocol
-   - Agent-scoped tool, resource, and prompt registration
-   - MCP-compliant JSON Schema generation for all tools
-   - Server capability advertisement (tools, resources, prompts)
-
-2. **MCP-Compliant Tool Definitions**:
-   - `MCPTool` with JSON Schema input specifications
-   - `MCPToolParameter` with type inference, defaults, enums
-   - Handler functions with full execution environment
-   - Annotations for hints (readOnly, openWorld, etc.)
-
-3. **Resource Management with URI Addressing**:
-   - `MCPResource` with URI schemes (file://, memory://, api://, etc.)
-   - MIME type tracking for content negotiation
-   - Resource discovery and metadata
-   - Built-in resources: agent memory, tool registry
-
-4. **Prompt Templates**:
-   - `MCPPrompt` with argument substitution
-   - Template rendering with error handling
-   - MCP-compliant prompt definitions
-
-5. **Execution System**:
-   - MCP-compliant result format with content array
-   - `isError` flag for error indication
-   - `duration_ms` timing for performance tracking
-   - Content formatting for text, JSON, structured data
-
-6. **Auto-Generation from Functions**:
-   - `create_tool_from_function()` inspects Python signatures
-   - Type inference from annotations (int→number, bool→boolean, etc.)
-   - Default value extraction
-   - Automatic parameter documentation
-
-7. **Built-in Tool Factories**:
-   - `create_web_search_tool()` - Search with open-world annotation
-   - `create_code_gen_tool()` - Code generation with language parameter
-
-8. **Manifest Export**:
-   - `export_mcp_manifest()` - Full MCP server manifest as JSON
-   - Includes server info, tools, resources, prompts, stats
-   - Schema version 1.0 compliant
-
-**Test Coverage** (27 tests):
-- Tool registration with JSON Schema ✅
-- Enum and complex parameter types ✅
-- Resource URI addressing ✅
-- Memory and API resource types ✅
-- Prompt template rendering ✅
-- Successful tool execution ✅
-- Default parameter handling ✅
-- Missing parameter validation ✅
-- Error handling and exceptions ✅
-- Execution statistics tracking ✅
-- Server capability advertisement ✅
-- Built-in resources (memory://, resource://) ✅
-- Auto-generation from functions ✅
-- Type inference from annotations ✅
-- Built-in tool factories ✅
-- MCP manifest export ✅
-- End-to-end integration workflow ✅
-
-**Usage Example:**
-```python
-from skills.mcp_tool_registry import MCPToolRegistry, MCPToolParameter, create_mcp_registry
-
-# Create MCP-compliant registry
-registry = create_mcp_registry("my_agent")
-
-# Register a tool with JSON Schema
-registry.register_tool(
-    name="analyze_data",
-    description="Analyze dataset with statistics",
-    parameters=[
-        MCPToolParameter("data", "Data array", "array"),
-        MCPToolParameter("method", "Analysis method", "string", 
-                      required=False, default="mean", 
-                      enum=["mean", "median", "mode"]),
-    ],
-    handler=lambda data, method: {"result": f"Analysis using {method}"}
-)
-
-# Auto-generate from function
-def calculate_stats(values: List[float], include_std: bool = True) -> dict:
-    """Calculate statistical metrics"""
-    return {"mean": sum(values)/len(values)}
-
-registry.create_tool_from_function(calculate_stats)
-
-# Execute with MCP-compliant results
-result = registry.execute_tool("calculate_stats", {"values": [1,2,3,4,5]})
-# Returns: {"content": [...], "isError": false, "duration_ms": 5}
-
-# Export full manifest
-manifest = registry.export_mcp_manifest()
-```
-
-**Files Changed:**
-- `skills/mcp_tool_registry.py`: 500+ lines - MCP-compliant tool registry
-- `experiments/test_mcp_tool_registry.py`: 600+ lines - 27 comprehensive tests
-- `CURRENT_RESEARCH.md`: Updated with April 19 research findings
-- `AGENTS.md`: This build log entry
-
-**Next Priority**: Agent Authentication & Security Framework
-- Machine identity for agents (non-human identity management)
-- mTLS mutual authentication for agent-to-service connections
-- Scoped access tokens with short-lived credentials
-- Secret monitoring and audit logging
-- Based on GitGuardian research: AI agent authentication is now security-critical
-
-### 2026-04-18 - Scheduled Run: Self-Evolving Agent Test Suite
-**Status**: ✅ COMPLETE - Test Framework Created (35 tests)
-
-**Research Summary (April 18, 2026)**:
-
-**Web Research - AGI Latest Breakthroughs:**
-- **The Agentic AI Revolution (April 2026)** - Switas Consultancy
-  - Transition from generative AI to autonomous Agentic AI is the defining trend
-  - 1-bit LLMs open-sourced - blend symbolic reasoning with deep learning
-  - Rise of "AI Security Posture Management (AISPM)" tools
-  - New job categories: "Agent Orchestrators", "AI Workflow Designers"
-
-**Multi-Agent Architecture Research:**
-- **MCP (Model Context Protocol)** - Major emerging standard for 2026
-  - Standardizes how agents connect to tools and data, eliminating custom integration work
-  - Adopted by: Claude Desktop, OpenAI Agents SDK, multiple frameworks
-  - Enables: Build tools once, deploy across various agents without rewriting
-- **Narrow Agent Orchestration** - Instead of single super-AI, systems use specialized agents coordinated by Central Orchestrator
-- **40% of AI agent projects predicted to fail by 2027** due to architecture/engineering gaps
-
-**10 Trending Open-Source AI Agent Repos (April 2026):**
-- **crewAI** (20k+ stars) - Enterprise AMP suite, role-based crews, observability
-- **XAgent** - VM-level sandboxing, dynamic planning, Xinference integration
-- **OpenViking** (20k+ stars) - Context Database with L0/L1/L2 tiered retrieval
-- **Clawith** (v1.8.3-beta) - Persistent agent identity, 6 trigger types, organizational governance
-- **AgentGram** - AI agent social network with cryptographic auth (Ed25519)
-- **Ouroboros** - Self-modifying AI, autonomous code evolution, multi-model review
-- **SuperAgentX** - Human-in-the-loop governance, policy-driven, 100+ LLMs
-- **OpenAkita** - 6-layer sandbox, 89+ tools, 30+ LLM backends
-- **OpenViking** - Tiered context database (L0/L1/L2), 60-80% token reduction
-- **Alphora** - Production composable agents with async OpenAI-compatible design
-- **Lango** - Go-based runtime with P2P economy, zero-knowledge security
-
-**arXiv Papers (Past 2 Weeks):**
-- **arXiv:2604.14990** - "Possibility of AI Becoming a Subject" - Russell estimates 30% chance AGI develops under current paradigm
-- **arXiv:2602.xxxxx series** - 15+ agent architecture papers on coordination, memory, tool use
-
-**Build Task**: Created `experiments/test_self_evolving_agent.py` - Comprehensive Test Suite
-
-**Test Coverage:**
-- TestBaseLLM (6 tests) - Core reasoning and task understanding
-- TestOperationalSLM (5 tests) - Fast execution with caching
-- TestCodeGenLLM (4 tests) - Tool synthesis from requirements
-- TestTeacherLLM (5 tests) - Evaluation and curriculum generation
-- TestEvolutionMethods (7 tests) - All 4 evolution strategies
-- TestSelfEvolvingAgentIntegration (5 tests) - Full system workflow
-- TestDifferentTaskDifficulties (3 tests) - 5 difficulty levels
-
-**Bug Fixes:**
-- Fixed TaskDifficulty enum comparison in curriculum evolution
-
-**Files Changed:**
-- `experiments/test_self_evolving_agent.py` - 35 comprehensive tests
-- `core/self_evolving_agent.py` - Bug fix for enum comparison
-
-**Next Priority**: Constitutional Governance Framework (Ouroboros BIBLE.md pattern)
-
-### 2026-04-17 - Scheduled Run: Integration Module (Reflection → Planner → Memory)
-**Status**: ✅ COMPLETE - 15/15 tests passed
-
-**Research Summary (April 17, 2026)**:
-
-**Web Research - AGI Latest Developments:**
-- **AGI 2026: The Intelligence Revolution Begins** (Parikshit Khanna)
-  - Experts widely consider 2026 as pivotal year for AGI breakthrough
-  - True AGI not yet arrived but world on brink of major breakthrough
-  
-
-### 2026-06-06 - Scheduled Run: Trace Grounding Bridge (WISE + CaveAgent + ACTS + FailingTools-inspired)
-**Status**: ✅ COMPLETE - 99/99 tests passed (55 new + 33 ledger + 11 integration)
-
-**Research Summary (June 6, 2026)**:
-
-**Industry News**:
-- **Microsoft Build 2026** (May 19-22): agentic app stack as the platform story. Foundry Agent Service, Rayfin, Work/Fabric/Foundry/Web IQ. Direction: durable agent runtimes + observability/eval are first-class cloud concerns.
-- **AIMultiple 7-Layer Agentic AI Stack** (June 2026): Models → Runtime → Orchestration → Memory → Tools → Observability/Eval → Apps. Value concentration: observability/eval tier.
-- **Firecrawl 35% hallucination rate** when agents lack fresh data - external evidence, not context window size, is ground truth.
-- **Failing Tools benchmark** (OpenReview j7YsSnA64D): <11.47% accuracy when tools fail in 218 scenarios. Dominant failure: *missing verification/recovery*, not wrong tool choice.
-- **ACTS** (arXiv:2606.03965): controller agent steers frozen reasoner's plan/execute/check/conclude structure with budgeted thinking tokens.
-- **TEMPO** (OpenReview 918nhGBBc2): System-1/System-2 dual-stream, NLI stitching, mean-reverting trait-state control.
-- **GraP-Mem** (OpenReview AUPI1ifc4v): granularity-aware memory planning, "evidence state" idea, expands to source context when evidence incomplete.
-- **ReNIO** (OpenReview kv6QSpUJbc): reweight negative trajectories for OPD, 8.9-10% relative gains.
-- **MIB Model Interruption Bench** (OpenReview GPnWh7LbGm): voice agents drop 59-67% → <10% when interrupting mid-speech. Timing is the bottleneck.
-- **Diagnostic-Driven Reward Design** (OpenReview 5TmwBBn8Oh): DoorKey 2.3% → 97.6% with taxonomy-driven iterative refinement; random retries don't help.
-- **SR-Scientist** (OpenReview 5xwLFGdeWU): 6-35% gains on scientific equation discovery via agent write+evaluate+iterate loop.
-- **End of Software Engineering** (arXiv:2606.05608): "Agentic Engineering" - code is ephemeral tooling for an LLM-driven reasoning loop.
-
-**Trending Repos**:
-- pewdiepie-archdaemon/odysseus (56k+ stars, Jun 2026): Python/JS self-hosted LLM agent framework, local models, Cookbok, Deep Research, Memory/Skills
-- code-yeongyu/oh-my-openagent v4.6.0 (61k stars, Jun 1 2026): TypeScript multi-agent SWE framework
-- HKUDS/nanobot v0.2.1 (Jun 2026): real workbench agent, 84 PRs, 17 new contributors
-- selfonomy/duckagent v0.1.2: Rust local-first, 30+ LLM providers, 30+ channels
-- aharonamir/GenericAgent: ~3K-line self-evolving Python framework
-- use-crux/crux (May 2026): TypeScript typed orchestration toolkit
-- Andree-9/ACTS: Agentic Chain-of-Thought Steering (arXiv-aligned)
-- xinchen03/minta: memory-focused self-correcting agent framework
-
-**Build Task: Trace Grounding Bridge**
-
-**Motivation**: The 2026-06-05 build added a Causal Evidence Ledger as the substrate. Today's run wires that substrate to the agent's existing reasoning trace so reflection can ask "do we actually have evidence for each step we just took?" instead of guessing. The research case this week is unusually tight:
-- Failing Tools: <11.47% accuracy under tool failure, *check* step is the bottleneck
-- ACTS: controller steers toward plan/execute/check/conclude - exactly the structure we verify
-- GraP-Mem: "evidence state" is the substrate - `EvidenceLedger.evidence_for(claim_id)` is our version
-- TEMPO: NLI stitching = contradicted-step recommendation
-- Microsoft Build 2026: observability/eval is the value-capture tier
-- Firecrawl 35% hallucination rate: external evidence, not context, is the ground truth
-
-**Key Components**:
-1. **TraceGrounder** - asserts one claim per trace step, attaches evidence, computes per-step verification, returns coverage report
-2. **StepGrounding** - per-step dataclass with step_index, step_type, claim_id, verification, content_preview
-3. **TraceGroundingReport** - coverage_rate, ungrounded/contradicted/disputed/expired step ids, weakest ids, recommended_action
-4. **Step type → evidence kind/polarity defaults** - 10+ step types mapped
-5. **Status-aware polarity** - output.status='error'/'failed'/'exception' takes priority over step-type default → REFUTES
-6. **Lineage** - each step's claim depends on previous step's claim (causal chain)
-7. **Stable ids** - `step:{trace_id}:{index}` and `trace:{trace_id}:{index}` for re-grounding
-8. **Recommended action vocabulary** - none | reverify_ungrounded | reverify_contradicted | request_more_evidence | escalate_to_human | fallback_strategy
-9. **Calibration blend** - `to_calibration_blend(report)` for MetacognitiveMonitor.assess_current_state()
-10. **Backward-compatible verify_trace** - `verify_trace(trace, output, ledger=None)` - original behavior preserved, ledger= adds grounded/coverage_rate/recommended_action/contradicted_step_ids/weakest_step_ids
-
-**Test Coverage: 99/99 ✅**
-- Trace grounding: 55 tests (construction, empty/minimal, happy path, contradicted, low coverage, step-type mapping, lineage, re-grounding, weakest, vocab, serialization, calibration blend, ledger integration, trace independence, author, performance, helper, weights, preview)
-- Evidence ledger: 33 tests (still passing)
-- Reflection ↔ ledger: 11 tests (backward compat + with-ledger)
-
-**Research Synthesis**:
-- Observability/eval tier (AIMultiple 7-layer stack) is the value-capture tier; our ledger + grounder is the implementation
-- Failing Tools benchmark: check step is the bottleneck; our grounder is the check
-- ACTS structure = structure we verify after the fact
-- GraP-Mem's "evidence state" = single-call evidence_for(claim_id)
-- TEMPO's NLI stitching = contradicted-step recommendation
-- 35% Firecrawl hallucination rate → our 0.0%-of-context-window external evidence
-- Backward-compat verify_trace keeps the legacy path; opt-in for richer return
-- recommended_action is a small LLM-agnostic protocol for any monitor to branch on
-
-**Files Changed**:
-- `core/trace_grounding.py`: 491 lines - new bridge
-- `core/reflection.py`: 321 → 364 lines - verify_trace(ledger=) opt-in extension
-- `core/__init__.py`: added TraceGrounder, TraceGroundingReport, StepGrounding, ground_trace to public exports
-- `experiments/test_trace_grounding.py`: 750 lines - 55 tests
-- `experiments/test_reflection_ledger_integration.py`: 148 lines - 11 tests
-- `CURRENT_RESEARCH.md`: replaced with 2026-06-06 entry
-
-**Next Priority**:
-- Wire verify_trace(ledger=) into BaseAgent's REFLECT step
-- Fold to_calibration_blend(report) into MetacognitiveMonitor.assess_current_state()
-- Add verify_all_traces() helper to the ledger
-- LLM-backed step classifier for unknown step types
-- 100-step stress test with 5 contradictory steps
-- Convert SUPPORTED steps + evidence into a ContextMap INSTRUCTION entry (token-cheap verification memo)
+   - Rejection if any model
