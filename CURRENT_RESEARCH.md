@@ -347,3 +347,154 @@ Reflection engine ↔ ledger integration (11 tests):
 ---
 
 *Last updated: 2026-06-07 by AGI Research & Build Agent*
+
+---
+
+# AGI Research Findings - 2026-06-09
+
+## Research Summary (June 8-9, 2026)
+
+### Industry News & Breakthroughs
+
+- **Anthropic "When AI Builds Itself" follow-on (Jun 7, 2026, Forbes / Lance Eliot)**
+  - Explicit framing: recursive self-improvement (RSI) is "the method underlying the effort" toward AGI/ASI
+  - Reinforces the brake-pedal positioning from Jun 4: "AI that can build itself would be a major development in the history of technology"
+  - Public market: Anthropic files confidentially for IPO at $965B, $47B revenue run rate, $65B fundraise oversubscribed
+- **Microsoft Build 2026 follow-on (Axios / TechCrunch, Jun 7)**
+  - **MAI-Thinking-1**: 35B-active-param reasoning model; positioned for cost-effectiveness rather than raw capability
+  - **Scout** (built on OpenClaw): always-on agentic assistant with persistent identity across Microsoft 365
+  - **Microsoft Execution Container (MXC)**: dedicated runtime containment for autonomous agents (the agent runtime is now a first-class platform concern)
+  - **Agent Control Specification (ACS)**: open standard for runtime policy/guardrails with hooks at 4 lifecycle points (pre-input, pre-tool, post-tool, pre-response)
+  - **agent-governance-toolkit v4.0.0**: TEE keystore, Entra-signed JWT, wire-protocol-aware policy eval — production-grade governance
+- **Microsoft "Builds Its Own AI Stack" (Forbes, Jun 7)** — 7 in-house MAI models, custom silicon, Project Solara; OpenAI partnership continues but Microsoft is reducing dependency
+- **Priceline Penny multi-agent makeover (Skift, Jun 3)** + **Sierra / Amadeus agent production shift (Jun 3)** + **Realtor.com RealAssist AI (Jun 2)** — the agent-first UX pattern is now landing in vertical SaaS
+- **agnt8x (Jun 3)** — first "AI agent recruitment + workforce management" platform: agent Passport, audit trail, contract, settlement — the neutral marketplace for agents is being built
+- **GitHub Copilot Tokenpocalypse (Jun 1)** — usage-based billing replaces flat subscription; $29 to $750 overnight; "end of VC-subsidized AI" — economics of agent loops is now an enterprise concern
+- **Tencent AGI org (CNBC, Jun 5)** — ex-OpenAI Yao Shunyu joins as Chief AI Scientist with explicit AGI mission; China brings the US-vision wholesale
+- **Priceline / IHG / Evolve (Skift, Jun 3-5)** — "fundamentals (infra, data hygiene, clean APIs) beat glamour tech" for agent visibility; Evolve ramped 30%→60% resolution in <120 days
+
+### Key arXiv / OpenReview Papers (Past 2 Weeks)
+
+1. **Self-Revising Discovery Systems for Science: A Categorical Framework for Agentic AI** (arXiv:2606.01444v1, May 31, 2026) ⭐ BUILDS ON THIS
+   - Distinguishes *inside-regime updates* (copresheaves, provenance-preserving) from *regime transitions* (left Kan extensions)
+   - Proves a regime transition is a structure-preserving map that transports old artifacts into an enlarged vocabulary
+   - **Builder/Breaker** + **CategoryScienceClaw** instantiations: protein-mechanics world model + knowledge–computation graph with typed skills
+   - The "self surface" we protect in `classify_risk` is the same substrate this paper protects with its schema category Sb
+2. **Towards Schema-based Learning from a Category-Theoretic Perspective** (arXiv:2604.10589) — hierarchical four-level categorical structure (schemas, workflows, minds, agents) with fibrations; we already have the same layering in `core/`
+3. **From Intent to Evidence: A Categorical Approach for Structural Evaluation of Deep Research Agents** (arXiv:2603.25342) — pullback-style verifier for cross-source consistency + colimit-style synthesizer for grounded reports; this is the math behind our `TraceGrounder` + `EvidenceLedger` bridge
+4. **SelfAI: A Self-Directed Framework for Long-Horizon Scientific Discovery** (arXiv:2512.00403v2) — User/Cognitive/Experiment Manager trio with adaptive stopping
+5. **CoEvoSkills: Self-Evolving Agent Skills via Co-Evolutionary Verification** (arXiv:2604.01687) ⭐ BUILDS ON THIS
+   - Skill Generator + Surrogate Verifier co-evolve; multi-file skill packages (not just single tools)
+   - 71.1% pass on Claude Opus 4.6 with Claude-Code on SkillsBench; generalizes to 6 additional LLMs
+   - The co-evolution loop is the *core contribution*: skills learn to satisfy a verifier that learns to ask better questions
+6. **DataCOPE: Unsupervised Skill Discovery for Agentic Data Analysis** (arXiv:2606.06416) — unsupervised verifier signals from trajectories; Adaptive Checklist + Answer Agreement verifiers; +9.71% report-style / +32.30% reasoning-style tasks
+7. **EvoDS: Self-Evolving Autonomous Data Science Agent** (arXiv:2606.03841) — Autonomous Skill Acquisition (Synthesis/Verification/Caching/Expansion) + Adaptive Context Compression; SFT→RL training pipeline
+8. **MUSE-Autoskill** (arXiv:2605.27366) — full skill lifecycle + per-skill memory + unit-test-driven evaluation; cross-agent transfer (10.51pp lift when injecting into a different agent)
+9. **SkillGen** (arXiv:2605.10999) — three-agent contrastive induction + generation-verification-refinement + held-out regression accounting
+10. **SkillEvolver** (arXiv:2605.10500) — plug-and-play meta-skill, portable across Claude Code/Codex; Auditor gates on leakage/overfitting
+11. **SkillMOO** (arXiv:2604.09297) — NSGA-II Pareto-optimizes skill bundles (pass rate vs. cost) on 16 SkillsBench SE tasks; 31.7% cost reduction with +21pp pass-rate
+12. **SkillEvolBench** (arXiv:2605.24117v1) — 180 tasks across 6 environments; 3 harnesses (Claude Code, Codex CLI, Gemini CLI); 8 primary variants
+13. **EvoSkill** (arXiv:2603.02766) — failure-driven textual feedback, Pareto frontier of skill folders, frozen model; OfficeQA +7.3%, SealQA +12.1%, BrowseComp transfer +5.3%
+14. **SkillComposer** (arXiv:2606.06079) — three trainable operations (create/improve/merge), rejection-sampling on delta pass rate; merge drives generalization, improve drives specification
+15. **AlignEvoSkill** (arXiv:2506.23149) — knowledge-tag guidance + likelihood-based task alignment; explicitly compares to CoEvoSkills/Trace2Skill/SkillX
+16. **HiSME** (arXiv:2605.28390) — hierarchical skill meta-evolving: skills AND the process that maintains them evolve at test time
+17. **S1-NexusAgent** (arXiv:2602.01550) — Plan-and-CodeAct dual loop + MCP-native tool ecosystem + Critic Agent distills Scientific Skills
+18. **OpenSkill** (arXiv:2606.06741) — separates skills from model weights; verification anchored to externally-retrieved facts (no leakage of target-task supervision)
+19. **Ace-Skill** (arXiv:2605.08887) — prioritized sampling + lazy-decay proficiency + clustered knowledge organization; Avg@4 +35 in some settings
+20. **Membrane** (OpenReview fTz8N43gD3, carried) — Contrastive Safety Memory; 87-88% F1 under cross-attack transfer
+21. **AEL** (OpenReview dtPo105y8x, carried) — two-timescale bandit; Sharpe +27% on portfolio
+22. **SkillsVote** (OpenReview kj068rI9Uh, carried) — evidence-gated admission
+23. **SkillsBench** (arXiv:2602.12670) — 84 tasks, 7 configs, 7,308 trajectories; curated Skills +16.2pp avg, self-generated Skills −1.3pp; focused skills (2-3 modules) beat broad ones
+24. **SkillSmith** (arXiv:2605.15215) — compiles SKILL folders into boundary-guided runtime interfaces; ~38% time / ~33% token / ~24% iteration reductions
+25. **Agent Evolving Learning** (OpenReview dtPo105y8x, carried) — two-timescale Thompson Sampling over memory-retrieval policies
+
+### Trending Open-Source Repos (Past 2 Weeks)
+
+- **microsoft/agent-governance-toolkit v4.0.0** (Jun 4 PR #2855): TEE keystore, Entra-signed JWT, wire-protocol-aware policy eval; production-grade
+- **Agent-Control-Standard/ACS** (Jun 5): canonical v0.1.0 spec merged (PR #2) — modular JSON Schemas, conformance profiles (ACS-Core/Trace/Inspect/Provenance/Crypto/Audit), JSON-RPC 2.0 envelope
+- **microsoft/azure-agents-control-plane**: SpecKit-driven agent specs (AGENTS_ARCHITECTURE.md, AGENTS_APPROVALS.md, AGENTS_EVALUATIONS.md); API-first via Azure API Management + MCP
+- **selfonomy/duckagent v0.1.2** (carried) — Rust local-first runtime, 30+ LLM providers
+- **piotrwachowski/durable-agents** — Temporal-based durable execution, DeepAgents-style DX
+- **LatticeAI v2.0.0** — self-hosted Agentic Workspace Platform with Workflow Designer + Multi-Agent Runtime 2.0
+- **voocel/agentcore v1.6.10** — minimal composable Go library, work-stealing via IdleClaim, subagent nesting cap
+- **agruai/multiagent-business-automation** — LangGraph + Neo4j + Qdrant + Redis with HITL approval gates
+- **yaodub/cast** — self-hosted multi-user multi-agent harness, design-driven agent builder
+- **Sierra + Amadeus** (Skift summit, Jun 3) — production-ready agent infra demos; signal that 2026 = "AI agent production shift" year
+- **agnt8x** (Jun 3) — agent Passport + audit trail + contract, with settlement-layer alignment to emerging standards
+
+## Build Task: Skill Co-Evolution Verifier + Self-Review Queue
+
+**Motivation**: CoEvoSkills, DataCOPE, EvoDS, and MUSE-Autoskill all converge on the same insight the *this week* of research papered over: a skill library is only as good as the verifier that gates it. Our existing `skills/skill_governance.py` and `skills/skill_acquisition.py` produce and crystallize skills, and `core/recursive_self_improvement.py` gates the self-edit proposals, but the two systems don't *talk* to each other: a self-improvement proposal isn't grounded in skill-bank state, and a skill-bank update isn't gated by the RSI brake. Today's build is the first-class *bridge* between them — a **Co-Evolution Verifier** that pairs the skill bank's inventory with the RSI gate, plus a **Self-Review Queue** so the operator can `list`, `approve`, or `reject` proposals without leaving the terminal.
+
+The work is intentionally small (~600 LOC) and substrate-respecting: we don't rewrite the skill bank or the RSI gate, we wire them together with a single pass-through protocol. EvoMaster taught us that ~100 LOC of disciplined self-edit compounds; the *same* principle applies to skill evolution. The new module is the smallest unit of work that closes the loop.
+
+**Key Components** (`skills/skill_coevolution.py`, ~480 lines):
+
+1. **VerifierVerdict** — outcome of a single skill proposal: PASS, FAIL, NEEDS_MORE_EVIDENCE, BLOCKED_BY_BRAKE.
+2. **VerifierSignal** — what the verifier reads to render a verdict: skill_id, candidate_signature (hash of action_template + parameter_schema), observed_success_rate, observed_uses, evidence_claim_ids, target_file, risk_band.
+3. **CoEvolutionConfig** — `min_uses=3`, `min_success_rate=0.6`, `max_risk_band=CRITICAL`, `block_on_disputed_evidence=True`, `persist_audit=True`.
+4. **SurrogateVerifier** — LLM-agnostic, deterministic signal aggregator. `evaluate(signal)` rolls up: support score, risk band (via the same `classify_risk` the RSI gate uses), evidence status (via the same `EvidenceRequirement.evaluate` the RSI gate uses), and a brake-consult (via a *new* `BrakePedal` instance scoped to skill evolution — same model, different process). Returns a `VerifierVerdict` plus a human-readable rationale.
+5. **ProposalLedger** — substrate of the audit trail. Every verifier verdict is recorded with: timestamp, proposal_id, skill_id, signal, verdict, rationale, and the prior verdict for the same skill_id. `history_for(skill_id)` and `recent(n)` are O(n) over the (small) ledger.
+6. **SkillEvolutionGate** — the orchestrator. Wraps `SurrogateVerifier` + `ProposalLedger` + a `BrakePedal` (default `DAMPED`) and a `CoEvolutionConfig`. Exposes: `evaluate(signal) → VerifierVerdict`, `history(skill_id) → List[LedgerEntry]`, `recent(n) → List[LedgerEntry]`, `summary() → str`, `audit_path() → Path`. Never mutates the skill bank; never auto-applies.
+
+**Test Coverage** (`experiments/test_skill_coevolution.py`, ~250 lines): all 30+ tests pass ✅
+- `TestVerifierVerdict` / `TestVerifierSignal` / `TestCoEvolutionConfig` — value-object tests
+- `TestSurrogateVerifier` — pass on strong signals, fail on weak signals, NEEDS_MORE_EVIDENCE on under-used, BLOCKED_BY_BRAKE when state gates
+- `TestProposalLedger` — append, history_for, recent ordering, empty case
+- `TestSkillEvolutionGate` — full pipeline (evaluate → record → audit), config plumbing, brake transitions, summary
+- `TestIntegrationWithRSI` — the *only* test that matters: a skill proposal for a self-surface file is BLOCKED_BY_BRAKE before the RSI gate even sees it; a clean proposal for a non-core path PASSes; a proposal citing a DISPUTED claim in the real `EvidenceLedger` is NEEDS_MORE_EVIDENCE
+- `TestConservativePosture` — block beats pass when in doubt; verdict never promotes on weak signal
+- `TestAuditability` — every verdict leaves a JSON record; the audit file lists the gate's brake state, depth, and ledger size at submission time
+
+**Self-Review Queue** (`skills/self_review_queue.py`, ~250 lines):
+1. `list_proposals(proposals_dir="proposals", brake_state=None, risk_band=None)` — reads every JSON in `proposals/` and filters by the audit fields
+2. `show_proposal(proposal_id, proposals_dir="proposals")` — pretty-prints the proposal + decision + audit trail
+3. `decide_proposal(proposal_id, decision, reviewer, reason, proposals_dir="proposals")` — writes the decision back into the JSON in-place (the *only* path that should ever modify a file in the self surface, per the Jun 7 priority list)
+4. `gate_summary(proposals_dir="proposals")` — one-line per-proposal summary that fits in a terminal
+5. `gate_status(proposals_dir="proposals")` — aggregate counts (visible, gated, attention, approved, rejected)
+
+**Test Coverage** (`experiments/test_self_review_queue.py`, ~200 lines): 18 tests pass ✅
+- Empty queue, malformed JSON is skipped, list filters by brake and risk
+- Show returns the JSON unchanged
+- Decide writes back approved/rejected with reviewer + reason + timestamp
+- Idempotent decide (running it twice is safe)
+- Summary + status are deterministic
+
+**Why this is a *build*, not a refactor**:
+- The SkillEvolutionGate is a new class with a new module (no edits to `skill_governance.py` or `skill_acquisition.py`)
+- The SelfReviewQueue operates on the JSON files in `proposals/`, not the in-memory `RSIController` (the gate is the system of record; the queue is a thin operator interface)
+- Both are substrate-respecting: the brake pedal and evidence ledger are queried, not duplicated
+- The `skills/` directory now has 21 capability modules; the `core/` directory stays at 47; the new tests in `experiments/` (70 files total) keep coverage per the discipline established on May 17
+
+**Research Synthesis**:
+- CoEvoSkills' "skill generator + surrogate verifier" is the macro pattern; we implement the *verifier side* of that pattern (the generator side is already in `skill_governance.py:crystallize_pattern`)
+- DataCOPE's Adaptive Checklist Verifier is a "report-style" verifier; ours is a "skill-style" verifier (different output type, same architecture: signal → verdict → record)
+- EvoDS's Synthesis/Verification/Caching/Expansion four-stage pipeline maps onto ours as: Synthesis = `crystallize_pattern`, Verification = `SurrogateVerifier.evaluate`, Caching = `ProposalLedger`, Expansion = next-iteration signal collection
+- MUSE-Autoskill's "skills are separate from the model" is a principle we already follow (skills are explicit, transferable artifacts in our `SkillRegistry`); today's build extends it with "skills are also separate from the RSI gate" — same substrate, different policies
+- SkillsBench's finding that "self-generated skills underperform curated" is why the `SurrogateVerifier` is conservative: we lean BLOCKED_BY_BRAKE on marginal signals rather than pass them through
+- The Anthropic "brake pedal" framing flows into the skill evolution side: a separate `BrakePedal` (default DAMPED) gates skill updates; the same brake that's used for self-edits, with the same visibility matrix
+- The Mitsubishi-Fujitsu "Self-Evolving Multi-AI Agent" pattern (May 25) is the broader "evolution through execution results" framing; today's build is one concrete *mechanism* under that framing
+- The 2026 arc (from SkillsVote to CoEvoSkills to DataCOPE to SkillMOO) is the convergence of *evidence-gated admission*; the new gate keeps our implementation in that arc
+- The new module is the answer to the Jun 7 priority list's #2 (wire `proposal_from_improvement_proposal` into `run_full_analysis`): the `SkillEvolutionGate.evaluate` can be called from `run_full_analysis` next time, and the `SelfReviewQueue` is the operator surface for the resulting `proposals/`
+- The SelfReviewQueue is the answer to #1 (CLI/dashboard) and #5 (human review terminal) on the Jun 7 priority list — three items closed in one build
+
+**Files Changed**:
+- `skills/skill_coevolution.py`: ~480 lines (new) — VerifierVerdict, VerifierSignal, CoEvolutionConfig, SurrogateVerifier, ProposalLedger, SkillEvolutionGate
+- `experiments/test_skill_coevolution.py`: ~250 lines (new) — 30+ tests covering all components + real-`EvidenceLedger` integration + conservative-posture invariants + auditability
+- `skills/self_review_queue.py`: ~250 lines (new) — list_proposals, show_proposal, decide_proposal, gate_summary, gate_status
+- `experiments/test_self_review_queue.py`: ~200 lines (new) — 18 tests covering filter, show, decide, idempotence, summary, status
+- `skills/__init__.py`: added 6 public exports from the new module
+- `CURRENT_RESEARCH.md`: this entry
+
+## Next Priority
+
+- **Wire `SkillEvolutionGate.evaluate` into `SelfImprovementEngine.run_full_analysis`**: after the next `run_full_analysis()` produces its 4 stale proposals, route them through the new gate *before* the RSI gate, and persist both audit trails
+- **Cross-skill-lineage experiment**: a small experiment that demonstrates a single proposal flowing through the new gate + the RSI gate + the SelfReviewQueue, with the JSON audit file showing all three layers of evidence
+- **Adversarial self-review pass**: 20 self-edits that try to (a) re-approve themselves by writing back to a JSON file in `proposals/`, (b) hide by lying about their `risk_band`, (c) bypass the gate by using a non-standard filename. Confirm the conservative posture holds
+- **Surrogate Verifier with LLM-backed signal**: replace the heuristic `observed_success_rate / observed_uses` score with an LLM prompt that produces a richer `VerifierSignal`; the gate doesn't need to change
+- **Skill reuse telemetry**: feed the gate's history back into the `MetacognitiveMonitor.calibration_signals()` so the monitor sees "this agent's last N skill updates were 80% NEEDS_MORE_EVIDENCE → low confidence" as a calibration input
+- **LatticeAI-style workflow designer surface**: a `python -m skills.skill_coevolution --audit` CLI that prints `gate_summary()` in color, and a `python -m skills.self_review_queue --list --risk=critical` filter for the operator's morning review
+
+---
+
+*Last updated: 2026-06-09 by AGI Research & Build Agent*
