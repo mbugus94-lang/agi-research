@@ -498,3 +498,152 @@ The work is intentionally small (~600 LOC) and substrate-respecting: we don't re
 ---
 
 *Last updated: 2026-06-09 by AGI Research & Build Agent*
+---
+
+# AGI Research Findings - 2026-06-10
+
+## Research Summary (June 10, 2026)
+
+### Industry News & Breakthroughs
+
+- **Anthropic Claude Code + Skills self-evolution** (Jun 9, 2026): Skills (`.claude/skills/`) become a first-class artifact; the runtime is now "the loop is: skill → invoke → memory → next skill", not "the loop is: prompt → LLM → response". The agent surface that SkillsVote, CoEvoSkills, EvoDS, and DataCOPE all describe in research is now in production.
+- **"Self-Evolving Multi-AI Agent" mainstreaming** (Mitsubishi / Fujitsu May 25 → industry-wide by Jun 10): the framing of "an agent that updates from execution results" is no longer a research claim; it's a deployment pattern. Reinforces the SkillsVote / CoEvoSkills direction.
+- **Agent Security Week (Jun 6–10)**: TrueFoundry's MCP Gateway (RBAC at the tool level, pre-execution guardrails), Claude Code Security Best Practices (SSO + AI Gateways + MCP Governance), AI Governance & Audit (virtual keys, compliance-grade logs). The "governance at the execution boundary" idea from the OCL paper is now a product category.
+- **Hermes Agent v2026.6.5 (Jun 6)**: cross-model gateway (OpenRouter, NVIDIA NIM, z.ai/GLM, OpenAI, etc.), TUI, scheduled automations, RPC tool calls with zero-context-cost chaining. The leader in single-agent self-improvement tooling; 189k stars, 32k forks.
+- **OpenFang (RightNow-AI) v0.6.9 (May 2026)**: Rust-based "Agent OS" with 14 crates, ~137k LOC, scheduling + knowledge graphs + monitoring + automation. 17.8k stars. The opposite end of the spectrum from Hermes: a kernel, not a runtime.
+- **OpenHive (aden-hive) v0.11.0 (May 2026)**: model-agnostic multi-agent harness, dynamic topology generation, persistent role-based memory. 51 ADK frameworks evaluated in 2026 — no single framework dominates, but OpenHive and OpenFang lead the production-grade cohort.
+- **HiClaw (agentscope-ai) v1.1.2 (May 27)**: Kubernetes-native multi-runtime orchestrator blending OpenClaw (Node.js) + QwenPaw (Python) + Hermes. Auditable via Matrix m.mentions; manager QwenPaw + worker Hermes pattern. 4.7k stars.
+- **HermesClaw (NextAgentX) v0.0.1 (May 2026)**: Electron + React desktop wrapper that unifies OpenClaw gateway + Hermes Agent runtime. First "personal OS" packaging of the openclaw/Hermes stack.
+- **r0b0tlab/hermes-concurrent-agents**: parallel Hermes Agent workers on unified-memory GPUs (GB10, DGX Spark) with profile-isolated workers (creative / coder / researcher / QA) and a SQLite kanban for task coordination. Pattern: model-endpoint-agnostic parallelism on inference-friendly hardware.
+
+### Key arXiv / OpenReview Papers
+
+- **["Silent Failure in LLM Agent Systems: The Entropy Principle and the Inevitable Disorder of Autonomous Agents"](https://arxiv.org/abs/2606.08162)** (Dexing Liu, Shanghai Qijing Digital, Jun 9 2026) ⭐ BUILDS ON THIS
+  - Central claim: silent failures are *not* implementation defects; they are the inevitable consequence of 22 intrinsic properties of language-based autonomous systems
+  - Formal result: S(t) = S0 · exp(α·t); system entropy increases monotonically with interaction rounds
+  - Five silent failure types: Channel Fracture (L1), Cognitive Framework Lag (L2), Data Consistency Decay (L3), Cross-Session Knowledge Fragmentation (L2), Behavior Routing Deficiency (L3)
+  - Three structural patterns: multi-step accumulation, absence of self-reporting, recurrence under identical conditions
+  - Engineering response: PIG (Physical Integrity Gate) Engine + ADE (Agent Delivery Engineering) protocol suite = "deterministic governance" at the boundary
+  - Survey of 130+ existing failure modes (MAST 14, Microsoft AIRT 30+, Token Budgets 63, Latitude 6, Pazi 5, BAGEN, Library Drift) — all map to the five types
+  - Independent confirmation: Zhang et al.'s "Library Drift" (unbounded skill libraries causing retrieval disorder) is exactly the Behavior Routing Deficiency + Cross-Session Fragmentation combination
+
+- **["Q-Evolve: Self-evolving LLM agents with in-distribution Optimization"](https://arxiv.org/abs/2606.07367)** (Jun 9): in-distribution RL with weighted Implicit Q-Learning on hybrid off-policy data (expert + agent trajectories); process-reward labeling co-evolves with policy. Stabilizes Bellman backups in sparse-reward settings. Reinforces the "evidence-gated admission" pattern from SkillsVote.
+
+- **["Socratic-SWE: Self-Evolving Coding Agents via Trace-Derived Agent Skills"](https://arxiv.org/abs/2606.07412)** (Jun 9, 21 pages): trace → skills → behavior update. Same macro pattern as the Hermes/CoEvoSkills direction: skills are derived from execution, not prompted.
+
+- **["Rethinking Continual Experience Internalization for Self-Evolving LLM Agents"](https://arxiv.org/abs/2606.04703)** (Jun 3, Renmin University): three failures of experience internalization (granularity, injection pattern, internalization regime). Off-policy context-distillation on high-quality teacher trajectories is more stable than on-policy distillation. Confirms the SkillsVote / EvoMaster / RSIController conservatism.
+
+- **["PACE: Anytime-Valid Acceptance Tests for Self-Evolving Agents"](https://arxiv.org/abs/2606.08106)** (Jun 9, cs.AI + cs.MA): statistical acceptance tests for self-evolving agents. The "anytime-valid" framing complements the PIG+ADE "deterministic governance" framing — both answer "is the system still safe?".
+
+- **["Scaling Self-Evolving Agents via Parametric Memory"](https://arxiv.org/abs/2606.04536)** (Jun 9): parametric (not in-context) memory as the substrate for self-evolution. The complementary direction to the SkillBank pattern in this repo.
+
+- **["OpenSkill: Open-World Self-Evolution for LLM Agents"](https://arxiv.org/abs/2606.06741)** (Jun 9, 20 pages): open-world self-evolution. Same direction as Hermes (closed-loop learning + autonomous skill creation) but in an "open world" setting.
+
+- **["Tree-of-Experience"](https://arxiv.org/abs/2606.06960)** (Jun 9): structured experience management for low-repetition, implicit-reward environments. Tree-based indexing as a countermeasure to the cross-session fragmentation the Entropy Principle paper calls out.
+
+- **["Parthenon Law: A Self-Evolving Legal-Agent Framework"](https://arxiv.org/abs/2606.04602)** (Jun 9): domain-specific self-evolution (legal). Evidence that the SkillsVote / EvoMaster pattern is generalizing.
+
+- **["SePO: Self-Evolving Prompt Agent for System Prompt Optimization"](https://arxiv.org/abs/2606.04465)** (Jun 9): system-prompt optimization as a self-evolution target. The LLM-prompt is now just another updatable artifact.
+
+- **["Organizational Control Layer: Governance Infrastructure at the Execution Boundary of LLM Agent Systems"](https://arxiv.org/abs/2606.04306)** (Jun 9): OCL intercepts actions *before* execution via policy enforcement + escalation. Reduces unsafe executions 88% → ~0% and valid success 12% → 96% in adversarial buyer-seller negotiations. Closest direct paper to today's build: same "deterministic governance at the boundary" idea as the Entropy Principle's PIG Engine.
+
+- **["VESTA: A Fully Automated Scenario Generation and Safety Evaluation Framework for LLM Agents"](https://arxiv.org/abs/2606.08531)** (Jun 9): 1,072 evaluation scenarios across 5 risk dimensions; current agents show 47.1% ASR (Attack Success Rate), some >70%. The eval counterpart to the PIG+ADE countermeasure.
+
+- **["Toward Pre-Deployment Assurance for Enterprise AI Agents"](https://arxiv.org/abs/2606.04037)** (Jun 9, v2): ontology-grounded simulation + trust certification. Regulatory coverage 48.3% vs 33.1% for persona-based generation (corrected p=.0006). The "pre-deployment" complement to the Entropy Principle's "runtime monitoring".
+
+- **["Cascading Hallucination in Agentic RAG: The CHARM Framework"](https://arxiv.org/abs/2606.04435)** (Jun 9): cascade detection rate 5.3% FPR, error propagation reduction 82.1% (vs 18.5% output-level). Maps onto the paper's "Channel Fracture" type — but for retrieval pipelines rather than inter-agent messaging.
+
+- **["Multi-Agent Reflexion (MAR)"](https://arxiv.org/abs/2512.20845)** (Dec 2025, v2 Jun 2026): replication of Reflexion exposes systematic confirmation bias and degeneration-of-thought; multi-agent extension with diverse reasoning personas + judge model improves both. Reinforces the MultiAgent `core/multi_agent.py` work.
+
+- **["The End of Software Engineering: How AI Agents Are Fundamentally Restructuring the Software Paradigm"](https://arxiv.org/abs/2606.05608)** (Jun 9): 3-stage evolutionary roadmap (Tool-Augmented 2023-2025 → Single-Task Autonomous 2025-2027 → ...). Stage II = the 2026 production-shift year.
+
+- **["ADK Arena: Evaluating Agent Development Kits via LLM-as-a-Developer"](https://arxiv.org/abs/2606.05548)** (Jun 9): 51 Python ADK frameworks, 204 agent-benchmark pairs. No single framework dominates; best resolves 80% on a single benchmark, median 32%. Documents the fragmentation OpenHive / OpenFang / Hermes / OpenFang / HiClaw are racing to consolidate.
+
+- **AgentScout Weekly Digest (Jun 4 → Jun 10)**: 3 self-evolving agent frameworks (EvoDS, SkillPyramid, EvoDrive) + LAP agent-to-instrument protocol + Constraint State Governance. Same "self-evolving skill library" pattern as our `skills/skill_governance.py` + `core/skill_acquisition.py`.
+
+### Trending Open-Source Repos (Jun 4–10)
+
+- **NousResearch/hermes-agent** v2026.6.5 (Jun 6, 189k stars): single-agent self-improvement, cross-model gateway, TUI, scheduled automations. The most-trending single-agent framework.
+- **RightNow-AI/openfang** v0.6.9 (May 2026, 17.8k stars): Rust "Agent OS" with 14 crates, ~137k LOC. The most-trending "agent OS" project.
+- **aden-hive/hive** v0.11.0 (May 2026): multi-agent harness with dynamic topology generation.
+- **agentscope-ai/HiClaw** v1.1.2 (May 27, 4.7k stars): Kubernetes-native multi-runtime orchestrator (OpenClaw + QwenPaw + Hermes).
+- **AMAP-ML/SkillClaw** (Jun 2026, 1.8k stars): collective skill evolution across Hermes, Codex, Claude Code, OpenClaw, etc. Direct parallel to our `skill_coevolution.py` work.
+- **Lumio-Research/hermes-agent-rs**: Rust rewrite of Hermes Agent (zero dependencies, single binary).
+- **r0b0tlab/hermes-concurrent-agents**: parallel Hermes workers on unified-memory GPUs with SQLite kanban.
+- **huggingface/smolagents** v1.26.0 (May 2026, 27.8k stars): lightweight Python library for code-powered agents. Continues to be the "smallest viable agent" reference.
+- **open-multi-agent/open-multi-agent** v1.6.0 (Jun 6, 6.3k stars): TypeScript-native multi-agent orchestration for Node.js.
+- **open-gitagent/gitagent** v1.4.3 (Apr 22, 525 stars): agent-as-git-repo; identity, rules, memory, tools, skills all version-controlled.
+- **verl-project/uni-agent**: Python framework for 1000+ concurrent agent tasks with the same stack for inference and RL training.
+
+### Build Task: Silent Failure Monitor (PIG Engine + ADE Protocol)
+
+**Motivation**: The Entropy Principle paper (arXiv:2606.08162, Jun 9 2026) is the strongest 2026 statement of an under-acknowledged truth: silent failures in LLM agent systems are *not* bugs to be fixed but inevitable consequences of intrinsic properties of language-based agents. S(t) = S0 · exp(α·t) means system entropy *will* grow unless something at the boundary enforces order. The paper's engineering response is a PIG (Physical Integrity Gate) Engine + ADE (Agent Delivery Engineering) protocol suite. This repo already has a `MetacognitiveMonitor` (self-report) and a `SafetyCircuitBreaker` (per-action gate), but neither is a *boundary* monitor with a measurable entropy substrate. Today's build fills the gap.
+
+The work is intentionally small (~800 LOC): we don't replace the `MetacognitiveMonitor` or the `SafetyCircuitBreaker` — we add a third leg of the stool that integrates with both. The monitor is the agent's *self* report; the circuit breaker is the *per-action* check; the silent-failure monitor is the *rolling-window boundary* monitor. They cross-check each other.
+
+**Key Components** (`core/silent_failure_monitor.py`, ~790 lines):
+
+1. **`SilentFailureType`** — enum of the paper's 5 failure types, each tagged with the lifecycle layer (L1/L2/L3) from §2.2 of the paper
+2. **`FAILURE_TO_PROPERTIES`** — explicit crosswalk from each failure type to the 22 intrinsic properties (P1–P22) that cause it. The crosswalk is the *causal grounding* layer: when a signal is observed, the audit log records both the type and the property IDs the caller claims
+3. **`EntropyConfig`** — per-type `threshold`, `episode_count`, `alpha_cap`, `episode_window_s`. The cap is *operator-controlled* (matching the `BrakePedal` posture from the RSI gate, not auto-tuned)
+4. **`EntropySignal`** — a single timestamped (failure_type, value, metric, source, grounding) indicator. `value` is in [0, 1]; `grounding` is a tuple of property IDs from the paper's 22
+5. **`EntropyObservation`** — substrate of the audit log: signal + decision + rationale + rolling count + rolling alpha
+6. **`FailureEpisode`** — coherence window for a single failure type: opened when the rolling count crosses `episode_count`, closed when the rolling count returns below threshold for the full window
+7. **`PIGEngine`** — the boundary gate. Reads signals, tracks rolling entropy per type, returns a deterministic `PIGDecision` (ALLOW / DAMP / BLOCK / ESCALATE). Channel Fracture is the highest-stakes type (priority 5); Behavior Routing Deficiency is the lowest (priority 1)
+8. **`ADEProtocol`** — the protocol suite: `monotonic_constraint` (peak-alpha invariant), `episode_window` (bounded duration), `evidence_coherence` (grounding matches property map), `cross_type_damping` (highest-priority type wins)
+9. **`SilentFailureMonitor`** — orchestrator. JSONL audit trail on disk, callback hook, batch-observation with `aggregate_decision`. Never mutates the agent; never auto-applies
+
+**Conservative defaults** (per the paper's "fail-loud" framing):
+- Channel Fracture: tightest threshold (0.4), BLOCK on first episode
+- Cognitive Framework Lag / Data Consistency Decay: threshold 0.5–0.6, DAMP → BLOCK → ESCALATE
+- Cross-Session Fragmentation: looser threshold (0.7) — the paper notes this is the slowest to accumulate
+- Behavior Routing Deficiency: threshold 0.5, but lowest priority in cross-type decisions
+- Recovery: a value below threshold resets the escalation counter and closes the episode
+
+**Test Coverage** (`experiments/test_silent_failure_monitor.py`, ~580 lines): all 44 tests pass ✅
+- `TestSilentFailureType` / `TestEntropyConfig` / `TestEntropySignal` — value-object tests (3 + 4 + 2)
+- `TestPIGEngineBasicDecision` — below-threshold ALLOW, above-threshold DAMP, episode BLOCK, sustained ESCALATE (4)
+- `TestPIGEngineChannelFracture` — BLOCK on first episode for the highest-stakes type, quick escalation (2)
+- `TestPIGEngineEpisodeLifecycle` — open, close on recovery, reopen (3)
+- `TestPIGEngineGroundingCoherence` — incoherent grounding prefixes rationale; ADE helper (3)
+- `TestPIGEngineCrossTypeDamping` — ADE cross-type ladder (4)
+- `TestPIGEngineMonotonicConstraint` — ADE monotonic + episode_window (3)
+- `TestEntropyAlphaCapEscalation` — alpha cap is recorded + observed on the second episode (1)
+- `TestFailureEpisodeDuration` — open/closed duration math (3)
+- `TestSilentFailureMonitorAuditTrail` — JSONL persistence, in-memory mode, callback hook (3)
+- `TestSilentFailureMonitorRecent` / `TestSilentFailureMonitorSummary` — recent(n), history_for(t), summary state (5)
+- `TestSilentFailureMonitorIntegration` — observe_batch + aggregate_decision (3)
+- `TestAuditabilityInvariant` — every decision has a rationale; audit file records full state (2)
+
+**Research Synthesis**:
+- The Entropy Principle paper is the *first* paper in 2026 to give a single unifying theory for the 130+ failure modes already documented (MAST, Microsoft AIRT, Token Budgets, Latitude, Pazi, BAGEN, Library Drift, etc.). The paper's five-type taxonomy is the substrate; our monitor is the implementation
+- The PIG Engine's role is the *same role* as the OCL paper (organizational control layer at the execution boundary) and the same role as our existing `SafetyCircuitBreaker` — but for *rolling-window* drift rather than per-action risk. The three form a triad: (a) per-action (`SafetyCircuitBreaker`), (b) rolling-window boundary (this build), (c) agent self-report (`MetacognitiveMonitor`)
+- The 22 intrinsic properties → 5 failure types → 1 PIG decision is a clean compression: we don't need to track 22 properties; we observe 5 types, and the property IDs are in the audit log when the caller wants to do after-the-fact analysis
+- The "alpha cap" framing (per-type cap on entropy rate) is the conservative analog of the Anthropic "brake pedal": the operator sets the cap, the engine enforces it, and the cap is *always* in the audit record
+- The cross-type priority ladder (Channel Fracture > Cognitive Lag > Data Decay > Cross-Session Frag > Behavior Routing) is the macro policy: when multiple types drift at once, the highest-stakes type wins. This matches the paper's framing of "the deepest layer (memory, transmission) matters more than the surface layer (execution)"
+- The monitor's audit trail is JSONL: every signal + decision + rationale is on disk in `<audit_path>/events.jsonl`, matching the pattern of `SkillEvolutionGate` and `SelfReviewQueue` — same substrate, different policies
+- The integration points with the rest of the repo (next priority list) close the loop: the RSI gate (Jun 7) + the SkillEvolutionGate (Jun 9) + this monitor = three orthogonal governance layers, all reading the same evidence substrate
+- The PIG Engine's design choice — "BLOCK on the boundary, never auto-apply" — is the same posture as the `BrakePedal`: the boundary is deterministic, the policy is operator-controlled, the audit trail is on disk
+- The June 10 wave of self-evolution papers (Q-Evolve, Socratic-SWE, OpenSkill, Tree-of-Experience, Parametric Memory) all converge on the same macro pattern that the Entropy Principle paper diagnoses as silent-failure-prone. The monitor is the runtime counterpart to those research advances
+- VESTA, the OCL paper, and Pre-Deployment Assurance are the *eval* and *pre-deployment* counterparts to today's *runtime* build. The full picture is: PIG+ADE = runtime boundary, VESTA = safety eval, OCL = execution boundary, Pre-Deployment Assurance = pre-deployment certification
+- The `core/recusive_self_improvement.py` `BrakePedal` (Jun 7) and this `PIGEngine` are the same operator-controlled-throttle pattern, applied to two different layers: the *self-edit surface* and the *agent-action boundary*. They don't share code on purpose; they share the *posture*
+
+**Files Changed**:
+- `core/silent_failure_monitor.py`: 790 lines (new) — SilentFailureType, FAILURE_TO_PROPERTIES, EntropyConfig, EntropySignal, EntropyObservation, FailureEpisode, PIGEngine, ADEProtocol, SilentFailureMonitor, create_silent_failure_monitor, quick_signal
+- `experiments/test_silent_failure_monitor.py`: 580 lines (new) — 44 tests covering all components + ADE protocol + audit-trail JSONL + cross-type priority ladder + conservative defaults
+- `CURRENT_RESEARCH.md`: this entry
+
+## Next Priority
+
+- **Wire `PIGEngine.evaluate` into `SafetyCircuitBreaker.should_allow`**: every action decision consults the rolling-window monitor for sustained drift; the circuit breaker becomes both per-action and rolling-window
+- **Wire `PIGEngine` into `BaseAgent.run` cycle**: after each EXPLORE/VERIFY/PLAN/EXECUTE/REFLECT step, the agent records an `EntropySignal` from the relevant property (e.g. EXPLORE → Channel Fracture, REFLECT → Cognitive Framework Lag, EXECUTE → Data Consistency Decay)
+- **Cross-monitor calibration cross-check**: feed `MetacognitiveMonitor.calibration_signals()` into `PIGEngine` so the engine knows when the agent's *self-report* says "uncertain" and the rolling alpha says "stable" (or vice versa); the disagreement is itself a signal
+- **Empirical-alpha fit**: a small experiment that fits the α constant from the existing `proposals/` audit trail (the RSI gate has been writing audit files for 1+ week) and exposes `alpha_cap` as a learned parameter rather than a configured one — operator-tunable, not auto-tuned
+- **Pre-deployment assurance bridge**: connect the VESTA / OCL / Pre-Deployment Assurance *eval* systems to the PIG Engine so the engine's decision is informed by the agent's pre-deployment certification; a certified agent gets a wider alpha cap
+- **`observe_batch` integration with `MultiAgent.disseminate`**: when the MultiAgent module passes a message between agents, both the sender and the receiver emit a Channel Fracture signal; the monitor's cross-type damping picks the highest priority
+- **LatticeAI-style dashboard**: a `python -m core.silent_failure_monitor --summary` CLI that prints the monitor state in color, and a `python -m core.silent_failure_monitor --audit --last 20` filter for the operator's morning review
+- **Adversarial entropy injection experiment**: 20 episodes that try to (a) lie about `grounding` to bypass the ADE evidence_coherence check, (b) inflate `value` past the threshold and immediately recover to avoid the rolling window, (c) split a single failure across multiple types to defeat the cross-type damping. Confirm the conservative posture holds
+
+---
+
+*Last updated: 2026-06-10 by AGI Research & Build Agent*
