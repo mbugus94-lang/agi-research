@@ -647,3 +647,131 @@ The work is intentionally small (~800 LOC): we don't replace the `MetacognitiveM
 ---
 
 *Last updated: 2026-06-10 by AGI Research & Build Agent*
+## Research Summary (June 11-12, 2026)
+
+### Industry News & Breakthroughs
+
+- **Three-Ring Architecture: Governing Agents in the Era of On-Platform Organisations** (arXiv:2606.07119, Alvarez-Telena & Diez-Fernandez, Jun 5 2026) ⭐ BUILDS ON THIS
+  - Central claim: organisations are acquiring agentic capability without the infrastructure to govern it. Expected to reproduce the 95% GenAI pilot-failure rate. Ring 1 = production (substrate), Ring 2 = M2 federation (strategies-based, deterministic, traceable), Ring 3 = LLM-based frontier intelligence (non-deterministic, propagating, non-traceable)
+  - The strongest single sentence: "every improvement in LLM capability is a structural tailwind for this architecture. More capable non-deterministic actors produce larger consequences when they deviate. The governance requirement scales with capability."
+  - The federation layer is the *OS* of the agentic enterprise — resource abstraction, process coordination, permission enforcement
+  - Direct lineage from the org's Q2 2026 enterprise data (89% obs / 52% evals, MIT 95% pilot failure) and the OWASP GenAI Security Project's "State of Agentic AI Security and Governance" (Jun 3 2026)
+
+- **Autonomous Incident Resolution at Hyperscale (arXiv:2606.09122, Jun 8 2026)** — production-deployed multi-agent framework; >90% autonomous resolution; layered authorization + rollback; structured knowledge from runbooks; closed-loop verification. The runtime case for a permission-bounded federation layer
+
+- **Microsoft Build 2026 follow-on (Jun 5-7) — Microsoft Execution Container (MXC) and MAI-Thinking-1**
+  - MXC: kernel-level execution containers for agent containment; the OS-level cousin of our Ring 2 permission gate
+  - MAI-Thinking-1: first-party reasoning model, Microsoft decoupling from OpenAI for the model tier
+  - Pairs with MDASH multi-agent vulnerability research — the security/eval side of the Three-Ring story
+  - Azure Agent Mesh is a federated control plane that *literally routes* agent workloads across Windows, Windows 365, and Azure Arc — same shape as our Three-Ring governor, scaled to enterprise
+
+- **OWASP "State of Agentic AI Security and Governance" (Jun 3 2026)** — security maturity model for multi-agent systems; closes the gap between shipped agents and shipped governance. Borrows Meta's "Rule of two" (an agent should satisfy no more than two of three risky properties in a session without human approval)
+
+- **Vigil — Help Without Being Asked (arXiv:2604.09579)** — deployed proactive on-call agent at Volcano Engine (ByteDance); continuous self-improvement from human-resolved incidents. The deployed case for SkillEvolutionGate + evidence-ledger integration
+
+- **OpenAI files for IPO (Jun 9 2026)** — the AGI mission explicitly stated in the S-1; OpenAI now competing with Anthropic for the personal-agent super-app
+
+- **OpenAI + Visa agentic commerce (Jun 10 2026)** — Visa Intelligent Commerce rails inside ChatGPT; the first "AI agents buy things" production deployment; permission scope (DELEGATE + BROAD) becomes literal money
+
+### Key arXiv / OpenReview Papers (Past 2 Weeks)
+
+- **Three-Ring Architecture (arXiv:2606.07119)** ⭐ BUILDS ON THIS — federation vs. frontier ring split, permission bounds, capability tailwind
+- **Autonomous Incident Resolution at Hyperscale (arXiv:2606.09122)** — production-deployed case for the Three-Ring approach
+- **AOI (arXiv:2603.03378)** — Observer-Probe-Executor runtime with read-write separation; >24pp gain on AIOpsLab; Trajectory-Corrective Evolver converts 37 failed trajectories into training signals. The closest empirical cousin to our Ring 2 (R2) read/write/execute permission bound
+- **Vigil (arXiv:2604.09579)** — proactive on-call agent with continuous self-improvement
+- **Memory-as-Governance: PROJECTMEM (arXiv:2606.12329)** — local-first event-sourced memory with a deterministic pre-action gate that warns an agent before repeating a failed fix. The pre-action gate is exactly our `classify_risk` + safety circuit breaker
+- **VESTA — safety eval framework (Jun 2026)** — pre-deployment assurance, the *eval* side of the runtime
+- **OCL — Organizational Control Layer (arXiv:2606.04306)** — governance infrastructure at the execution boundary; same shape as our Ring 2 permission gate
+
+### Trending Open-Source Repos (multi-agent + governance)
+
+- **microsoft/agent-framework v1.10.0 (Jun 10 2026, 15k+ stars, MIT)** — production-grade multi-agent framework with graph orchestration, checkpointing, streaming, HITL, time-travel. Microsoft / .NET
+- **crewAIInc/crewAI v1.14.7 (Jun 11 2026)** — standalone Python multi-agent framework; crews + flows
+- **dapr/dapr-agents v1.0.4 (Jun 11 2026)** — Dapr-based durable multi-agent; virtual actors, pub/sub, AIOps-friendly
+- **open-multi-agent/open-multi-agent v1.6.0 (Jun 6 2026)** — TypeScript goal-first multi-agent; auto-parallelizes via runtime DAG
+- **idea-idsia/ant-ai v1.4.0 (Jun 4 2026)** — Python multi-agent with A2A protocol, lifecycle hooks, MCP, Langfuse
+- **sontianye/nexus** — Python multi-agent with graph + router + adaptive modes; 100+ LLM providers via LiteLLM
+- **adenhq/hive v0.11.0 (May 2026)** — production-grade multi-agent harness; session isolation, checkpoint recovery, audit trails
+- **EvoMap/awesome-agent-evolution** — curated list of self-evolving agents and memory substrates
+
+## Build Task: Three-Ring Architecture (Alvarez-Telena & Diez-Fernandez, arXiv:2606.07119)
+
+**Status**: ✅ COMPLETE - 66/66 tests pass (module was sitting uncommitted on disk; this run picked it up and committed it)
+
+**Motivation**: The Three-Ring Architecture paper is the most concrete 2026 statement of the missing layer between the LLM and the production system. It frames the problem as a 95% project-failure rate (matching MIT's GenAI pilot stat) and proposes a three-layer governance infrastructure: Ring 1 is the existing production architecture (informational), Ring 2 is the M2 federation layer (deterministic, strategies-based, traceable, recoverable), Ring 3 is the LLM-based frontier intelligence layer (non-deterministic, propagating, non-traceable). The paper's strongest claim is *structural*: "every improvement in LLM capability is a structural tailwind for this architecture. More capable non-deterministic actors produce larger consequences when they deviate. The governance requirement scales with capability." Our repo already has the per-action gate (SafetyCircuitBreaker), the rolling-window boundary monitor (PIGEngine / silent_failure_monitor), and the self-report (MetacognitiveMonitor). The Three-Ring governor is the fourth leg: it routes requests through Ring 2 first, only escalates to Ring 3 when Ring 2 flags the request as needing frontier intelligence.
+
+**Key Components** (`core/three_ring_architecture.py`, 1138 lines):
+
+1. **`RingLayer`** (str-enum) — `PRODUCTION` / `FEDERATION` / `FRONTIER`. str-mixins so `RingLayer.FEDERATION == "ring_2_federation"`
+2. **`RiskProfile`** — the paper's two-categorical distinction: `DETERMINISTIC` (R2, traceable) / `NON_DETERMINISTIC` (R3, propagating) / `INFORMATIONAL` (R1, substrate). Crosswalked from ring in `RING_TO_RISK`
+3. **`PermissionScope`** — `READ` / `WRITE` / `EXECUTE` / `DELEGATE` / `BROAD`. Ring 2 default is (READ, WRITE, EXECUTE); Ring 3 default is (READ, WRITE, EXECUTE, DELEGATE, BROAD). R2 is a strict subset of R3
+4. **`CostClass`** — `LOW` (≤1¢) / `MEDIUM` (≤10¢) / `HIGH` (≤$1) / `CRITICAL` (>$1 / cross-system blast). The cost-weighting substrate for the capability-tailwind metric
+5. **`AgentDescriptor`** — small, deterministic descriptor of a single agent: name, ring, capabilities, permissions, cost class, deterministic flag, registered_at. `to_dict` / `from_dict` for audit trail round-tripping
+6. **`RoutingDecision`** — traceable, audit-logged answer to a routing request. Carries request_id, ring, agent_id, needs_frontier, rationale, capability_required, permission_used, cost_class, timestamp, tailwind_pressure, previous_decision_id. The decision is *never* re-routed silently — re-routing is a fresh decision
+7. **`StrategyPlan`** — Ring-2 plan: a sequence of (agent_id, capability) tuples. `needs_frontier=True` is the explicit escalation signal; the plan must carry a `frontier_capability` when it escalates
+8. **`FederationLayer`** (Ring 2) — registry of strategies-based agents. Registration is strict: rejects non-Ring-2 agents, rejects non-deterministic agents. `plan(request_id, request, required_capability)` runs a planner_fn (default: capability match → text-match → escalate) and returns a `StrategyPlan`. Plans are stored and retrievable via `plan_for(request_id)`
+9. **`FrontierLayer`** (Ring 3) — registry of LLM-actor descriptors. Symmetric strict registration: rejects R2/deterministic agents. `record_invocation(agent_id, cost_class, succeeded)` accumulates tailwind pressure with per-cost-class weights (LOW=1, MEDIUM=3, HIGH=10, CRITICAL=30); success does *not* increment. `invocations(n)` returns the rolling history; filterable by `agent_id`
+10. **`CapabilityTailwind`** — descriptive analytical view. `r3_escalation_rate`, `r3_cost_distribution`, `r3_failure_rate`, `summary()`. The `recommendation()` string surfaces one of: HIGH_ESCALATION (>50% of recent R3), HIGH_CRITICAL_COST (any recent R3 was CRITICAL), HIGH_FAILURE_RATE (>30% of recent R3 failed), or OK. The recommendation is the *operator-visible* expression of the paper's "governance scales with capability" claim
+11. **`ThreeRingGovernor`** — orchestrator. `route(request, required_capability, request_id, permission)` always asks R2 first; if R2 returns `needs_frontier=True`, consults R3; if R3 has no matching agent, refuses to route and records the refusal. Picks the *lowest-cost* R3 candidate when multiple match. `_record(decision)` appends to the in-memory deque and persists to `<audit_path>/routing.jsonl`. `record_frontier_outcome(decision, succeeded)` updates the frontier tailwind *without* mutating the original decision (the decision and its outcome are two halves of the same event)
+12. **Convenience constructors** — `create_three_ring_governor(audit_path)`, `make_ring2_agent(name, capabilities, permissions, cost_class)`, `make_ring3_agent(name, capabilities, permissions, cost_class)`. Default R2 cost class is LOW; default R3 is MEDIUM (the conservative posture: don't default to HIGH/CRITICAL)
+
+**Conservative posture (the paper's macro invariants, baked in)**:
+- Ring 2 always plans first. R2's plan is recorded even when R3 ultimately handles the request (so the audit trail always shows the R2 escalation path)
+- Ring 3 is *never* a free pass. Every R3 call passes through R2's permission gate (the planner returns `needs_frontier=True` and the R2 plan is stored)
+- The governor never auto-escalates from R2 to R3; the routing decision is logged with a rationale the operator can audit
+- The lowest-cost R3 candidate is preferred when multiple match (conservative on cost, conservative on consequence)
+- An empty R2 plan refuses to route (refusal is logged with the rationale "R2 plan is empty; refusing to route")
+- A deregistered agent between plan-and-route is a race that refuses to route ("no longer registered; refusing to route")
+- An R3 capability that no frontier agent has is a refusal ("no R3 agent matches; refusing to route")
+- The `RoutingDecision` is immutable after `_record`; `record_frontier_outcome` writes a tailwind update *without* mutating the decision
+
+**Audit trail**: every routing decision is persisted to `<audit_path>/routing.jsonl` (one JSON object per line). The `summary()` method returns ring_2_routes, ring_3_routes, federation_size, frontier_size, tailwind_pressure, and audit_path. The audit trail is the substrate for after-the-fact review
+
+**Test Coverage** (`experiments/test_three_ring_architecture.py`, 748 lines): all 66 tests pass ✅
+- `TestRingLayer` / `TestRiskProfile` / `TestCostClass` — value-object tests (3 + 1 + 1 = 5)
+- `TestPermissionScope` — R2 default is bounded, R3 is broader, R2 is a strict subset of R3 (3)
+- `TestAgentDescriptor` — construction, empty-capabilities rejection, dict round-trip, registered_at (4)
+- `TestFederationLayer` — empty, register, reject R3, reject non-deterministic, deregister, find_by_capability, plan with R2 match, plan with explicit capability, plan escalation, custom planner, plan_for retrieval, planner type-check (12)
+- `TestFrontierLayer` — empty, register, reject R2, reject deterministic, deregister, find_by_capability, tailwind starts at zero, failure increments with cost weighting, cost weight table, invocations history, invocations filter by agent (11)
+- `TestThreeRingGovernor` — construction, route R2 match, route R3 when no R2 match, route R3 picks lowest cost, route R3 refuses when no match, empty federation refuses, race deregistered agent, records decision in log, record_frontier_outcome, ignores R2 outcomes, audit trail persists to disk, summary includes all substrate (12)
+- `TestRoutingDecision` — to_dict / from_dict round-trip (1)
+- `TestStrategyPlan` — basic plan, needs_frontier requires capability (2)
+- `TestCapabilityTailwind` — empty summary, recording R3 increments, high escalation, high critical cost, high failure, mixed routes (6)
+- `TestConvenienceConstructors` — make_ring2_agent defaults, make_ring3_agent defaults, usable with governor (3)
+- `TestConservativePosture` — R2 cannot be in frontier, R3 cannot be in federation, default prefers R2, R3 only when R2 can't, failure increases tailwind but not routes, decision is immutable, governor never calls R3 without R2 planning (7)
+
+**Research Synthesis**:
+- The Three-Ring paper is the *macro* frame; our existing SafetyCircuitBreaker, PIGEngine, and MetacognitiveMonitor are the *micro* legs of the stool. The governor is the *router* that sits in front of them: it does not replace them, it routes requests to the right ring
+- The Ring 2 / Ring 3 risk distinction maps cleanly onto the permission scope: R2 has bounded scope (READ + WRITE + EXECUTE), R3 has wider scope (plus DELEGATE + BROAD). The wider scope is the *operator-visible* expression of the paper's "more capable non-deterministic actors produce larger consequences when they deviate" claim
+- The capability-tailwind metric is descriptive, not predictive. It records what the governor *observes* (escalation rate, R3 cost distribution, R3 failure rate) and surfaces a `recommendation` string. The paper's claim is structural; the metric is the structural-substrate that lets the operator verify the claim after the fact
+- The "R2 plans first, R3 only on escalation" conservative posture is the same posture as our `BrakePedal` (RSI gate, Jun 7): the boundary is deterministic, the policy is operator-controlled, the audit trail is on disk
+- The `RoutingDecision`'s immutability after `_record` mirrors the `PIGDecision`'s immutability and the `RSIDecision`'s immutability. The audit substrate is *append-only*; the audit trail is the system of record
+- The lowest-cost R3 candidate selection is the conservative analog of the `CostClass` weighting in the PIG engine. Both policies say: when in doubt, pick the cheap one
+- The federation layer's strict registration (rejecting R3 in R2, rejecting non-deterministic in R2) is the same posture as `classify_risk` promoting any proposal that touches the self surface to CRITICAL. The substrate protects itself
+- The `RoutingDecision.previous_decision_id` field is the substrate for re-routing chains: a re-routing is *never* a silent edit, it's a new decision with the old one's ID. This is the same pattern as the proposal-from-improvement-proposal bridge in the RSI gate
+- The `create_three_ring_governor(audit_path)` factory is the smallest viable install: federation, frontier, governor, tailwind — four objects, one line. Every other repo's multi-agent framework (CrewAI, dapr-agents, Nexus) starts at 10-100x the size because they conflate the *routing* with the *execution*. The governor is *only* routing; execution is the agents' job
+- The 66 tests are intentionally small: each one verifies a single conservative-posture invariant. The conservative posture is the macro invariant; the tests are the micro expressions of that invariant
+- The audit-trail JSONL mirrors the pattern of `SkillEvolutionGate` (Jun 9), `SelfReviewQueue` (Jun 9), `SilentFailureMonitor` (Jun 10), and `RSIController` (Jun 7). The substrate is the same: append-only, on-disk, auditable
+- The whole module is ~1138 lines: small enough to read in one sitting, large enough to be non-trivial. This matches the EvoMaster / SkillsVote "small, focused, working" discipline
+
+**Files Changed**:
+- `core/three_ring_architecture.py`: 1138 lines (new) — RingLayer, RiskProfile, PermissionScope, CostClass, AgentDescriptor, RoutingDecision, StrategyPlan, FederationLayer, FrontierLayer, CapabilityTailwind, ThreeRingGovernor, create_three_ring_governor, make_ring2_agent, make_ring3_agent
+- `experiments/test_three_ring_architecture.py`: 748 lines (new) — 66 tests across 11 test classes covering all components + the conservative-posture invariants
+- `core/__init__.py`: 17 new public exports for the Three-Ring module
+- `CURRENT_RESEARCH.md`: this entry
+- `AGENTS.md`: build log entry
+
+## Next Priority
+
+- **Wire `ThreeRingGovernor` into `BaseAgent.run`**: replace the implicit "call LLM" path with an explicit `gov.route(task, required_capability)` call. The agent gets a `RoutingDecision` back; the agent's actual `llm_client` call is gated by `decision.ring == RingLayer.FRONTIER` (i.e. R3 is the only place the LLM is invoked directly; R2 calls are deterministic strategies)
+- **Wire `CapabilityTailwind` into `MetacognitiveMonitor.assess_current_state`**: when the tailwind's `recommendation()` returns HIGH_ESCALATION, HIGH_CRITICAL_COST, or HIGH_FAILURE_RATE, the metacog monitor's `should_escalate` flips to True. The cross-check surfaces the operator-visible structural signal in the agent's self-report
+- **Wire `ThreeRingGovernor` into the `RSIProposal` risk classifier**: a proposal that targets `core/three_ring_architecture.py` is added to the explicit self-surface list (it is now part of the substrate)
+- **CLI / dashboard for the routing decisions**: `python -m core.three_ring_architecture --review` shows the last N routing decisions, the tailwind pressure, and the audit-path JSONL line count
+- **Registry bridge to `AgentPool.register_agent`**: when an agent is registered in the federation layer, also register it in the multi-agent `AgentPool` so the governor's R2 routing can be used by the multi-agent orchestrator's `execute()` path
+- **Adversarial test pass**: 20 routing attempts that try to (a) escalate to R3 with an empty R2 plan, (b) mutate a recorded RoutingDecision, (c) register a deterministic agent in R3, (d) force the governor to prefer a higher-cost R3 agent when a lower-cost R3 is available. Confirm the conservative posture holds
+- **Permission-scope enforcement at the tool layer**: a `RingPermissionEnforcer` that wraps a tool invocation and refuses to execute it if the agent's `permissions` do not include the `permission` the governor recorded. Closes the loop between routing and execution
+- **Capability-tailwind cross-feed to `SilentFailureMonitor`**: when the tailwind's `r3_failure_rate` crosses 30%, the monitor's `PIGEngine` raises the alpha cap on `DATA_CONSISTENCY_DECAY` (the failure type that captures cross-agent fidelity loss). The structural signal flows into the rolling-window boundary
+
+---
+
+*Last updated: 2026-06-12 by AGI Research & Build Agent*
