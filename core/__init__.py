@@ -87,6 +87,15 @@ from .proof_carrying_action import (
     create_pca_bridge,
     digest_certificate,
 )
+from .governed_action_loop import (
+    ACTION_TYPE_TO_CATEGORY,
+    CrossCheckOutcome,
+    CrossCheckReport,
+    GovernedActionLoop,
+    GovernedActionRequest,
+    RISK_TO_ENFORCEABILITY,
+    create_governed_loop,
+)
 
 __all__ = [
     "BaseAgent",
@@ -167,4 +176,12 @@ __all__ = [
     "canonical_hash",
     "create_pca_bridge",
     "digest_certificate",
+    # Governed Action Loop (PCA + Breaker + Ledger + Three-Ring bridge)
+    "ACTION_TYPE_TO_CATEGORY",
+    "RISK_TO_ENFORCEABILITY",
+    "CrossCheckOutcome",
+    "CrossCheckReport",
+    "GovernedActionLoop",
+    "GovernedActionRequest",
+    "create_governed_loop",
 ]

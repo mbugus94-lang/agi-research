@@ -5148,3 +5148,123 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
    - `implement_amendment()` - Apply approved changes with human gate
    - Auto-approval for cosmetic changes
    - Rejection if any model
+### 2026-06-14 - Scheduled Run: Governed Action Loop (PCA + Breaker + Ledger + Three-Ring bridge)
+**Status**: ✅ COMPLETE - 48/48 tests passed (incremental build on the PCA bridge from 2026-06-13)
+
+**Research Summary (June 13-14, 2026)**:
+
+**Industry News**:
+- **Anthropic Claude Fable 5 / Mythos tier launch (Jun 9, 2026)**: scored 80.3% on SWE-bench Pro; Stripe used it to migrate a 50-million-line codebase in a day. The Mythos model is the first publicly available model from the safety tier — same architecture as Fable 5, marketed as safe enough for production
+- **OpenAI + Visa Intelligent Commerce (Jun 10, 2026)**: AI agents can now make purchases through ChatGPT. Permission scope (DELEGATE + BROAD) becomes literal money. The "enforceability class" idea in the bridge maps directly onto this — DELEGATE money is REQUIRE_HUMAN
+- **JPMorgan Chase "long-horizon agents" (Jun 9, 2026)**: planning to deploy AI agents that "operate autonomously for hours" later in 2026. The agentic-AI-at-scale story needs the runtime governance the bridge + governed loop provide
+- **OpenAI files for IPO (Jun 9, 2026)**: S-1 explicitly states AGI mission; CEO Altman + Chief Scientist Pachocki published "third phase" blog post (research → products → abundance)
+- **OpenAI acquires Ona (Jun 13, 2026)**: a German startup that "keeps software agents working in a secure cloud after the developer logs off". Folds into Codex. Direct echo of the governed-execution substrate
+- **MIT "Self-Revising Discovery Systems" (May 31, 2026)**: formal framework using left Kan extensions to validate transitions between reasoning regimes. The "agent that rewrites its own reasoning structure" pattern; re-emphasises the need for a substrate that polices self-edits
+- **OpenAI Tokenpocalypse (Jun 1, 2026)**: GitHub Copilot switched to token-based billing; bills jumping 25x. Signals end of VC-subsidized AI compute; cost-aware routing matters more
+- **Microsoft open-source hack (Jun 8, 2026)**: 70+ Microsoft projects on GitHub compromised; password-stealing malware injected. A reminder that the agent's tool surface is also an attack surface; governance must extend to *what* the agent's code runs against
+
+**Key arXiv / OpenReview Papers**:
+- **SperaxOS open-sourced (Jun 11, 2026)** — AI agent workspace for DeFi; seven years of on-chain financial infrastructure. The "open-source governed agent" pattern; an example of the EnforceabilityClass + Bridge concept at production scale
+- **Microsoft autogen AIP-1 spec draft (Issue #7724)** — cross-framework task marketplace; AIGEN surface for cross-framework discovery. Standardises the bridge's "approval receipt" across frameworks
+- **TeamOlimpo (alpha, Jun 2026)** — MCP-native meta-orchestrator with structured handoff protocol (11 types, 4 statuses). The "auditable handoff" pattern; same posture as our IEEC chain
+- **fruit-orchestra (May 28, 2026)** — middleware memory layer with shared/private/broadcast scopes; ChromaDB + SQLite. Same direction as our `tiered_memory` module
+- **AgentX v0.4.x (Jun 2026)** — declarative YAML + Python agent framework with optional LangGraph integration. 153 tests. Reinforces the "small, focused, working" discipline
+
+**Trending Open-Source Repos (this week)**:
+- SperaxOS (Jun 11 2026) — DeFi agent workspace, full public launch
+- autogen AIP-1 (Jun 12 2026) — cross-framework discovery spec draft
+- TeamOlimpo (Jun 2026) — MCP-native multi-agent meta-orchestrator
+- fruit-orchestra (May 28 2026) — multi-agent memory middleware
+- AgentX v0.4.x (Jun 2026) — declarative YAML + Python agent framework
+- microsoft/agent-governance-toolkit v4.0.0 (Jun 4 2026) — TEE keystore, Entra-signed JWT, wire-protocol policy eval
+
+**Build Task: Governed Action Loop (wires the four runtime-governance substrates into one cross-check pipeline)**
+
+**Motivation**: The 2026-06-13 PCA bridge (ProofCarryingActionBridge) is structurally sound, but it operates in isolation. The other three governance substrates that exist in the repo — `SafetyCircuitBreaker` (per-action policy + approval), `EvidenceLedger` (claim/evidence substrate for the gate), and `ThreeRingGovernor` (Ring 2/3 routing) — were built in different sprints (Apr–Jun) and have never been wired together. Today's industry news (Anthropic Mythos, OpenAI-Visa, JPMorgan long-horizon, Ona acquisition) makes the case sharper than ever: the runtime governance is *the* missing layer between the LLM and the production system. The PCA bridge by itself has a structural gate; the governed loop adds the *cross-check* — the bridge's verdict is cross-examined by the other three substrates, and a held certificate is the *normal* state, not the exception.
+
+**Key Components**:
+
+1. **`CrossCheckOutcome`** (str-enum) — `ALLOW` / `HOLD_PENDING_HUMAN` / `HOLD_PENDING_EVIDENCE` / `HOLD_PENDING_RING` / `REJECT`. Five outcomes; conservative posture: "held" is normal, "allow" requires all four substrates to agree.
+
+2. **`RISK_TO_ENFORCEABILITY`** — `RiskLevel` → `EnforceabilityClass` mapping. LOW → POLICY_ONLY; MEDIUM → REQUIRE_BRIDGE; HIGH/CRITICAL → REQUIRE_HUMAN. The breaker can promote the bridge's enforceability but never demote.
+
+3. **`ACTION_TYPE_TO_CATEGORY`** — `action_type` string → `ActionCategory` enum. Default for unknown types is `EXECUTE` (conservative). Covers all 18 action types used in the bridge's `HUMAN_GATED_ACTION_TYPES` and `COST_HEAVY_ACTION_TYPES` sets.
+
+4. **`_enforceability_rank(ec)`** — ordinal: AUTO(0) < POLICY_ONLY(1) < REQUIRE_BRIDGE(2) < REQUIRE_HUMAN(3). Used so the cross-check can compare enforceability classes without ordering semantics bleeding into the enum itself.
+
+5. **`CrossCheckReport`** — descriptive view of the cross-check: outcome, bridge_decision, breaker_risk, ledger tallies, routing ring/agent, enforceability, rationale, detail. `to_dict()` round-trips through JSON for the audit trail.
+
+6. **`GovernedActionRequest`** — typed request: action_id, action_type, parameters, agent_id, ring_layer, externality, claim_ids, target, description, required_capability, permission. Mirrors the structure of a SARC Pre-Action Gate payload.
+
+7. **`GovernedActionLoop`** — orchestrator. `propose(request)` runs the four-substrate cross-check, attaches the report to the certificate as a new ASSUMPTION_CAPTURE detail (no double-checkpoint), and returns `(cert, verdict, report)`. The cert is now ADMISSIBLE, PENDING_APPROVAL (held by the cross-check), or REJECTED. The cross-check is a *promoter*: it can REJECT, HOLD, or accept; it never demotes a REJECTED verdict.
+
+8. **`_cross_check(cert, verdict, request)`** — the four-step pipeline:
+   - **Step 1**: bridge structural gates. If the bridge says REJECTED, the cross-check stops and returns REJECT.
+   - **Step 2**: `breaker.assess_risk(category, target, description, parameters)`. CRITICAL → HOLD_PENDING_HUMAN. HIGH/MEDIUM/LOW → promote enforceability.
+   - **Step 3**: `ledger.verify()` for each supplied claim_id. CONTRADICTED → REJECT. DISPUTED → HOLD_PENDING_EVIDENCE. SUPPORTED < supplied → HOLD_PENDING_EVIDENCE.
+   - **Step 4**: `three_ring.route()` for R2/R3 proposals. Refused route → HOLD_PENDING_RING. Successful route → record in `approval.detail['three_ring']`.
+
+9. **`execute(certificate_id, target, description)`** — the ONLY sanctioned path to `bridge.execute()`. Wraps the executor in a try/except, records the outcome into the breaker's audit trail + stats, and returns the closed certificate. The breaker is read-only at this point — we record, we do not re-gate.
+
+10. **`certify_and_execute(request, executor, approver)`** — convenience wrapper. Propose → approve (if needed) → execute. If `approver=None` and the cross-check holds the action, returns early with a PENDING_APPROVAL cert. The executor is registered for the duration of the call and stashed/restored to keep the bridge clean.
+
+11. **`_check_ledger(claim_ids)`** — verifies each claim via `ledger.verify()` and tallies statuses (supported, disputed, contradicted, ungrounded, expired). Empty input is a no-op (the bridge + breaker are the only gates when no evidence is supplied).
+
+12. **`_record_from_cert(cert, target, description, risk)`** — builds a `SafetyCircuitBreaker.OperationRecord` from a closed cert. The record's `operation_id` matches the cert's id so the operator can cross-reference.
+
+13. **`create_governed_loop(audit_path, three_ring)`** — smallest viable install: 1 line. Returns a `GovernedActionLoop` with the four default substrates.
+
+**Conservative posture (the four-substrate invariants)**:
+- The cross-check is a *promoter* — it can REJECT, HOLD, or accept; it never demotes a REJECTED verdict
+- The breaker can promote the enforceability class but never demote
+- The ledger can only ADJUST a verdict's rationale; it can never approve an action the bridge has REJECTED
+- The three-ring governor is consulted for *every* R2/R3 proposal; the result is recorded in the cert's approval detail
+- An R3 refusal is *not* a PCA REJECTED — it is a "no available R3 agent" note and the operator decides
+- The executor wrapper is the *only* sanctioned path to `bridge.execute()`. Bypassing it is the substrate for the Self-Honesty Check
+- The IEEC chain is unchanged (the loop just adds a new ASSUMPTION_CAPTURE detail; no new checkpoint is added)
+- The audit trail is unchanged (the breaker's `operation_history` is the substrate; the loop just appends)
+
+**Test Coverage**: 48/48 tests pass ✅
+- TestCrossCheckOutcome (4) — enum values, count, str-mixin, report serialization
+- TestRiskMapping (4) — RiskLevel → EnforceabilityClass for LOW/MEDIUM/HIGH/CRITICAL
+- TestActionTypeMapping (4) — read/write/delete/self_modify mappings + default
+- TestEnforceabilityRank (4) — ordinal comparison, strictly increasing
+- TestLedgerCheck (5) — empty input, supported/disputed/contradicted tallies, mixed
+- TestBridgeOnly (4) — bridge REJECT short-circuits the other substrates
+- TestBreakerPromotion (4) — CRITICAL holds; HIGH/MEDIUM/LOW promotion path
+- TestLedgerHardHold (5) — CONTRADICTED rejects, DISPUTED holds, SUPPORTED allows
+- TestThreeRingHold (3) — R3 refusal held, R2 match allowed, no three_ring skipped
+- TestIntegration (4) — end-to-end propose + approve + execute, hold blocks execute, certify_and_execute auto-approve, certify_and_execute held without approver
+- TestAuditAndSummary (3) — reports history, summary shape, outcome tally
+- TestConvenience (4) — create_governed_loop with minimum/audit/three_ring, record_from_cert
+
+**Research Synthesis**:
+- The PCA bridge (2026-06-13) is the *envelope*; the governed loop is the *cross-check*. Together they are the runtime-governance tripod: per-action gate (breaker) + per-claim substrate (ledger) + per-request router (three-ring) + per-action envelope (PCA) = *one* auditable pipeline
+- The cross-check is a *promoter*, not a *decider*. The bridge's structural gates are the floor; the breaker/ledger/three-ring add weight. This is the same posture as the RSI gate (2026-06-07) — "promote never demote"
+- The four-substrate pattern mirrors SARC's Pre-Action Gate / Action-Time Monitor / Post-Action Auditor / Escalation Router. The bridge's `propose()` is the Pre-Action Gate; the cross-check is the Escalation Router; `execute()` is the Action-Time Monitor; `record_outcome()` is the Post-Action Auditor
+- The OpenAI + Visa "agent can spend money" announcement is the *use case*: the bridge's REQUIRE_HUMAN for `send_money` *plus* the breaker's CRITICAL for `production_drop_table` *plus* the ledger's REQUIRED_SUPPORTED for the transfer claim *plus* the three-ring's NO_R3_ROUTE = HOLD_PENDING_HUMAN. The operator sees *all four* signals in `cross_check.report`
+- The "JPMorgan long-horizon agent" story needs the governed loop: an agent running for hours needs a substrate that prevents silent drift, surfaces held actions, and audits every step. The IEEC chain is the substrate; the cross-check is the regulator
+- The Ona acquisition ("agent runs in customer's cloud, keeps working after the developer logs off") is the *deployment target*. The governed loop is the "what runs in the customer's cloud" part — the audit trail is portable, the executor is sandboxed, the breaker is the operator's last line of defense
+- The Anthropic Mythos / Fable 5 launch ("safe enough for production") is the *model posture*. The governed loop is the *runtime posture*: even with a safe model, the runtime must hold actions whose evidence is ungrounded
+- The Tokenpocalypse (Copilot token billing) is the *cost* signal. The governed loop's RISK_TO_ENFORCEABILITY mapping (LOW → POLICY_ONLY) is the conservative cost-aware routing — a LOW-risk action doesn't need a heavyweight LLM call to approve it
+- The Microsoft open-source hack is the *security* signal. The governed loop's `execute()` is the *only* sanctioned path to `bridge.execute()`; the executor is the boundary. Bypassing it is the substrate for the Self-Honesty Check
+- The 48 tests are intentionally small: each one verifies a single conservative-posture invariant. The full test runs in <1 second
+- The module is ~785 lines: small enough to read in one sitting, large enough to be non-trivial. Matches EvoMaster / SkillsVote / Three-Ring "small, focused, working" discipline
+- The cross-check report attaches to the bridge's existing ASSUMPTION_CAPTURE checkpoint's `detail` rather than adding a new checkpoint — the IEEC step count stays bounded, the audit trail is human-readable
+
+**Files Changed**:
+- `core/governed_action_loop.py`: 785 lines (new) — CrossCheckOutcome, CrossCheckReport, GovernedActionLoop, GovernedActionRequest, RISK_TO_ENFORCEABILITY, ACTION_TYPE_TO_CATEGORY, _enforceability_rank, _record_from_cert, create_governed_loop
+- `experiments/test_governed_action_loop.py`: 740 lines (new) — 48 tests across 12 test classes
+- `core/__init__.py`: 7 new public exports + import block
+- `CURRENT_RESEARCH.md`: this build log entry
+- `AGENTS.md`: this build log entry
+
+**Next Priority**:
+- **Wire `GovernedActionLoop.certify_and_execute()` into `BaseAgent.run`**: replace the agent's implicit `tool.invoke()` path with explicit `loop.certify_and_execute(request, executor)`. The tool is wrapped in a `CertifyingExecutor` that creates the request from the tool's metadata
+- **IEEC chain → MetacognitiveMonitor cross-feed**: every held certificate raises the monitor's `ungrounded_rate`; the next `assess_current_state()` call reflects the held rate
+- **`CapabilityTailwind` → GovernedActionLoop cross-feed**: the tailwind's `r3_failure_rate > 30%` promotes the loop's default `require_human_for_ring3` to True, even if the bridge defaults to False
+- **Adversarial test pass**: 30 cross-checks that try to (a) skip the breaker, (b) approve with a CONTRADICTED claim, (c) hold a CRITICAL action that has a SUPPORTED claim, (d) reuse a closed cert. Confirm the conservative posture holds
+- **Cross-process replay**: a `replay.py` CLI that reads `ieec.jsonl` + the breaker's `operation_history` + the ledger's audit trail + the three-ring's `routing.jsonl` and re-validates the whole pipeline; useful for an external auditor that should not trust the in-process cross-check
+- **LLM-backed risk assessment**: keep the breaker's heuristic `assess_risk()` as the *floor*; use a small LLM prompt to *suggest* a risk level for borderline cases, with the breaker requiring the human to over-ride
+- **`_record_from_cert` → EvidenceLedger** dual-write: every closed cert's outcome becomes a SUPPORTED evidence edge on a "this action succeeded" claim; the next time the same action is proposed, the ledger pre-fills SUPPORTED evidence
+- **Per-agent learning rate**: track the cross-check's HOLD rate per `agent_id`; an agent with a > 50% HOLD rate triggers a "needs calibration" flag in the operator dashboard
