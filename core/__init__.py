@@ -68,6 +68,25 @@ from .three_ring_architecture import (
     make_ring2_agent,
     make_ring3_agent,
 )
+from .proof_carrying_action import (
+    ActionCertificate,
+    AdmissibilityDecision,
+    AdmissibilityVerdict,
+    ApprovalReceipt,
+    CertificateState,
+    Checkpoint,
+    CheckpointKind,
+    DataClassification,
+    EnforceabilityClass,
+    ExternalityContext,
+    ExternalityPolicy,
+    IEECStep,
+    ProofCarryingActionBridge,
+    ReversalBound,
+    canonical_hash,
+    create_pca_bridge,
+    digest_certificate,
+)
 
 __all__ = [
     "BaseAgent",
@@ -130,4 +149,22 @@ __all__ = [
     "create_three_ring_governor",
     "make_ring2_agent",
     "make_ring3_agent",
+    # Proof-Carrying Action bridge (PCAA + SARC + OpenKedge + PCE)
+    "ActionCertificate",
+    "AdmissibilityDecision",
+    "AdmissibilityVerdict",
+    "ApprovalReceipt",
+    "CertificateState",
+    "Checkpoint",
+    "CheckpointKind",
+    "DataClassification",
+    "EnforceabilityClass",
+    "ExternalityContext",
+    "ExternalityPolicy",
+    "IEECStep",
+    "ProofCarryingActionBridge",
+    "ReversalBound",
+    "canonical_hash",
+    "create_pca_bridge",
+    "digest_certificate",
 ]

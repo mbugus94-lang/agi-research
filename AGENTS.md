@@ -1,3 +1,61 @@
+### 2026-06-13 - Scheduled Run: Proof-Carrying Action (PCA) Bridge (PCAA + SARC + OpenKedge + PCE)
+**Status**: ✅ COMPLETE - 47/47 tests passed
+
+**Research Summary (June 13, 2026)**: See CURRENT_RESEARCH.md for the full report. Headlines:
+- **PCAA (arXiv:2606.04104)** + **SARC (arXiv:2605.07728)** + **OpenKedge (arXiv:2604.08601)** + **PCE (arXiv:2605.24462)** all landed on the same idea: portable, certificate-bearing actions as the substrate for runtime governance. Today's build is the convergence.
+- **EnforceabilityClass** as the implementation of the "rule of two" pattern: REQUIRE_HUMAN / REQUIRE_BRIDGE / POLICY_ONLY / AUTO
+- **IEEC (Intent-to-Execution Evidence Chain)** as a hash-chained append-only ledger of propose -> approve -> execute -> close
+- **ExternalityContext** as first-class boundary facts (PCAA): destination_visibility, provenance, cost_class, data_classification, reversal_bound
+- **OpenAI files for IPO** with AGI mission in S-1; **AGIBOT World Challenge 2026** closes the sim-to-real gap; **Microsoft MXC + MAI-Thinking-1** at Build 2026; **CISO Daily**: 1-in-8 AI breaches is now agentic
+- Trending repos: microsoft/agent-governance-toolkit v4.0.0, cordum-io/cordum v1.1.0, Orvek-dev/Zeus v1.0.0-alpha.7, cunardai/agp-protocol v0.5.1, SIDJUA v1.1, govAgent v1.x, ACR v1.1.0
+
+**Build Task: Proof-Carrying Action (PCA) Bridge**
+
+**Motivation**: The June 12 build (`ThreeRingGovernor`) closed the routing layer. Today's build closes the **execution layer**: every action now carries a portable `ActionCertificate` with five checkpoints, an externality context, an `ApprovalReceipt` (with `policy_ids` and `claim_ids` linking to existing `SafetyCircuitBreaker` + `EvidenceLedger`), and a hash-chained IEEC. The cert is the *only* path to execution; bare actions stay possible for back-compat.
+
+**Key Components**:
+1. `ActionCertificate` (DRAFT -> ADMISSIBLE -> PENDING_APPROVAL -> APPROVED -> EXECUTING -> CLOSED, plus REJECTED/ABANDONED) — immutable after CLOSED. `to_dict`/`from_dict` round-trip.
+2. `ExternalityContext` (destination_visibility, provenance, cost_class, data_classification, reversal_bound) + `ExternalityPolicy` (treats empty as missing)
+3. Five `CheckpointKind` (PRE_ADMISSIBILITY, ACTION_OPEN, ASSUMPTION_CAPTURE, APPROVAL, OUTCOME_CLOSURE) with `verify_certificate` re-checking ordering + digest
+4. `EnforceabilityClass` enum: REQUIRE_HUMAN, REQUIRE_BRIDGE, POLICY_ONLY, AUTO
+5. `IEECStep` + SHA-256 hash chain (OpenKedge IEEC) with `verify_ieec` re-walking the chain
+6. `AdmissibilityDecision` tree: ADMISSIBLE / REQUIRES_BRIDGE / REQUIRES_HUMAN / REJECTED. Ring 3 frontier defaults REQUIRE_HUMAN; IRREVERSIBLE+RESTRICTED is hard human; `delete`/`drop`/`truncate`/`send_money`/`self_modify`/`purge`/`kill`/`force_push` always human
+7. `ProofCarryingActionBridge` orchestrator with `propose`/`approve`/`execute`/`record_outcome`/`reject`/`abandon`; on-disk audit via `enable_audit(audit_path)` (JSONL IEEC)
+8. `create_pca_bridge(audit_path)` — smallest viable install: 1 line, ~1100 LOC
+
+**Conservative posture**: cert-gated execution; immutable after close; empty externality = missing; Ring 3 human default; IRREVERSIBLE+RESTRICTED = hard human; always-human-gated action types; outcome set once; `policy_ids` + `claim_ids` link to breaker + ledger.
+
+**Test Coverage**: 47/47 tests passed ✅
+- TestExternalityPolicy (4), TestDigestHelpers (3), TestAdmissibilityRouting (9), TestExternalityRequired (2), TestApprovalFlow (7), TestExecuteAndOutcome (5), TestIEECChain (5), TestAudit (2), TestCertificateVerification (3), TestSerialization (1), TestConservativePosture (4), TestVerifiableActionIntegration (2)
+
+**Research Synthesis**:
+- The June 2026 convergence on **portable, certificate-bearing actions** is the maturation signal of agent governance
+- **Two-timescale split preserved**: `require_human_for_ring3` + `ExternalityPolicy` are the operator-controlled slow loop; the admissibility decision tree is the system-controlled fast loop
+- **IEEC hash chain** is the substrate for replay-ready proofs (PCAA) and witness-cosigned transparency (Sello) — single-witness now, multi-witness is Q3
+- **`EnforceabilityClass`** is the implementation of the "rule of two" pattern
+- **`ReversalBound` + `DataClassification`** is the conservative version of the safety-utility tradeoff (OCL)
+- **`ApprovalReceipt.policy_ids` + `claim_ids`** is the bridge between the certificate and existing `SafetyCircuitBreaker` + `EvidenceLedger`
+- **`digest_certificate`** deliberately excludes checkpoints/approval/state/outcome — auditor can recompute without IEEC history
+
+**Files Changed**:
+- `core/proof_carrying_action.py`: 1118 lines (new)
+- `experiments/test_proof_carrying_action.py`: 822 lines (new) — 47 tests
+- `core/__init__.py`: 18 new public exports
+- `CURRENT_RESEARCH.md`: build log entry
+- `AGENTS.md`: this entry
+
+**Next Priority**:
+- Wire `propose()` to consume `SafetyCircuitBreaker.assess_risk()` — breaker's CRITICAL overrides AUTO
+- `propose_with_evidence(action_id, ..., claim_ids=[...])` to pull SUPPORTED claims from `EvidenceLedger`
+- `ThreeRingGovernor.route()` -> `ActionCertificate.ring_layer`; Ring 3 routes always REQUIRE_HUMAN
+- Adversarial test pass: 20 certs that try to (a) execute without approval, (b) tamper with closed cert, (c) hide chain step, (d) self-approve, (e) skip externality
+- Cross-process replay CLI: `ieec_replay.py` reads `ieec.jsonl` and re-validates
+- Multi-witness notarization (Sello) — two-of-three witness signatures before CLOSED
+- LLM-backed `EnforceabilityClass` recommendation (operator's human-default stays the floor)
+- Wire into `VerifiableActionLoop.propose_action` — every action carries a cert
+
+---
+
 ### 2026-06-12 - Scheduled Run: Three-Ring Architecture (arXiv:2606.07119, Alvarez-Telena & Diez-Fernandez)
 **Status**: ✅ COMPLETE - 66/66 tests passed (picked up the uncommitted build from the working tree)
 
