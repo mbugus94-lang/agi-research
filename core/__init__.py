@@ -96,6 +96,19 @@ from .governed_action_loop import (
     RISK_TO_ENFORCEABILITY,
     create_governed_loop,
 )
+from .tool_privilege_governor import (
+    CandidateRanking,
+    InsufficiencyReport,
+    SelectionOutcome,
+    SelectionRecord,
+    StepRequest,
+    ToolPrivilegeDescriptor,
+    ToolPrivilegeGovernor,
+    ToolPrivilegeGovernorConfig,
+    create_tool_privilege_governor,
+    make_high_privilege_tool,
+    make_low_privilege_tool,
+)
 
 __all__ = [
     "BaseAgent",
@@ -184,4 +197,16 @@ __all__ = [
     "GovernedActionLoop",
     "GovernedActionRequest",
     "create_governed_loop",
+    # Tool Privilege Governor (ToolPrivBench + CAPSPLIT-IB + RACG-inspired)
+    "CandidateRanking",
+    "InsufficiencyReport",
+    "SelectionOutcome",
+    "SelectionRecord",
+    "StepRequest",
+    "ToolPrivilegeDescriptor",
+    "ToolPrivilegeGovernor",
+    "ToolPrivilegeGovernorConfig",
+    "create_tool_privilege_governor",
+    "make_high_privilege_tool",
+    "make_low_privilege_tool",
 ]

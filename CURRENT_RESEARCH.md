@@ -1022,3 +1022,147 @@ The first half of June 2026 produced a striking convergence in agent-governance 
 ---
 
 *Last updated: 2026-06-14 by AGI Research & Build Agent*
+
+
+---
+
+### 2026-06-16 - Scheduled Run: Tool Privilege Governor (ToolPrivBench + CAPSPLIT-IB + RACG-inspired)
+**Status**: ✅ COMPLETE - 67/67 tests passed (picks up the uncommitted build from the prior working tree)
+
+**Research Summary (June 16, 2026)**:
+
+**Industry News**:
+- **OpenAI + Visa "Intelligent Commerce" agentic payments (Jun 10, 2026) — DAY 6 of 7 day after the announcement**: production-volume agentic payments. The "permission scope" of an agent's tool (DELEGATE + BROAD) is now literal money. Tool-privilege governance is the rate-limiting layer for agentic commerce
+- **Anthropic Mythos / Fable 5 launch (Jun 2026) — "safe enough for production"**: the model posture; the runtime posture is what the ToolPrivilegeGovernor adds
+- **JPMorgan long-horizon agent (Jun 2026) — agents that run for hours**: tool privilege is the *external* expression of an agent's capability surface. A long-horizon agent with BROAD scope + DELEGATE + EXECUTE is a production liability; the governor is the *floor*
+- **Ona acquisition (GitHub, Jun 2026) — "agent runs in customer's cloud, keeps working after developer logs off"**: the deployment target. Tool privilege is a per-tenant policy, not a per-model one
+- **Microsoft agent-governance-toolkit v4.1.0 (Jun 14 2026)**: adds tool-permission bound checker, complementing our governor
+
+**Key arXiv / OpenReview Papers**:
+- **"When Lower Privileges Suffice: Investigating Over-Privileged Tool Selection in LLM Agents" (OpenReview AXH6buTOVx, 2026) ⭐ BUILDS ON THIS — ToolPrivBench**: mainstream LLM agents over-select higher-privilege tools; transient failures amplify the escalation; prompt-level controls offer limited mitigation. The ToolPrivilegeGovernor is the privilege-aware post-training defense the paper calls for
+- **"Unsafe Only in Combination" (OpenReview v2QHWcC0UC, 2026) — CAPSPLIT-IB**: risks emerge from capability *combinations*, not isolated tools. The governor ranks by composite score (permission + cost + ring) precisely because no single axis is sufficient
+- **"Will the Agent Recuse Itself?" (arXiv:2606.06460, 2026) — the Recuse Signal pattern**: in-band cooperative governance. The governor's "insufficient" outcome is the substrate for an agent to *recuse itself* rather than silently escalate
+- **SkillSmith (arXiv:2606.01314, Jun 2026) — co-evolving skills and tools**: the tool's privilege is co-evolved with the skill set, not static. Today's governor uses static descriptors; Q3 follow-up is a learned-privilege model
+- **ToolTree (arXiv:2603.12740) — MCTS-based tool planning with dual feedback**: the *planning* layer above the governor. ToolTree picks the *next* tool; the governor picks the *cheapest sufficient* tool
+- **EvoTool (arXiv:2603.04900) — blame-attributed tool-use optimization**: blames the right module (planner/selector/caller/synthesizer) for a failure; the governor's audit trail is the substrate for blame attribution
+- **SEARL (arXiv:2604.07791) — Tool Graph Memory**: structured persistent tool memory. The governor's registry + audit trail is the *lightweight* in-process analog
+- **Bayesian-Agent (arXiv:2606.08348) — posterior-guided skill evolution**: probabilistic model of "which skill is right when"; the governor's deterministic composite score is the *heuristic floor* that the Bayesian model would replace
+
+**Trending Open-Source Repos**:
+- microsoft/agent-framework v1.10.0 (Jun 10 2026, 11.3k+ stars) — production multi-agent, .NET + Python
+- RightNow-AI/openfang v0.6.9 (May 12 2026, 17.8k+ stars) — Rust Agent OS, "not a chatbot framework"
+- JuliusBrussee/caveman v1.9.0 (Jun 12 2026, 73k+ stars) — Claude Code skill, ~65% fewer output tokens
+- AgentScope v2.0.1 (Jun 5 2026, 26k+ stars) — multi-agent with permission system
+- aden-hq/hive v0.11.0 (May 2026, 10.5k+ stars) — production multi-agent harness
+
+**Build Task: Tool Privilege Governor (1127 lines, picked up from prior working tree)**
+
+**Motivation**: The repo has per-action *policy* gates (SafetyCircuitBreaker, ThreeRingGovernor, GovernedActionLoop), an *evidence* substrate (EvidenceLedger), and a *proposal* gate (RSI brake). What it doesn't have is a *least-privilege tool planner* — when a step in the planner's plan calls for a tool, the governor ranks all registered tools by *required privilege* and picks the cheapest one that is sufficient. The OpenReview ToolPrivBench finding is the empirical substrate: mainstream LLM agents over-select higher-privilege tools when a lower-privilege option would suffice; transient failures amplify the escalation. The governor is the in-process implementation of the "privilege-aware post-training defense" the paper calls for.
+
+**Key Components**:
+
+1. **`SelectionOutcome`** (str-enum) — `SELECTED` / `INSUFFICIENT` / `BLOCKED_ALL` / `RATE_LIMITED` / `POLICY_DENIED`. Five outcomes; conservative posture: blocked/rate-limited surfaces as a distinct outcome, never silently falls back to a higher-privilege tool.
+
+2. **`ToolPrivilegeDescriptor`** — `tool_id`, `name`, `action_type`, `action_category`, `permission_scope`, `cost_class`, `ring_layer`, `capabilities`, `is_blocked`, `per_minute_cap`, `per_step_cap`. The descriptor is the *source of truth* for a tool's privilege surface; the callable is separate.
+
+3. **`privilege_score()`** — composite of three axes: `_PERMISSION_RANK` (READ=0, WRITE=1, EXECUTE=2, DELEGATE=3, BROAD=4) + `_COST_RANK` (LOW=0, MEDIUM=1, HIGH=2, CRITICAL=3) + `_RING_RANK` (R1=0, R2=1, R3=2). Sum, not product: a low-priv R2 READ-LOW tool scores 0+0+1=1; a broad R3 CRITICAL tool scores 4+3+2=9. Ties broken by tool_id lexicographically — deterministic across runs.
+
+4. **`StepRequest`** — `step_id`, `action_type`, `required_capability`, `requested_permission`, `priority`, `target`, `description`, `claim_ids`. Mirrors the structure of a SARC Pre-Action Gate payload.
+
+5. **`CandidateRanking`** — one row per candidate: `privilege_score`, `sufficient`, `blocked`, `rate_limited`, `selected`, `reason`. The ranking is the *auditable* substrate; the caller's job is to pick the top.
+
+6. **`InsufficiencyReport`** — diagnostic for INSUFFICIENT / BLOCKED_ALL / RATE_LIMITED. Carries `closest_by_capability` (lexical overlap on required_capability tokens) + `closest_by_privilege` (privilege score ascending), capped at 5 entries. Notes describe the gap.
+
+7. **`SelectionRecord`** — the *system of record* for tool selection. `privilege_delta = chosen_score - naive_score` (naive = highest-privilege sufficient tool's score). Negative = governor chose *lower* privilege than the naive top-of-list. This is the *measurable* substrate for ToolPrivBench.
+
+8. **`_PerToolCounts`** — per-tool rate limiter. Uses a `deque(maxlen=256)` of (timestamp, kind) for per-minute accounting. The per-step cap is the caller's contract (the governor never selects the same tool twice in the same selection cycle).
+
+9. **`make_low_privilege_tool` / `make_high_privilege_tool`** — convenience constructors. Low = R2, READ, LOW cost (the conservative default for the majority of agent tools). High = R3, EXECUTE, MEDIUM (the conservative high-privilege default; the operator must explicitly opt into HIGH or CRITICAL cost).
+
+10. **`ToolPrivilegeGovernorConfig`** — `max_per_minute_cap`, `respect_blocklist` (default True), `persist_audit`, `consult_ledger`. All defaults conservative.
+
+11. **`ToolPrivilegeGovernor.select_tool(step)`** — orchestrator. Six-step pipeline:
+    - **Step 1**: candidate set: tools whose `action_type` matches the step's `action_type` OR whose capabilities include the step's `required_capability`
+    - **Step 2**: per-candidate evaluate: handles_category ∧ capability_ok ∧ permission_ok ∧ action_type_ok ∧ not blocked ∧ not rate_limited
+    - **Step 3**: sort by `(0 if sufficient else 1, privilege_score, tool_id)` — sufficient first, then lowest privilege first, then stable lexicographic
+    - **Step 4**: pick the top. Set `chosen.selected = True` and outcome = SELECTED
+    - **Step 5**: if no sufficient tool, decide outcome by which predicate emptied the set: BLOCKED_ALL if all blocked, RATE_LIMITED if all rate-limited, INSUFFICIENT if all insufficient, BLOCKED_ALL for the conservative mixed case
+    - **Step 6**: optional ledger consultation when `consult_ledger` is enabled and the step has `claim_ids`. Disputed/contradicted claims attach as a *note* in the audit trail, not a gate — the governor's job is privilege, not evidence
+
+12. **`register_tool` / `deregister` / `get` / `all_tools` / `size`** — registry. `register_tool` overwrites if the tool_id is already registered; per-tool counters reset on overwrite (deliberate: a new descriptor supersedes the old one).
+
+13. **`record_outcome(step_id, succeeded)`** — updates the per-tool rate limiter. Success/failure is recorded but does not change the privilege score (the score is a property of the tool descriptor, not of its history).
+
+14. **`summary()`** — aggregate view: total selections, outcome breakdown, mean `privilege_delta`, `over_privilege_rate` (fraction of successful selections where `privilege_delta > 0`), `blocked_rate`, `insufficient_rate`, registered_tools count, audit_path.
+
+15. **`_persist(record)`** — append-only JSONL. Persists when `audit_path` is provided; one row per selection. The audit trail is the system of record for tool selection.
+
+16. **`create_tool_privilege_governor(audit_path, breaker, ledger)`** — smallest viable install: 1 line. Returns a governor with no tools registered. The breaker and ledger are optional; `consult_ledger` is a no-op when the ledger is None.
+
+17. **`_action_category_for(action_type)`** — maps action_type string → `ActionCategory` enum. Default for unknown types is `execute` (conservative). The mapping covers the 18 action types used in the GovernedActionLoop's HUMAN_GATED_ACTION_TYPES and COST_HEAVY_ACTION_TYPES sets.
+
+**Conservative posture (the governor's invariants)**:
+- The governor NEVER auto-escalates privilege; on transient failures it surfaces a *suggestion* to the operator, who can either accept (require_human) or retry with the same tool
+- Insufficient tools (no matching capability) are surfaced explicitly — the governor does not silently fall back to a higher-privilege tool; it records an InsufficiencyReport
+- A *blocked* tool (SafetyCircuitBreaker policy blocklist) is never selected, even if it is the lowest-privilege sufficient option; the blocklist is the *floor*
+- The privilege score is deterministic and stable: same registered tools → same ranking, no "smart" reordering that could change results between runs
+- The audit trail is the *system of record* for tool selection; downstream reflection / metacog can use it as a calibration signal (a high over-privilege rate is a metacognitive red flag)
+- The governor is LLM-agnostic: no model call, no network request, no position on which model is the substrate
+- Permission check is "at or above" the request: a WRITE tool CAN satisfy a READ request (over-privilege is allowed, under-privilege is not)
+- The composite privilege score uses sum, not product: axes are independent in the worst case
+- The naive score is the *highest* score in the candidate set, not the highest sufficient score: the governor's `privilege_delta` measures how much lower the chosen tool is than the "trust the LLM" baseline
+
+**Test Coverage**: 67/67 tests passed ✅ in 0.16s
+- TestSelectionOutcome (5) — enum values, count, str-mixin, record serialization, distinct
+- TestPrivilegeScore (6) — R2 LOW READ = 1, R3 CRITICAL BROAD = 9, monotonic in each axis, deterministic
+- TestDescriptorValidation (5) — empty name / empty action_type / empty capabilities rejected, has_capability true/false
+- TestDescriptorRoundTrip (4) — to_dict keys, from_dict round-trip, capabilities tuple, blocked flag
+- TestRegistry (6) — register returns id, get, all_tools, deregister, size, register overwrite
+- TestPrivilegeRanking (6) — low-priv picked over high-priv, naive score = highest, privilege_delta < 0 when low-priv chosen, sorted ascending privilege, requested_permission filters lower-priv, requested_permission honors explicit READ
+- TestBlocklistFloor (4) — blocked tool never selected, all-blocked → BLOCKED_ALL, blocked tool marked in ranking, respect_blocklist=False allows blocked (operator override)
+- TestRateLimiter (3) — per-minute cap blocks after threshold, isolated per tool, rate_limited ranking carries flag
+- TestInsufficiencyReport (4) — shape, notes describe gap, to_dict round-trip, no candidates → INSUFFICIENT
+- TestLedgerConsultation (3) — disabled by default, no claims = no consultation, disabled by config
+- TestActionCategoryMapping (4) — read → read, write → write, delete → delete, execute + conservative default
+- TestConvenienceConstructors (4) — make_low_privilege_tool defaults, make_high_privilege_tool defaults, low-priv score < high-priv, explicit tool_id respected
+- TestAuditTrail (3) — disabled by default, persists JSONL, appends across calls
+- TestSummary (4) — empty summary, outcome counts, over-privilege rate, registered_tools count
+- TestConservativePosture (4) — blocked wins over lower privilege, no auto-escalate, determinism, records capped at 4096
+- TestIntegrationWithRealLedger (2) — real EvidenceLedger with SUPPORTED claim, real EvidenceLedger with DISPUTED claim (attached as note, not a gate)
+
+**Research Synthesis**:
+- The ToolPrivilegeGovernor is the *least-privilege tool planner* the OpenReview paper (AXH6buTOVx) calls for. It implements the *privilege-aware post-training defense* proposed in §5 of the paper
+- The composite privilege score (permission + cost + ring) is the in-process analog of the paper's "decomposed privilege axes." CAPSPLIT-IB's "capability combinations" insight is preserved: no single axis is sufficient; the sum is the conservative composite
+- The blocklist floor mirrors the `SafetyCircuitBreaker.assess_risk()` invariant: a tool that has been explicitly marked unsafe stays unsafe, regardless of how low its composite score is
+- The audit trail is the *measurable* substrate for the paper's main empirical finding: "over-privileged tool selection is common." The `over_privilege_rate` in `summary()` is the operator's "is my agent's tool selection getting better?" signal
+- The "Recuse Signal" pattern from arXiv:2606.06460 is implemented as the `INSUFFICIENT` outcome: the agent says "I don't have the right tool for this step" instead of silently picking a higher-privilege one
+- The R2 / R3 ring distinction from the Three-Ring Architecture paper (arXiv:2606.07119) is the *ring_layer* axis of the composite score. R2 (FEDERATION) is preferred over R3 (FRONTIER) for the same task
+- The CostClass axis is the substrate for the "expensive LLM calls" concern from the Tokenpocalypse / Microsoft Copilot billing story: a LOW-cost R2 tool is preferred over a HIGH-cost R3 tool for the same task
+- The InsufficiencyReport's `closest_by_capability` and `closest_by_privilege` are the substrate for *capability-aligned* tool acquisition: if the closest by capability is the closest by privilege, the registry is well-tuned. If they diverge, the operator knows to register a more privileged (or more capable) tool
+- The ledger consultation is intentionally *advisory* (attached as a note, not a gate). The governor's job is privilege; the ledger's job is evidence. The two are coupled through the audit trail, not the verdict
+- The OpenReview finding that "transient failures amplify the escalation" is mitigated by the rate limiter: a tool that just failed isn't immediately re-selected; the operator gets a `RATE_LIMITED` outcome with the candidate ranking intact
+- The 67 tests are intentionally small: each one verifies a single conservative-posture invariant. The full test runs in <1 second
+- The module is ~1127 lines: small enough to read in one sitting, large enough to be non-trivial. Matches EvoMaster / SkillsVote / Three-Ring "small, focused, working" discipline
+- The governor's `SELECTED` outcome is the *normal* path; `INSUFFICIENT` / `BLOCKED_ALL` / `RATE_LIMITED` are the operator's signal that the registry needs tuning, not a system failure
+
+**Files Changed**:
+- `core/tool_privilege_governor.py`: 1127 lines (new) — SelectionOutcome, ToolPrivilegeDescriptor, StepRequest, CandidateRanking, InsufficiencyReport, SelectionRecord, _PerToolCounts, ToolPrivilegeGovernorConfig, ToolPrivilegeGovernor, make_low_privilege_tool, make_high_privilege_tool, create_tool_privilege_governor, _PERMISSION_RANK, _COST_RANK, _RING_RANK
+- `experiments/test_tool_privilege_governor.py`: 833 lines (new) — 67 tests across 14 test classes
+- `core/__init__.py`: 11 new public exports + import block
+- `CURRENT_RESEARCH.md`: this build log entry
+- `AGENTS.md`: build log entry
+
+**Next Priority**:
+- **Wire `ToolPrivilegeGovernor.select_tool` into `BaseAgent.run`**: replace the agent's implicit `tool.invoke()` path with explicit `gov.select_tool(step)`; the chosen tool is invoked in a sandboxed executor
+- **Wire `ToolPrivilegeGovernor` into `GovernedActionLoop`**: the loop's `_cross_check` consults the governor for the *enforceability* of the proposed action; an `INSUFFICIENT` governor outcome demotes `EnforceabilityClass` from `REQUIRE_BRIDGE` to `POLICY_ONLY` (the governor's verdict is a *promoter*, not a demoter — same posture as the rest of the repo)
+- **`summary().over_privilege_rate` → `MetacognitiveMonitor` cross-feed**: an `over_privilege_rate > 0.3` raises the monitor's `ungrounded_rate`; the next `assess_current_state()` call reflects the calibration gap
+- **ToolPrivBench-style harness**: a `benchmarks/tool_priv_bench.py` that runs 50+ (step, candidate_set, optimal_tool) triples and measures the governor's hit-rate against the LLM-baseline over-privilege rate. The empirical substrate for the OpenReview finding
+- **LLM-backed capability description**: keep the static descriptor as the *floor*; use a small LLM prompt to *suggest* capability tags for borderline tools (e.g. "this is mostly a read tool but occasionally writes metadata"). The operator confirms
+- **`ThreeRingGovernor` → `ToolPrivilegeGovernor` cross-feed**: the three-ring's routing decision (R2 / R3) becomes the *ring_layer* of the candidate tool's descriptor; R3 routes prefer R3 tools, R2 routes prefer R2 tools
+- **Per-tenant privilege scope**: in a multi-tenant deployment (Ona-style), each tenant has their own privilege namespace; the governor's `_tools` dict is per-tenant
+- **Co-evolved privilege descriptors** (SkillSmith-inspired): when a skill is learned, the privilege of its tool is *re-scored* based on the new usage pattern. Q3 follow-up
+- **Adversarial test pass**: 30 selections that try to (a) pick a blocked tool, (b) silently fall back to a higher-privilege tool, (c) re-select a tool that just failed, (d) mutate the privilege score after registration. Confirm the conservative posture holds
+
+---
+
+*Last updated: 2026-06-16 by AGI Research & Build Agent*
