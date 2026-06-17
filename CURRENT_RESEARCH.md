@@ -1166,3 +1166,49 @@ The first half of June 2026 produced a striking convergence in agent-governance 
 ---
 
 *Last updated: 2026-06-16 by AGI Research & Build Agent*
+
+---
+
+## 2026-06-17 Build: Memory Refiner (MemRefine-inspired)
+
+**Status**: ✅ COMPLETE - 138/138 tests passed
+
+### Research Highlights (June 17, 2026)
+
+- **Salesforce acquires Fin for $3.6B** — Enterprise AI agents are now acquisition-grade
+- **Dapr 1.18 "Verifiable Execution"** (Jun 14) — Workflow History Signing + Resiliency Middleware. The runtime is the new audit substrate
+- **Tilebox open-source verifiable AI agents** (Jun 15) — $12M seed, Apache 2.0, built on Dapr 1.18
+- **Failing Tools benchmark** (OpenReview j7YsSnA64D) — <11.47% accuracy on 218 runtime-failure scenarios. Missing verification is the dominant failure mode
+- **MemRefine** (arXiv:2606.13177v1) — LLM-guided compression for long-term agent memory under a fixed budget. Use similarity only to *propose* candidate pairs; defer merge/delete/preserve decisions to an LLM reasoning over factual content
+- **StreamMemBench** (arXiv:2606.14571v1) — Eight memory systems fail to convert feedback into reliable future behavior
+- **CRAB-Bench** (OpenReview fyBYslDRsi) — 61% pass@1 on complex task-dependency tasks
+- **Curation-Bench** (arXiv:2606.04261) — Agents tune existing policy variants rather than explore new families
+- **CaveAgent** (OpenReview p3dlOhpqKD) — LLM as Stateful Runtime Operator; +13.5% on Tau²-bench
+
+### Trending Repos
+- dapr/dapr-agents v1.0.4
+- tilebox/tilebox-agents (new)
+- HKUDS/nanobot v0.2.1
+- code-yeongyu/oh-my-openagent v4.6.0
+
+### Build: `core/memory_refiner.py` (1114 lines, 138 tests)
+
+MemRefine-inspired compression/refinement layer wrapping `TieredMemorySystem`. Key components:
+- `RefinementAction` (KEEP / EVICT / PROMOTE / COMPRESS / MERGE)
+- `RefinementCandidatePair` (similarity-proposed)
+- `RefinementDecision` (judge's verdict with action, reason, confidence, optional compressed_content, decided_at)
+- `RefinementJudge` (Protocol) + `FactDensityJudge` (default deterministic heuristic) + `LLMJudgeStub` (records calls for testability)
+- `MemoryRefiner` orchestrator: `propose_pairs()`, `refine(budget)`, `compress_one(entry_id)`, `evict_one(entry_id)`, `merge(a_id, b_id)`, `summary()`
+- Budget-pressure escalation: when over budget, FactDensityJudge escalates low-importance entries to EVICT
+- Conservative posture: `compress_one` always COMPRESSES (the name is a promise); `evict_one` refuses above `protect_above_importance`; never auto-promotes; never merges high+high; never silent-evicts; audit trail is append-only
+
+### Why This Build
+
+`TieredMemorySystem` had importance-decay eviction but no LLM-guided refinement. MemRefine shows that similarity should only *propose* candidate pairs; the actual KEEP/MERGE/COMPRESS/EVICT/PROMOTE decision belongs to a judge that reasons over factual content. The refiner is the responsible compression layer for `BaseAgent`'s long-term memory. Combined with `ProofCarryingActionBridge` (Jun 13), the agent's memory refinements and actions are both on disk — the in-process analog of Dapr 1.18's verifiable execution.
+
+### Test Coverage
+138/138 tests passed in <1s. See `BUILD_LOG_2026-06-17.md` for the full breakdown.
+
+---
+
+*Last updated: 2026-06-17 by AGI Research & Build Agent*

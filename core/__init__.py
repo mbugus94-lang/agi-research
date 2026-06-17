@@ -109,6 +109,18 @@ from .tool_privilege_governor import (
     make_high_privilege_tool,
     make_low_privilege_tool,
 )
+from .memory_refiner import (
+    RefinementAction,
+    RefinementCandidatePair,
+    RefinementDecision,
+    RefinementJudge,
+    RefinementReport,
+    MemoryRefinerConfig,
+    MemoryRefiner,
+    FactDensityJudge,
+    LLMJudgeStub,
+    create_memory_refiner,
+)
 
 __all__ = [
     "BaseAgent",
@@ -209,4 +221,15 @@ __all__ = [
     "create_tool_privilege_governor",
     "make_high_privilege_tool",
     "make_low_privilege_tool",
+    # Memory Refiner (MemRefine-inspired compression/refinement layer)
+    "FactDensityJudge",
+    "LLMJudgeStub",
+    "MemoryRefiner",
+    "MemoryRefinerConfig",
+    "RefinementAction",
+    "RefinementCandidatePair",
+    "RefinementDecision",
+    "RefinementJudge",
+    "RefinementReport",
+    "create_memory_refiner",
 ]

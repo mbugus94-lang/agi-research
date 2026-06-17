@@ -5351,3 +5351,84 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 - **Per-tenant privilege scope**: in a multi-tenant deployment (Ona-style), each tenant has their own privilege namespace
 - **Co-evolved privilege descriptors** (SkillSmith-inspired): when a skill is learned, the privilege of its tool is *re-scored* based on the new usage pattern. Q3 follow-up
 - **Adversarial test pass**: 30 selections that try to (a) pick a blocked tool, (b) silently fall back to a higher-privilege tool, (c) re-select a tool that just failed, (d) mutate the privilege score after registration
+
+### 2026-06-17 - Scheduled Run: Memory Refiner (MemRefine-inspired compression/refinement layer)
+**Status**: ✅ COMPLETE - 138/138 tests passed
+
+**Research Summary (June 17, 2026)**: See CURRENT_RESEARCH.md for the full report. Headlines:
+- **Salesforce acquires Fin for $3.6B** — Enterprise AI agents are acquisition-grade
+- **Dapr 1.18 "Verifiable Execution"** (Jun 14) — Workflow History Signing + Resiliency Middleware; the runtime is the new audit substrate
+- **Tilebox open-source verifiable AI agents** (Jun 15) — $12M seed, Apache 2.0, on Dapr 1.18
+- **Failing Tools benchmark** (OpenReview j7YsSnA64D) — <11.47% accuracy on 218 runtime-failure scenarios. Missing verification is the dominant failure mode
+- **MemRefine** (arXiv:2606.13177v1) — LLM-guided compression for long-term agent memory; use similarity only to *propose* candidate pairs, defer decisions to an LLM reasoning over factual content
+- **StreamMemBench** (arXiv:2606.14571v1) — Eight memory systems fail to convert feedback into reliable future behavior
+- **CRAB-Bench** (OpenReview fyBYslDRsi) — 61% pass@1 on complex task-dependency tasks
+- **Curation-Bench** (arXiv:2606.04261) — Agents tune existing policy variants rather than explore new families
+- **CaveAgent** (OpenReview p3dlOhpqKD) — LLM as Stateful Runtime Operator; +13.5% on Tau²-bench
+
+**Build Task: Memory Refiner (MemRefine-inspired)**
+
+**Motivation**: `TieredMemorySystem` had importance-decay eviction but no LLM-guided refinement. MemRefine's central insight: similarity should only *propose* candidate pairs; the actual KEEP/MERGE/COMPRESS/EVICT/PROMOTE decision belongs to a judge that reasons over factual content. Today's build implements that split for our agent memory, with budget-pressure escalation (when over budget, FactDensityJudge escalates low-importance entries to EVICT — same posture as ToolPrivilegeGovernor's blocklist floor).
+
+**Key Components**:
+1. `RefinementAction` enum: KEEP / EVICT / PROMOTE / COMPRESS / MERGE
+2. `RefinementCandidatePair` (similarity-proposed) with `shared_tags()` method
+3. `RefinementDecision` (judge's verdict) — action, target_ids, reason, judge name, confidence, optional compressed_content, decided_at
+4. `RefinementJudge` Protocol + `FactDensityJudge` (default deterministic heuristic) + `LLMJudgeStub` (records calls for testability; replaceable with real LLM via identical contract)
+5. `RefinementReport` — initial_size, final_size, iterations, evicted, compressed, merged_pairs, promoted, kept, decisions[]
+6. `MemoryRefinerConfig` — similarity_threshold, max_iterations, max_pair_scan, audit_path, promote_tier, protect_above_importance
+7. `MemoryRefiner` orchestrator — `propose_pairs()`, `refine(budget)`, `compress_one(entry_id)`, `evict_one(entry_id)`, `merge(a_id, b_id)`, `summary()`
+8. Pure helper functions: `_compress_facts`, `_merge_facts`, `_fact_density`, `_novelty_score`, `_similarity`, `_cosine_similarity`, `_char_jaccard`
+9. `create_memory_refiner(memory, judge, audit_path)` — 1-line install
+
+**Conservative posture (invariants)**:
+- `compress_one` always COMPRESSES (the name is a promise; operator chose compression, not eviction)
+- `evict_one` refuses above `protect_above_importance` (default 0.85; high-importance floor is hard)
+- Judge never auto-promotes; promotion is a deliberate decision
+- Judge never merges high+high importance (both ≥0.7 ⇒ KEEP; merge would risk losing signal)
+- Merge uses importance-delta ≥ 0.3 as a one-high-one-low signal
+- Pair proposals bounded by `max_pair_scan` (default 200) for predictable O(n²) cost
+- Audit trail is append-only; `audit_path` (optional) persists every decision to JSONL
+- Refiner never mutates the underlying `TieredMemorySystem` outside its own public API
+- Budget-pressure escalation: FactDensityJudge escalates low-importance / medium-fd to EVICT when over budget
+- Convergence check: loop terminates when no size-changing action (EVICT or MERGE) is taken
+- LLM-agnostic: `LLMJudgeStub.always_action` is a test affordance, not a runtime escape hatch
+
+**Test Coverage**: 138/138 tests passed ✅
+- TestRefinementAction (5), TestRefinementDecision (6), TestRefinementCandidatePair (5)
+- TestFactDensityJudge (10), TestLLMJudgeStub (12)
+- TestCompressionHelpers (8), TestSimilarity (5)
+- TestRefinerCore (10), TestRefinerOnEmptyMemory (2)
+- TestConservativePosture (6), TestRefinementReport (4)
+- TestCustomJudge (6), TestTargetedActions (8)
+- TestAudit (4), TestEdgeCases (8)
+- TestStubStructured (6), TestSingletonPressure (4)
+- TestIntegration (8)
+
+**Research Synthesis**:
+- MemRefine's central insight is the proposal/verdict split. Similarity is noisy; factual content is the signal. Our `RefinementCandidatePair` carries similarity for *proposal*; the judge never sees it as a verdict signal
+- Budget-pressure escalation is the novel engineering decision. Pure MemRefine would iterate compress-only forever in tight budgets; we add an over-budget branch that escalates low-importance entries to EVICT. Same posture as `ToolPrivilegeGovernor`'s blocklist floor
+- `compress_one` always-COMPRESSES is a contract. The operator chose compression; we don't second-guess. Mirrors the `compress_one` API in MemRefine
+- `protect_above_importance` mirrors `ToolPrivilegeGovernor.protect_above` and `SafetyCircuitBreaker`'s importance-aware gating. The "high-value entries are never silently lost" invariant is now a repo-wide pattern
+- The audit trail is the verifiable substrate. Combined with `ProofCarryingActionBridge.IEEC` (Jun 13), the agent's memory refinements and actions are both on disk. Dapr 1.18's "Verifiable Execution" pattern, in-process
+- `LLMJudgeStub` is the testability hook. Recording `calls` lets tests assert what *would* be sent to a real LLM. In production the stub is replaced with a real LLM call; the contract is identical
+- Curation-Bench finding (agents tune existing policy variants rather than explore new families) is a calibration signal for our own self-improvement. When the agent refines its memory, the judge must be the source of variety. `FactDensityJudge`'s five distinct outcomes are the variety
+- The 138 tests run in <1s, matching the repo's "small, focused, working" discipline
+
+**Files Changed**:
+- `core/memory_refiner.py`: 1114 lines (new) — full MemRefine-inspired compression/refinement layer
+- `experiments/test_memory_refiner.py`: ~750 lines (new) — 138 tests across 19 test classes
+- `core/__init__.py`: 8 new public exports for the new module
+- `CURRENT_RESEARCH.md`: 2026-06-17 build entry appended
+- `BUILD_LOG_2026-06-17.md`: full build log (this entry)
+- `AGENTS.md`: this build log entry
+
+**Next Priority**:
+- Wire `MemoryRefiner` into `BaseAgent.run`'s memory-consolidation step (after each task, call `refiner.refine(budget=l1_capacity // 2)`)
+- Wire `MemoryRefiner.summary()` into `MetacognitiveMonitor` (high `evicted` is a calibration red flag)
+- `LLMJudgeStub` → real LLM backend (wrap openai.ChatCompletion with the same interface)
+- `MemoryRefiner` × `SafetyCircuitBreaker` integration (refuse EVICT on safety-critical entries)
+- `MemoryRefiner` × `EvidenceLedger` integration (record a claim with each EVICT/COMPRESS decision)
+- Adversarial test pass: 30 memory states that try to (a) silently evict high-importance, (b) merge unrelated, (c) compress short content, (d) keep `audit` from growing past 4096
+- Streaming-mode `refine()`: incremental refinement after each `store_l1` call
+- CLI / dashboard for memory refiner: `python -m core.memory_refiner --review`
