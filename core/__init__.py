@@ -122,6 +122,40 @@ from .memory_refiner import (
     create_memory_refiner,
 )
 
+from .agent_loop import (
+    AgentIdentity,
+    AgentLoop,
+    AgentLoopConfig,
+    BreakerGateVerifier,
+    BudgetStatus,
+    CompositeVerifier,
+    LedgerGateVerifier,
+    LifecycleState,
+    LoopBudget,
+    LoopStep,
+    MonitorGateVerifier,
+    Permission,
+    RevocationChannel,
+    StepPhase,
+    Verdict,
+    VerifierProtocol,
+    create_agent_loop,
+    strongest,
+)
+
+from .cef_detector import (
+    CEFAction,
+    CEFDetection,
+    CEFDetector,
+    CEFDetectorConfig,
+    CEFMarker,
+    CEFPattern,
+    CEFSeverity,
+    CEFType,
+    create_cef_detector,
+    detect_cef,
+)
+
 __all__ = [
     "BaseAgent",
     "AgentState",
@@ -232,4 +266,15 @@ __all__ = [
     "RefinementJudge",
     "RefinementReport",
     "create_memory_refiner",
-]
+    # CEF / CET Detector (arXiv:2606.14831)
+    "CEFAction",
+    "CEFDetection",
+    "CEFDetector",
+    "CEFDetectorConfig",
+    "CEFMarker",
+    "CEFPattern",
+    "CEFSeverity",
+    "CEFType",
+    "create_cef_detector",
+    "detect_cef",
+]  # type: ignore[has-type]  # keep flake8 quiet on trailing-comma list
