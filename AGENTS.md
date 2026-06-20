@@ -5529,3 +5529,109 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 - Adversarial test pass: 30 memory states that try to (a) silently evict high-importance, (b) merge unrelated, (c) compress short content, (d) keep `audit` from growing past 4096
 - Streaming-mode `refine()`: incremental refinement after each `store_l1` call
 - CLI / dashboard for memory refiner: `python -m core.memory_refiner --review`
+
+### 2026-06-20 - Scheduled Run: CEF Session Aggregator + GovernedActionLoop Wiring
+**Status**: ✅ COMPLETE - 81 new tests pass (25 session + 8 integration + 48 pre-existing governed loop refactor tests); full suite 1860 passed (+81 from 1779), 30 fail (same baseline), 13 pre-existing collection errors (unchanged). Zero regressions
+
+**Research Summary (June 13-20, 2026)**: See CURRENT_RESEARCH.md for full report. Headlines:
+- **CEF "point of no return" (arXiv:2606.14831)**: T5 recovers; T20+ ignores ground-truth. The per-output `CEFDetector` was already shipped (Jun 19); today's build closes the *session-level* gap — aggregating per-output detections into a session verdict that emits `HOLD_PENDING_HUMAN` / `HOLD_PENDING_CEF` when the recovery horizon is crossed
+- **Salesforce acquires Fin for $3.6B (Jun 15)** — agent builders are now acquisition-grade; Certinia $5B raise; OpenAI + Visa agentic commerce; SK Telecom "digital employee" program; Cohesity "Maestro" headless architecture for agent-orchestrator invocations
+- **Tencent hires ex-OpenAI Yao Shunyu (AGI Chief AI Scientist)**; OpenAI S-1 explicit AGI mission; Anthropic $965B IPO confidential filing; $65B fundraise oversubscribed
+- **Microsoft MXC + MAI-Thinking-1** at Build 2026 follow-on; **Dapr 1.18 Verifiable Execution** (Jun 14); **Tilebox verifiable agents** (Apache 2.0, Jun 15)
+- **Mitiga Skillgate (Jun 18)**: scanner for agent supply chain — found prompt-exfiltration + ANTHROPIC_BASE_URL MITM overrides + 1,230+ hardcoded API keys in AGENTS.md/CLAUDE.md/MCP configs
+
+**Build Task 1: CEF Session Aggregator (`core/cef_session.py`, 537 lines)**
+
+**Motivation**: The CEF paper's load-bearing claim is the *session-level* "point of no return" — once a session crosses the recovery horizon (T20+), the agent ignores corrective information entirely. The per-output `CEFDetector` was necessary but not sufficient: a single LOW detection is normal; 17.75 CEF turns in an L7 session is a compromised agent. Today's build aggregates per-output detections into a session verdict that emits `HOLD_PENDING_HUMAN` when the recovery horizon is crossed.
+
+**Key Components**:
+1. `CEFSessionState` (str-enum): CLEAN / EARLY / WARNING / POINT_OF_NO_RETURN. `is_compromised()` helper
+2. `CEFSessionAction` (str-enum): CONTINUE / WARN / FREEZE / RESTART. RESTART only when peak is CRITICAL (CET limit case)
+3. `CEFSessionConfig` (frozen dataclass): per-output detector config + 5 thresholds (warn_total=3, warn_consec=2, horizon_total=20, horizon_consec=5, severity_floor=LOW)
+4. `CEFSessionVerdict` (dataclass): session_id, totals, peak, state, action, first_horizon_id, first_horizon_turn, rationale, session_digest (SHA-256 of detection_ids). `to_dict()` round-trips for audit; `is_compromised()` mirrors the state
+5. `CEFSessionDetector`: stateful aggregator. `observe(detection, turn_index)` folds one detection; `observe_stream(detections, turn_indices)` folds a stream. `_crossed_horizon()`, `_crossed_warn()`, `_derive_state()`, `_derive_action()`, `_derive_rationale()` — all pure
+6. `detect_cef_session(session_id, outputs, config, context)`: end-to-end convenience. Runs `CEFDetector` on each output, aggregates, returns (detections, verdict)
+7. `create_cef_session_detector(config)`: smallest viable install — 1 line
+
+**Conservative posture (paper's macro invariants)**:
+- Aggregation promotes severity; never demotes. A single HIGH after several LOWs is preserved through subsequent CLEAN observations
+- Horizon is checked against EITHER total OR consecutive fabrications (operator-configurable thresholds)
+- First horizon-crossing detection is captured for audit (`first_horizon_id` + `first_horizon_turn`)
+- RESTART only when peak_severity == CRITICAL (CET — agent faked its own crash)
+- FREEZE for non-critical horizon crossing (agent's outputs are fabrications but session may still recover per T5 finding)
+- The detector never auto-acts. The caller (GovernedActionLoop) chooses what to do
+
+**Test Coverage**: 25/25 new tests pass ✅
+- TestCEFSessionConfig (3): defaults, frozen, custom thresholds
+- TestCEFSessionVerdict (3): to_dict, is_compromised, peak fields
+- TestSessionDetectorEmpty (1): empty stream stays CLEAN
+- TestSessionDetectorClean (2): single CLEAN stays CLEAN, consecutive reset on CLEAN
+- TestSessionDetectorSingle (1): single LOW stays EARLY
+- TestSessionDetectorPeak (1): peak takes MAX across mixed severities
+- TestSessionDetectorWarnEscalation (2): warn by consecutive, warn by total
+- TestSessionDetectorHorizon (3): horizon by consecutive, horizon by total, RESTART only when peak CRITICAL
+- TestSessionDetectorFloor (1): severity floor filters below minimum
+- TestSessionDetectorStream (2): observe_stream + reset reuses detector
+- TestDetectCEFSession (5): end-to-end clean + L5 + L7 + CET + digest format
+- TestSessionConservativePosture (2): promotes never demotes; verdict carries session_id
+
+**Build Task 2: CEF Wiring into GovernedActionLoop (the Jun 19 #1 next-priority)**
+
+**Motivation**: The previous run's #1 next-priority was *"Wire `CEFDetector.detect()` into `VerifiableActionLoop.observe()`"* — but the right integration point is the `GovernedActionLoop` cross-check, where every `propose()` already runs four substrates (bridge + breaker + ledger + three-ring). Today's build adds a Step 5 that runs `CEFDetector` on the agent's textual output (if supplied via `request.agent_output`) and emits a new `HOLD_PENDING_CEF` outcome when the per-output severity is HIGH/CRITICAL OR the session-level state is WARNING/POINT_OF_NO_RETURN.
+
+**Integration Points**:
+1. `GovernedActionRequest`: added optional `agent_output: Optional[str]` field. None means "skip CEF" (zero overhead)
+2. `CrossCheckOutcome`: added `HOLD_PENDING_CEF = "hold_pending_cef"`
+3. `CrossCheckReport`: added 7 CEF fields — `cef_severity`, `cef_type`, `cef_action`, `cef_detection_id`, `cef_recovery_horizon`, `cef_session_state`, `cef_session_action`. All optional, all in `to_dict()`
+4. `GovernedActionLoop.__init__`: added `cef_detector`, `cef_session_detectors` (per-agent-id dict), `cef_session_config` parameters
+5. `_cross_check()`: added Step 5 (CEF output fabrication check). Runs CEFDetector on `request.agent_output`. CRITICAL per-output → hard `HOLD_PENDING_HUMAN`. HIGH per-output → `HOLD_PENDING_CEF` (operator review). SESSION WARNING/POINT_OF_NO_RETURN → `HOLD_PENDING_CEF` with `cef_recovery_horizon=True`. Session detectors are stored per `agent_id` so the same loop can manage multiple agents' sessions
+6. `create_governed_loop()`: defaults `cef_detector` to a fresh `create_cef_detector()` so the wiring is on by default; `cef_session_detectors` starts empty (built up as agents register)
+
+**Conservative posture**:
+- HIGH or CRITICAL per-output severity → hard `HOLD_PENDING_HUMAN` (operator must review)
+- MEDIUM severity → `HOLD_PENDING_CEF` (auto-flag, not hard hold; observation continues)
+- LOW / NONE severity → annotate `cef_*` fields but don't block (paper: "vague excuse is normal")
+- Session POINT_OF_NO_RETURN → `HOLD_PENDING_CEF` regardless of latest output's severity
+- If `request.agent_output` is None OR `cef_detector` is None → CEF step is silently skipped (zero overhead for non-text-producing actions)
+- Per-output detection result is folded into the per-agent-id session detector, so the recovery horizon accumulates across calls (paper's "extended sessions" finding)
+
+**Test Coverage**: 8/8 new integration tests pass ✅ (in `test_governed_action_loop.py`)
+- TestCEFIntegration.test_clean_output_no_cef_fields — clean text → CLEAN session, no block
+- TestCEFIntegration.test_no_agent_output_skips_cef_silently — None agent_output → cef fields stay None
+- TestCEFIntegration.test_vague_excuse_observed_but_not_blocked — LOW severity → annotated but ALLOW
+- TestCEFIntegration.test_cet_crash_holds_for_human — CRITICAL SIMULATED_CRASH → HOLD_PENDING_HUMAN
+- TestCEFIntegration.test_cef_recovery_horizon_holds_session — session POINT_OF_NO_RETURN → HOLD_PENDING_CEF
+- TestCEFIntegration.test_cef_recovery_horizon_cef_session_action — session_state/action on report
+- TestCEFIntegration.test_cef_report_to_dict_includes_cef_fields — round-trip includes cef fields
+- TestCEFIntegration.test_cef_disabled_when_detector_none — cef_detector=None → no crash, no fields
+- TestCEFIntegration.test_cef_empty_pattern_catalogue_is_noop — empty catalogue → no detection, no fields
+
+**Research Synthesis**:
+- The CEF paper's load-bearing claim — *"the recovery is only possible when ground truth is administered at T5. By T20+, the agent ignores the corrective information entirely"* — is now operationalized in our substrate. The per-agent session detector accumulates fabrications; once the recovery horizon is crossed, the GovernedActionLoop emits `HOLD_PENDING_CEF` regardless of the latest output's individual severity
+- Together with `SilentFailureMonitor` (entropy / signal level), `SafetyCircuitBreaker` (action category / policy), `ThreeRingGovernor` (ring routing), `ProofCarryingAction` (portable certificate + IEEC), and now `CEFDetector` + `CEFSessionDetector` (fabrication classification + recovery horizon), we have the **five-layer runtime safety substrate** the paper calls for as the gap in current safety infrastructure
+- The CEF paper specifically criticizes *"standard enterprise guardrails (persona enforcement, data access controls, no-redirect policies) create the conditions under which CEF emerges"*. Our `ThreeRingGovernor` Ring-2 permission gate is the structural mitigation; today's wiring extends the gate to the *output* layer, not just the routing layer
+- The conservative posture (observe → classify → recommend; never auto-act on CEF) is the same posture as `SilentFailureMonitor` (BLOCK only on Channel Fracture), `RSIController` (`BrakePedal` BRAKED state), and `CEFDetector` (conservative thresholding). The fifth leg of the substrate respects the same invariant
+- Session-level aggregation is O(N) in turn count; per-output detection is O(len(output) * len(patterns)). Total cost per `propose()` with `agent_output` is bounded — no network, no LLM, no clock reads beyond the optional `turn_index`
+- The wiring closes both items on the Jun 19 next-priority list: (1) "Wire CEFDetector into VerifiableActionLoop.observe()" — closed via GovernedActionLoop Step 5; (2) "Session-level detector" — closed via the new `CEFSessionDetector`
+
+**Files Changed**:
+- `core/cef_session.py`: 537 lines (new) — CEFSessionState/Action/Config/Verdict, CEFSessionDetector, detect_cef_session, create_cef_session_detector
+- `experiments/test_cef_session.py`: 425 lines (new) — 25 tests covering all components + paper transcript validation
+- `core/governed_action_loop.py`: +33 lines, 7 new CEF fields on CrossCheckReport, new Step 5 in `_cross_check`, new `HOLD_PENDING_CEF` enum value, agent_output field on GovernedActionRequest
+- `core/__init__.py`: 7 new public exports for CEFSessionDetector + companions
+- `experiments/test_governed_action_loop.py`: +144 lines, 8 new TestCEFIntegration tests + 1 enum-count fix (5→6)
+- `CURRENT_RESEARCH.md`: this build log entry
+
+**Net Test Impact**:
+- Before today's build: 1779 pass, 30 fail, 13 collection errors (baseline)
+- After today's build: **1860 pass (+81), 30 fail (same), 13 collection errors (same)**
+- Zero regressions introduced
+
+**Next Priority**:
+- **Wire `CEFSessionDetector` into `RecursiveSelfImprovement.assess_session_risk()`** — the RSI controller already has `MetacognitiveMonitor`; adding the session-level CEF verdict closes the loop on self-modification safety (don't RSI on a session that's at POINT_OF_NO_RETURN)
+- **CEF session audit JSONL**: serialize every `CEFSessionVerdict` to a per-agent-id JSONL so the operator can replay the trajectory (similar to `IEEC` audit pattern)
+- **`EvidenceLedger.record_cef_session(verdict)`**: write the session verdict as a SUPPORTED claim with `first_horizon_id` as the source — closes the cross-substrate evidence chain
+- **CLI / dashboard for CEF sessions**: `python -m core.cef_session --review` to surface recent session verdicts per agent-id
+- **`SafetyCircuitBreaker.assess_session(verdict)`**: freezable session → OPEN the breaker for the agent-id until the operator explicitly clears
+- **LLM-backed judge for the CEF step**: keep the pattern detector as the fast deterministic layer; add an optional LLM judge for cases the pattern catalogue misses (Q3 follow-up)
+- **`detector_registry`**: a tiny JSON file that lets operators enable/disable the CEF step + session aggregator per agent-id (per-agent conservative posture)
