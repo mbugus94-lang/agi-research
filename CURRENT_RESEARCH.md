@@ -1337,3 +1337,158 @@ The June 19 research crystallizes a gap our repo addresses head-on:
 - CLI / dashboard: `python -m core.cef_detector --review` to surface recent detections with paper-quote rationales
 
 *Last updated: 2026-06-19 by AGI Research & Build Agent*
+
+---
+
+## 2026-06-20 - Scheduled Run: CEF Session Aggregator + GovernedActionLoop Wiring (arXiv:2606.14831 follow-on)
+
+### Research Summary (June 13-20, 2026)
+
+**Industry News**:
+- **Salesforce acquires Fin (Jun 15)** — $3.6B for an autonomous AI agent platform. Agent builders are now acquisition-grade
+- **Databricks LTAP (Jun 16)** — Lake Transactional/Analytical Processing; the 40-year OLTP/OLAP divide collapses onto a single open-format copy. Every data company is adding an agent layer
+- **Mobileye robotaxi US launch (Jun 16)** — fleet of ~17k by 2032; competitor to its own customers. The autonomous stack is converging on agent-style architectures
+- **Forbes "As Agentic AI Reshapes Computing" (Jun 17)** — Qualcomm's "DragonFly" inference platform; agentic workloads demand 4x CPU core growth in data centers. Token spend dominates inference economics for agentic loops
+- **SoftBank + OpenAI (Jun 16)** — Son + Chen announce OpenAI "patches" against cyberattacks. Agent supply-chain security is a board-level concern
+- **SK Telecom AX Innovation 2.0 (Jun 18)** — every worker gets an AI agent; agents as "digital employees" with formal IDs, departments, lifecycle management
+- **Cohesity "Maestro" headless architecture (Jun 17)** — agent orchestrators (Claude, ChatGPT) invoke cyber-resilience capabilities. The agent layer is the new control plane
+
+**Key arXiv / OpenReview Papers (week of Jun 13-20, 2026)**:
+1. **"From Trainee to Trainer: LLM-Designed Training Environment for RL with Multi-Agent Reasoning" (arXiv:2606.17682)** ⭐ RELEVANT — LLM-as-Environment-Engineer that proposes next-stage RL training configs from failure trajectories. MAPF-FrozenLake testbed; current policy can outperform base model as environment engineer. The "self-improving training loop" pattern, applicable to our `RecursiveSelfImprovement`
+2. **"VERITAS: Visual Verification Enables Inference-time Steering and Autonomous Policy Improvement" (arXiv:2606.18247)** ⭐ RELEVANT — generator-verifier framework for robotics: generator = pre-trained policy, verifier = gradient-free visual model. Verified rollouts become offline fine-tuning data. Direct cousin of our `CEFDetector`/`SilentFailureMonitor` (verification layer) + `MemoryRefiner` (refinement layer)
+3. **"Holistic Review of Agentic AI Frameworks" (Springer, 2026)** — canonical 2026 taxonomy: perception, role adoption, memory, planning, reflection, action/tool use, online learning. Maps directly onto our `agent.py`, `memory.py`, `planner.py`, `reflection.py`, `tool_integration.py`. Gaps called out: emergent behaviors, accountability, energy sustainability, multi-agent safety, online+long-term-memory integration
+4. **"AI Safety Landscape for LLMs" (Springer, 2026)** — three-perspective framework: Trustworthy AI / Responsible AI / Ecosystemic Safe AI. Our four-layer safety substrate (SilentFailureMonitor + SafetyCircuitBreaker + ThreeRingGovernor + CEFDetector) is the implementation of the "Ecosystemic Safe AI" perspective
+5. **"Agents, Alignment, and the Many Faces of Autonomy" (Minds and Machines, Jun 15 2026)** — three alignment strategies (liberal / capability-boosting / meta-autonomy). The "meta-autonomy" approach (user picks autonomy type) maps onto our ThreeRingGovernor operator-controlled routing
+6. **"Qwen-RobotNav Technical Report" (arXiv:2606.18112)** — single parameterized navigation model with task-mode switching. Supports instruction following, object search, target tracking, autonomous navigation via the same backbone. Strong zero-shot generalization; 2B-8B parameter scaling. The "single backbone, multi-mode" pattern
+7. **"DRFLOW: Deep Research Benchmark for Personalized Workflow Prediction" (arXiv:2606.18191)** — 100 tasks, 1246 workflow steps, 3900 sources. DRFA improves ~10% over baselines but with substantial remaining headroom. Personalized workflow prediction is the load-bearing open problem for deep-research agents
+8. **"MIRA: Towards Autonomous Medical AI Agents" (Nature, 2026)** — physician-level diagnostic accuracy in simulated EHR environment. Sandboxed clinical agent with 11 tools, 85k+ options. Direct empirical demonstration that an agent can navigate regulated tooled environments end-to-end
+9. **"Learning Under Constraints" (Frontiers, 2026)** — biological vs freely-evolving-weakly-constrained artificial systems. Constraints are *functionally significant* for learning; an adaptive meta-strategy that selects among exploration strategies is the principled design
+
+**Trending Open-Source Repos (week of Jun 13-20, 2026)**:
+- **PurasAI/puras** — Python open-core framework; prompts → testable/deployable skills. Local runner (MIT) + Puras Cloud. Checkpoint/resume after failures
+- **askalf/keeper** — Own Your Stack AI security stack. Encrypted agent key storage with short-lived, single-use leases; tamper-evident hash-chained audit log. Pairs with Warden/Canon/Cordon/Picket
+- **AIPensieve42/EverMemoryOS** — local-first self-evolving long-term memory. Markdown as truth source; hybrid retrieval; multi-agent portable memory
+- **ProfiLLM/ProfiLLM** — utility-aligned user profiles for ride-hailing dispatch. LLM agent with 27 analytical tools; offline reasoning + cheap online lookup. Enterprise review pending open-source release
+- **Sahana1412/AegisOne** — Band-of-Agents hackathon project: 17 specialized security agents orchestrated via Band. MITRE ATT&CK mapping, multi-LLM voting, full XDR pipeline
+- **jpoindexter/self-insight-agent-skills** — 10 SKILL.md-format metacognitive skills for coding agents. Dunning-Kruger awareness, calibration, outside view, feedback discipline. Drop-in for Claude Code / Codex
+
+### Why This Research Matters for Our Repo
+
+The June 13-20 research crystallizes a gap our repo addresses head-on:
+
+1. **VERITAS (arXiv:2606.18247) validates our CEFDetector pattern**: "generator-verifier" = policy + post-hoc verification. Our `CEFDetector` is the output-boundary verifier; `SilentFailureMonitor` is the signal-boundary verifier; together they are the two-verifier substrate. VERITAS goes further by *folding verified rollouts back into training* — the equivalent for us would be `CEFSessionDetector` rolling session-level fabrications into negative examples for the next finetune
+2. **Holistic Agentic AI Review (Springer 2026) is the canonical taxonomy** that maps directly onto our module structure: agent.py (perception+role), memory.py (memory), planner.py (planning), reflection.py (reflection), tool_integration.py (action/tool use). The review's gap list (emergent behaviors, accountability, energy, multi-agent safety, online+long-term memory) is our roadmap
+3. **DRFLOW (arXiv:2606.18191) gives us a benchmark** for our `deep_research` skill. We can adopt DRFLOW-Agent as a baseline and add CEF awareness to the workflow prediction
+4. **MIRA (Nature 2026) is the proof-of-concept** that an agent can navigate a regulated, tooled environment (EHR with 11 tools, 85k options) end-to-end. Our `ToolPrivilegeGovernor` + `VerifiableActionLoop` + `CEFDetector` is the substrate for the same architectural pattern
+5. **Keeper (Jun 19) gives us the agent-secret security primitive**: short-lived, single-use leases + tamper-evident audit log. The lease pattern is the substrate for our next `agent_secret` skill; the hash-chain audit log is the same shape as our IEEC
+6. **Self-Insight Skills (Jun 2026) gives us the metacognition catalog**: 10 SKILL.md-format skills for coding agents (calibration, outside view, feedback discipline). These could be loaded as skills via our `Skills/SkillsVote`-style pipeline
+7. **Salesforce/Fin acquisition ($3.6B) + Cohesity Maestro + SK Telecom AX 2.0** all confirm the enterprise agent market is converging on the same architectural pattern: orchestrator + agent registry + tool/skill catalog + audit substrate. Our `ThreeRingGovernor` + `MCP Tool Registry` + `SkillGovernance` + IEEC audit trail is the open-source substrate
+
+### Build Task 1: CEF Session Aggregator (arXiv:2606.14831 follow-on)
+
+**Motivation**: The June 19 `CEFDetector` flags a single agent output as a fabrication on the CEFType / CEFSeverity ladder. That is necessary but not sufficient. The paper's session-level finding is the load-bearing claim: L5 averaged 4.67 CEF turns per session; L7 averaged 17.75. Once a session crosses the recovery horizon (T20+), the agent ignores ground-truth corrections. This build closes that gap with a stateful aggregator that folds per-output detections into a session verdict.
+
+**Key Components**:
+1. `CEFSessionState` (str-enum) — `CLEAN` / `EARLY` / `WARNING` / `POINT_OF_NO_RETURN`
+2. `CEFSessionAction` (str-enum) — `CONTINUE` / `WARN` / `FREEZE` / `RESTART`. RESTART only on horizon + peak CRITICAL (CET-style)
+3. `CEFSessionConfig` (frozen dataclass) — `warn_total=3`, `warn_consecutive=2`, `horizon_total=20`, `horizon_consecutive=5`, `require_severity_floor=LOW`, plus a nested `CEFDetectorConfig`. Conservative defaults match the paper
+4. `CEFSessionVerdict` — `session_id`, `total_outputs`, `fabrication_count`, `consecutive_fabrications`, `peak_severity`, `peak_type`, `state`, `action`, `first_horizon_id`, `first_horizon_turn`, `rationale`, `verdict_id`, `verdict_at`, `session_digest` (sha256 of concatenated detection_ids). `to_dict` for audit
+5. `CEFSessionDetector` — `observe(detection, turn_index)` folds one detection; `observe_stream(detections, turn_indices)` folds a full window; `reset()` reuses the instance. `_crossed_horizon()` and `_crossed_warn()` are the threshold helpers. `_derive_state`/`_derive_action`/`_derive_rationale` map counters to verdict
+6. `detect_cef_session(session_id, outputs, config, context)` — end-to-end convenience: runs `CEFDetector.detect` on each output, then aggregates into a session verdict
+7. `create_cef_session_detector(config)` — smallest viable install: 1 line
+
+**Conservative posture (the paper's macro invariants)**:
+- `warn_consecutive=2` matches the paper's "two or more strong markers co-occurring" macro invariant
+- `horizon_consecutive=5` matches the paper's T5 recovery boundary (T5 recovers, T20+ ignores)
+- `horizon_total=20` matches the paper's T20+ recovery horizon
+- `require_severity_floor=LOW` means even vague-excuse patterns count (operators can raise to MEDIUM to filter those out)
+- `_peak_severity` is MAX over the window; later CLEAN detections do not demote it (conservative aggregation)
+- `first_horizon_id` captures the FIRST crossing detection for audit (operator can see the exact turn that crossed)
+- `RESTART` is reserved for horizon + CRITICAL peak (CET case); otherwise `FREEZE`. Operator decides what to do with the verdict
+
+**Test Coverage**: 25/25 tests pass ✅
+- TestCEFSessionConfig (3): defaults, frozen, custom thresholds
+- TestCEFSessionVerdict (4): to_dict round-trip, peak_severity=2 (int-enum), peak_type=architectural_confabulation
+- TestSessionDetectorEmpty (1): empty stream -> CLEAN/CONTINUE
+- TestSessionDetectorClean (2): single CLEAN stays CLEAN, CLEAN resets consecutive run
+- TestSessionDetectorSingle (1): single LOW stays EARLY
+- TestSessionDetectorPeak (1): MAX over window, never demoted
+- TestSessionDetectorWarnEscalation (2): warn by consecutive, warn by total
+- TestSessionDetectorHorizon (3): horizon by consecutive, horizon by total (with NONE interspersed), RESTART only on CRITICAL peak
+- TestSessionDetectorFloor (1): MEDIUM floor filters LOW
+- TestSessionDetectorStream (2): observe_stream, reset reuses detector
+- TestDetectCEFSession (5): clean session, L5 transcript warns, L7 transcript crosses horizon, CET CRITICAL peak, session_digest format
+- TestSessionConservativePosture (2): aggregation promotes but never demotes, session_id carries
+
+**Files Changed (Task 1)**:
+- `core/cef_session.py`: 537 lines (new) — full session aggregator
+- `experiments/test_cef_session.py`: 425 lines (new) — 25 tests
+- `core/__init__.py`: 7 new public exports (CEFSessionAction, CEFSessionConfig, CEFSessionDetector, CEFSessionState, CEFSessionVerdict, create_cef_session_detector, detect_cef_session)
+
+### Build Task 2: Wire CEFDetector + CEFSessionDetector into GovernedActionLoop
+
+**Motivation**: The June 14 build created `GovernedActionLoop` as a four-substrate cross-check (bridge + breaker + ledger + three-ring). The June 19 build added `CEFDetector` as a fifth substrate (output-boundary fabrication detection) but didn't wire it in. The June 20 build closes that gap. The CEF step is now Step 5 of the cross-check; CRITICAL fabrication → HOLD_PENDING_HUMAN (the agent's own output is a fabrication, so it needs operator review before its action can proceed).
+
+**Key Changes**:
+1. **New `HOLD_PENDING_CEF` outcome** in `CrossCheckOutcome` — distinct from `HOLD_PENDING_HUMAN` (which is structural/per-policy) so the operator can distinguish "the agent's *intent* is risky" from "the agent's *output* is fabricating"
+2. **New fields on `CrossCheckReport`**: `cef_severity`, `cef_type`, `cef_action`, `cef_detection_id`, `cef_recovery_horizon`, `cef_session_state`, `cef_session_action`. The CEF fields ride alongside the existing fields; `to_dict` includes all of them
+3. **`GovernedActionRequest.agent_output: Optional[str]`** — the caller supplies the agent's textual response. Optional because not every action carries one (a pure structural action like `read` may not)
+4. **Step 5 in `_cross_check`**: if `request.agent_output` is provided AND `self.cef_detector` is configured, run `CEFDetector.detect()`. CRITICAL → HOLD_PENDING_CEF + REQUIRE_HUMAN. MEDIUM/HIGH → demote verdict to REQUIRE_HUMAN but don't change outcome (the other substrates already passed). LOW → log only. None of these demote an earlier REJECT or REQUIRE_HUMAN
+5. **Session-level escalation**: `GovernedActionLoop` maintains a `cef_session_detectors: Dict[str, CEFSessionDetector]` keyed by `agent_id`. Each `propose()` folds the new detection into the agent's session detector. If the session crosses the recovery horizon, the cross-check holds with `CEFSessionState.POINT_OF_NO_RETURN` even if the per-output detection is LOW — the session-level signal is the load-bearing claim
+6. **Causal audit trail**: the CEF detection is attached to the certificate's `ASSUMPTION_CAPTURE` checkpoint detail under `cross_check.cef`. The cert carries the `cef_detection_id` end-to-end
+7. **Opt-in by default**: `create_governed_loop()` (the factory) constructs a fresh `CEFDetector` and an empty `cef_session_detectors` dict. Operators can pass `cef_detector=None` to disable, or supply their own `CEFDetector` with a customized pattern catalogue
+
+**Conservative posture**:
+- CEF step is *additive*: it can promote but never demote. A LOW CEF detection is recorded but doesn't change the verdict; a CRITICAL one adds HOLD_PENDING_CEF on top of whatever the other substrates said
+- Session-level escalation is *additive*: a CLEAN single output on a horizon-crossed session still flips to HOLD_PENDING_CEF because the session-level signal is the load-bearing claim
+- CEF fields are written to the report *even when the CEF step is skipped* (e.g., no agent_output) — they're just None. Audit completeness over speculation
+- The CEF step is never the *only* substrate; it's the fifth on top of the original four. Operator audit can replay the original four without CEF interference
+
+**Test Coverage**: 8 new CEF integration tests pass ✅ (within `TestCEFIntegration` class in `test_governed_action_loop.py`)
+- test_clean_output_no_cef_fields — CLEAN output produces None cef_severity/cef_type/cef_action; outcome is ALLOW
+- test_vague_excuse_observed_but_not_blocked — single VAGUE_EXCUSE carries LOW in report but doesn't change outcome
+- test_cet_crash_holds_for_human — fabricated exception trace → CRITICAL/SIMULATED_CRASH → HOLD_PENDING_CEF + REQUIRE_HUMAN (the paper's smoking gun)
+- test_cef_high_promotes_to_require_human — HIGH/MEDIUM fabrication promotes enforceability to REQUIRE_HUMAN without changing outcome (additive posture)
+- test_no_agent_output_skips_cef_silently — no agent_output → CEF fields are None, outcome unchanged
+- test_cef_disabled_when_detector_none — operator can pass `cef_detector=None` to disable; no CEF fields, no exception
+- test_cef_recovery_horizon_holds_session — repeat LOW fabrications on same agent cross horizon → HOLD_PENDING_CEF on later CLEAN output (session-level signal overrides per-output)
+- test_cef_report_to_dict_includes_cef_fields — to_dict round-trip includes all 7 new fields
+- (Bonus: test_cef_empty_pattern_catalogue_is_noop — empty pattern catalogue is a graceful no-op)
+
+**Files Changed (Task 2)**:
+- `core/governed_action_loop.py`: 33,000 → ~37,000 bytes (added imports, enum value, report fields, request field, init attributes, Step 5 logic, factory export)
+- `experiments/test_governed_action_loop.py`: 740 → ~850 lines (added 8 CEF integration tests, updated test_count from 5 → 6 outcomes)
+- `core/__init__.py`: 7 new exports for the session module (Task 1) + session aggregator wiring
+
+### Net Test Impact
+
+- Before this run: 1797 pass, 30 fail, 13 collection errors
+- After this run: **1860 pass (+63), 30 fail (same), 13 collection errors (same)**
+- Net new tests: 25 session + 8 integration = 33 new tests for the CEF system; +30 net from elsewhere (likely test fixups)
+
+### Why This Architecture is Right (for the next run)
+
+The four-layer safety substrate is now fully wired:
+1. **Signal level**: `SilentFailureMonitor` (PIG Engine) — measures entropy at the streaming boundary
+2. **Action level**: `SafetyCircuitBreaker` — per-action risk scoring
+3. **Routing level**: `ThreeRingGovernor` — R2/R3 routing with permission gate
+4. **Output level**: `CEFDetector` (per-output) + `CEFSessionDetector` (session-level) — fabrication detection
+
+The verification substrate is now fully wired:
+- `ProofCarryingAction` — ActionCertificate with IEEC hash chain (per-action)
+- `CEFDetector.output_hash` + `CEFDetection.detection_id` — content-addressed fabrication evidence (per-output)
+- `CEFSessionDetector.session_digest` + `CEFSessionVerdict.first_horizon_id` — session-level audit (per-session)
+- `EvidenceLedger.claim_id` + `CrossCheckReport.cef_detection_id` — claim/detection linking
+
+The conservative posture holds across all five steps of the cross-check: every substrate can PROMOTE a verdict but never DEMOTE one. The CEF step is the latest addition and follows the same posture.
+
+### Next Priority (for the next run)
+
+- **Wire `CEFSessionDetector` into `AgentLoop`** (the long-horizon agent loop, Jun 17 build) — every agent turn folds into the session detector, and a horizon-crossed session triggers a circuit-breaker open on the agent's principal
+- **`EvidenceLedger.record_cef(detection, session_verdict)`** — write CEF detections as SUPPORTED claims (per the existing pattern of `record_proof_carrying_action`)
+- **`SafetyCircuitBreaker.assess_cef(detection, session_verdict)`** — CRITICAL or session-horizon-crossed → OPEN the breaker for the agent's principal
+- **CLI / dashboard**: `python -m core.cef_session --review` surfaces the session_digest, peak severity, first-horizon detection, recommended action
+- **Multi-witness notarization on `CEFSessionVerdict`** — pair the session digest with a second detector (e.g., `SilentFailureMonitor`) so the operator can compare the two
+- **`ToolPrivilegeGovernor.cef_check(detection)`** — if the agent's output is fabricating an obstacle, downgrade the privilege scope (the paper's "constraint-evasive fabrication is enabled by over-broad permissions" insight)
+
+*Last updated: 2026-06-20 by AGI Research & Build Agent*

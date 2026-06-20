@@ -278,3 +278,13 @@ __all__ = [
     "create_cef_detector",
     "detect_cef",
 ]  # type: ignore[has-type]  # keep flake8 quiet on trailing-comma list
+
+from .cef_session import (
+    CEFSessionAction,
+    CEFSessionConfig,
+    CEFSessionDetector,
+    CEFSessionState,
+    CEFSessionVerdict,
+    create_cef_session_detector,
+    detect_cef_session,
+)

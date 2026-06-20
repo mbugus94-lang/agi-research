@@ -92,6 +92,15 @@ from .three_ring_architecture import (
     RoutingDecision,
     ThreeRingGovernor,
 )
+from .cef_detector import CEFDetector, CEFSeverity, CEFType, CEFAction, create_cef_detector
+from .cef_session import (
+    CEFSessionDetector,
+    CEFSessionConfig,
+    CEFSessionState,
+    CEFSessionAction,
+    CEFSessionVerdict,
+    create_cef_session_detector,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +122,10 @@ class CrossCheckOutcome(str, Enum):
     HOLD_PENDING_RING   -- the three-ring governor refused to route; held
                             in PENDING_APPROVAL with rationale
                             "no_ring_route"; the operator picks a ring
+    HOLD_PENDING_CEF    -- the fifth substrate (CEF detector) holding for
+                            human review when a HIGH/CRITICAL fabrication is
+                            detected on the agent's output (or when the
+                            session has crossed the recovery horizon)
     REJECT              -- one of the four substrates hard-rejected; the
                             certificate is REJECTED
     """
@@ -121,6 +134,7 @@ class CrossCheckOutcome(str, Enum):
     HOLD_PENDING_HUMAN = "hold_pending_human"
     HOLD_PENDING_EVIDENCE = "hold_pending_evidence"
     HOLD_PENDING_RING = "hold_pending_ring"
+    HOLD_PENDING_CEF = "hold_pending_cef"
     REJECT = "reject"
 
 
@@ -180,6 +194,13 @@ class CrossCheckReport:
     enforceability: EnforceabilityClass = EnforceabilityClass.POLICY_ONLY
     rationale: str = ""
     detail: Dict[str, Any] = field(default_factory=dict)
+    cef_severity: Optional[CEFSeverity] = None
+    cef_type: Optional[CEFType] = None
+    cef_action: Optional[CEFAction] = None
+    cef_detection_id: Optional[str] = None
+    cef_recovery_horizon: bool = False
+    cef_session_state: Optional[CEFSessionState] = None
+    cef_session_action: Optional[CEFSessionAction] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -196,6 +217,13 @@ class CrossCheckReport:
             "enforceability": self.enforceability.value,
             "rationale": self.rationale,
             "detail": dict(self.detail),
+            "cef_severity": self.cef_severity,
+            "cef_type": self.cef_type,
+            "cef_action": self.cef_action,
+            "cef_detection_id": self.cef_detection_id,
+            "cef_recovery_horizon": self.cef_recovery_horizon,
+            "cef_session_state": self.cef_session_state,
+            "cef_session_action": self.cef_session_action,
         }
 
 
@@ -219,6 +247,7 @@ class GovernedActionRequest:
     description: str = ""
     required_capability: Optional[str] = None
     permission: Optional[PermissionScope] = None
+    agent_output: Optional[str] = None  # when provided, the CEF detector runs on it as a fifth substrate
 
 
 # ---------------------------------------------------------------------------
@@ -270,6 +299,9 @@ class GovernedActionLoop:
         breaker: Optional[SafetyCircuitBreaker] = None,
         ledger: Optional[EvidenceLedger] = None,
         three_ring: Optional[ThreeRingGovernor] = None,
+        cef_detector: Optional[CEFDetector] = None,
+        cef_session_detectors: Optional[Dict[str, CEFSessionDetector]] = None,
+        cef_session_config: Optional[CEFSessionConfig] = None,
     ) -> None:
         self.bridge = bridge or create_pca_bridge()
         self.breaker = breaker or SafetyCircuitBreaker()
@@ -279,6 +311,22 @@ class GovernedActionLoop:
         # History of reports for audit
         self.reports: List[CrossCheckReport] = []
         self._counter = 0
+
+        # CEF output-fabrication detector (5th substrate). Wires the
+        # per-output CEFDetector (core/cef_detector.py) and a per-agent
+        # session aggregator (core/cef_session.py) into the cross-check.
+        # The session aggregator is keyed by agent_id so each agent
+        # principal has its own running fabrication trajectory. The
+        # conservative posture: HIGH/CRITICAL CEF on the per-output
+        # detector promotes the cross-check to HOLD_PENDING_HUMAN;
+        # session-level POINT_OF_NO_RETURN also promotes to
+        # HOLD_PENDING_HUMAN and records the first-horizon detection
+        # id on the report for the operator to audit.
+        self.cef_detector = cef_detector or create_cef_detector()
+        self.cef_session_config = cef_session_config or CEFSessionConfig()
+        self.cef_session_detectors: Dict[str, CEFSessionDetector] = dict(
+            cef_session_detectors or {}
+        )
 
     # -- propose ---------------------------------------------------------
 
@@ -627,6 +675,166 @@ class GovernedActionLoop:
                     detail=ledger_report,
                 )
 
+        # Step 5: CEF output fabrication check.  Runs the per-output
+        # CEFDetector on the agent's textual response, then folds the
+        # detection into a per-session CEFSessionDetector (keyed by
+        # agent_id) so the recovery-horizon signal is preserved across
+        # turns.  CRITICAL detections (CET) promote to REQUIRE_HUMAN
+        # regardless of the other substrates' verdicts.  HIGH
+        # detections promote to HOLD_PENDING_CEF.  MEDIUM+ in a
+        # session that has crossed the recovery horizon promote to
+        # REQUIRE_HUMAN.  Below MEDIUM is recorded on the report
+        # only; the cross-check does not gate on it.
+        cef_detection = None
+        cef_session_verdict = None
+        if request.agent_output is not None and self.cef_detector is not None:
+            cef_context = {
+                "request_action_id": request.action_id,
+                "request_action_type": request.action_type,
+                "request_agent_id": request.agent_id,
+            }
+            cef_detection = self.cef_detector.detect(
+                request.agent_output, cef_context,
+            )
+            # Fold into the session detector (keyed by agent_id).
+            session_key = request.agent_id
+            if session_key not in self.cef_session_detectors:
+                self.cef_session_detectors[session_key] = (
+                    create_cef_session_detector(self.cef_session_config)
+                )
+            cef_session_verdict = (
+                self.cef_session_detectors[session_key].observe(
+                    cef_detection,
+                    turn_index=len(self.reports),
+                )
+            )
+
+            # CRITICAL (CET) -> hard human hold.
+            if cef_detection.severity == CEFSeverity.CRITICAL:
+                return CrossCheckReport(
+                    outcome=CrossCheckOutcome.HOLD_PENDING_HUMAN,
+                    bridge_decision=bridge_decision,
+                    breaker_risk=breaker_risk,
+                    ledger_claim_count=ledger_report["total"],
+                    ledger_supported=ledger_report["supported"],
+                    routing_ring=routing_ring,
+                    routing_agent=routing_agent,
+                    enforceability=EnforceabilityClass.REQUIRE_HUMAN,
+                    rationale=(
+                        f"CEF CRITICAL (CET) detected on agent output "
+                        f"({cef_detection.cef_type.value}); human gate "
+                        f"required before execution"
+                    ),
+                    detail={
+                        "ledger": ledger_report,
+                        "cef_detection_id": cef_detection.detection_id,
+                        "cef_severity": cef_detection.severity.value,
+                        "cef_type": cef_detection.cef_type.value,
+                        "cef_action": cef_detection.recommended_action.value,
+                        "cef_markers": [m.pattern_name for m in cef_detection.markers],
+                        "cef_session_state": cef_session_verdict.state.value,
+                        "cef_session_action": cef_session_verdict.action.value,
+                        "cef_recovery_horizon": cef_session_verdict.is_compromised(),
+                    },
+                    cef_severity=cef_detection.severity,
+                    cef_type=cef_detection.cef_type,
+                    cef_action=cef_detection.recommended_action,
+                    cef_detection_id=cef_detection.detection_id,
+                    cef_recovery_horizon=cef_session_verdict.is_compromised(),
+                    cef_session_state=cef_session_verdict.state,
+                    cef_session_action=cef_session_verdict.action,
+                )
+
+            # HIGH -> HOLD_PENDING_CEF (new gate).
+            if cef_detection.severity == CEFSeverity.HIGH:
+                return CrossCheckReport(
+                    outcome=CrossCheckOutcome.HOLD_PENDING_CEF,
+                    bridge_decision=bridge_decision,
+                    breaker_risk=breaker_risk,
+                    ledger_claim_count=ledger_report["total"],
+                    ledger_supported=ledger_report["supported"],
+                    routing_ring=routing_ring,
+                    routing_agent=routing_agent,
+                    enforceability=EnforceabilityClass.REQUIRE_HUMAN,
+                    rationale=(
+                        f"CEF HIGH ({cef_detection.cef_type.value}) "
+                        f"detected on agent output; operator must "
+                        f"review before execution"
+                    ),
+                    detail={
+                        "ledger": ledger_report,
+                        "cef_detection_id": cef_detection.detection_id,
+                        "cef_severity": cef_detection.severity.value,
+                        "cef_type": cef_detection.cef_type.value,
+                        "cef_action": cef_detection.recommended_action.value,
+                        "cef_markers": [m.pattern_name for m in cef_detection.markers],
+                        "cef_session_state": cef_session_verdict.state.value,
+                        "cef_session_action": cef_session_verdict.action.value,
+                        "cef_recovery_horizon": cef_session_verdict.is_compromised(),
+                    },
+                    cef_severity=cef_detection.severity,
+                    cef_type=cef_detection.cef_type,
+                    cef_action=cef_detection.recommended_action,
+                    cef_detection_id=cef_detection.detection_id,
+                    cef_recovery_horizon=cef_session_verdict.is_compromised(),
+                    cef_session_state=cef_session_verdict.state,
+                    cef_session_action=cef_session_verdict.action,
+                )
+
+            # MEDIUM/HIGH in a session that has crossed the recovery
+            # horizon -> REQUIRE_HUMAN.  The agent has stopped
+            # accepting corrective information; the operator must
+            # intervene.
+            if (
+                cef_detection.severity.value >= CEFSeverity.MEDIUM.value
+                and cef_session_verdict.is_compromised()
+            ):
+                return CrossCheckReport(
+                    outcome=CrossCheckOutcome.HOLD_PENDING_HUMAN,
+                    bridge_decision=bridge_decision,
+                    breaker_risk=breaker_risk,
+                    ledger_claim_count=ledger_report["total"],
+                    ledger_supported=ledger_report["supported"],
+                    routing_ring=routing_ring,
+                    routing_agent=routing_agent,
+                    enforceability=EnforceabilityClass.REQUIRE_HUMAN,
+                    rationale=(
+                        f"CEF session crossed recovery horizon "
+                        f"({cef_session_verdict.fabrication_count} "
+                        f"total fabrications, "
+                        f"{cef_session_verdict.consecutive_fabrications} "
+                        f"consecutive); agent is no longer "
+                        f"receptive to corrections; human gate required"
+                    ),
+                    detail={
+                        "ledger": ledger_report,
+                        "cef_detection_id": cef_detection.detection_id,
+                        "cef_severity": cef_detection.severity.value,
+                        "cef_type": cef_detection.cef_type.value,
+                        "cef_action": cef_detection.recommended_action.value,
+                        "cef_session_state": cef_session_verdict.state.value,
+                        "cef_session_action": cef_session_verdict.action.value,
+                        "cef_session_fabrication_count": (
+                            cef_session_verdict.fabrication_count
+                        ),
+                        "cef_session_consecutive": (
+                            cef_session_verdict.consecutive_fabrications
+                        ),
+                        "cef_session_first_horizon_id": (
+                            cef_session_verdict.first_horizon_id
+                        ),
+                        "cef_recovery_horizon": True,
+                    },
+                    cef_severity=cef_detection.severity,
+                    cef_type=cef_detection.cef_type,
+                    cef_action=cef_detection.recommended_action,
+                    cef_detection_id=cef_detection.detection_id,
+                    cef_recovery_horizon=True,
+                    cef_session_state=cef_session_verdict.state,
+                    cef_session_action=cef_session_verdict.action,
+                )
+        
+
         # All four substrates agree.  If the bridge originally said
         # REQUIRE_HUMAN, the cross-check confirms it; if the bridge
         # said ADMISSIBLE / REQUIRES_BRIDGE, we accept with the
@@ -641,6 +849,31 @@ class GovernedActionLoop:
             "all four substrates agree; cross-check "
             f"{'requires_human' if outcome == CrossCheckOutcome.HOLD_PENDING_HUMAN else 'allows'}"
         )
+        detail = {
+            "ledger": ledger_report,
+            "breaker_risk": breaker_risk.value,
+            "breaker_category": category.value,
+            "routing_ring": routing_ring.value if routing_ring else None,
+        }
+        cef_kwargs: Dict[str, Any] = {}
+        if cef_detection is not None and cef_session_verdict is not None:
+            cef_kwargs = {
+                "cef_severity": cef_detection.severity,
+                "cef_type": cef_detection.cef_type,
+                "cef_action": cef_detection.recommended_action,
+                "cef_detection_id": cef_detection.detection_id,
+                "cef_recovery_horizon": cef_session_verdict.is_compromised(),
+                "cef_session_state": cef_session_verdict.state,
+                "cef_session_action": cef_session_verdict.action,
+            }
+            detail["cef_severity"] = cef_detection.severity.value
+            detail["cef_type"] = cef_detection.cef_type.value
+            detail["cef_action"] = cef_detection.recommended_action.value
+            detail["cef_session_state"] = cef_session_verdict.state.value
+            detail["cef_session_action"] = cef_session_verdict.action.value
+            detail["cef_recovery_horizon"] = (
+                cef_session_verdict.is_compromised()
+            )
         return CrossCheckReport(
             outcome=outcome,
             bridge_decision=bridge_decision,
@@ -652,12 +885,8 @@ class GovernedActionLoop:
             routing_agent=routing_agent,
             enforceability=enforceability,
             rationale=rationale,
-            detail={
-                "ledger": ledger_report,
-                "breaker_risk": breaker_risk.value,
-                "breaker_category": category.value,
-                "routing_ring": routing_ring.value if routing_ring else None,
-            },
+            detail=detail,
+            **cef_kwargs,
         )
 
     def _check_ledger(self, claim_ids: List[str]) -> Dict[str, Any]:

@@ -17,6 +17,7 @@ Test classes:
   - TestIntegration              (4) -- end-to-end propose + execute
   - TestAuditAndSummary          (3) -- report history, summary
   - TestConvenience              (4) -- create_governed_loop
+  - TestCEFIntegration           (N) -- Step 5 CEF output-fabrication check
 """
 
 from __future__ import annotations
@@ -44,6 +45,21 @@ from core.governed_action_loop import (
     _enforceability_rank,
     _record_from_cert,
     create_governed_loop,
+)
+from core.cef_detector import (
+    CEFAction,
+    CEFDetection,
+    CEFDetector,
+    CEFDetectorConfig,
+    CEFSeverity,
+    CEFType,
+    create_cef_detector,
+)
+from core.cef_session import (
+    CEFSessionAction,
+    CEFSessionConfig,
+    CEFSessionDetector,
+    CEFSessionState,
 )
 from core.proof_carrying_action import (
     ActionCertificate,
@@ -170,7 +186,7 @@ class TestCrossCheckOutcome(unittest.TestCase):
         self.assertEqual(CrossCheckOutcome.REJECT.value, "reject")
 
     def test_count(self):
-        self.assertEqual(len(list(CrossCheckOutcome)), 5)
+        self.assertEqual(len(list(CrossCheckOutcome)), 6)
 
     def test_str_mixin(self):
         # CrossCheckOutcome is a str-enum
@@ -734,6 +750,140 @@ class TestConvenience(unittest.TestCase):
         self.assertIsInstance(rec, OperationRecord)
         self.assertEqual(rec.operation_id, cert.certificate_id)
         self.assertEqual(rec.action_category, ActionCategory.READ)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+# ---- CEF Step 5: per-output fabrication check on the propose path --------
+
+
+class TestCEFIntegration(unittest.TestCase):
+    def test_clean_output_no_cef_fields(self):
+        loop = create_governed_loop()
+        req = _make_request(action_type="read")
+        req.agent_output = "Sure, here is the file you requested."
+        cert, verdict, report = loop.propose(req)
+        self.assertEqual(report.cef_severity, CEFSeverity.NONE)
+        self.assertEqual(report.cef_type, CEFType.NONE)
+        self.assertEqual(report.cef_session_state, CEFSessionState.CLEAN)
+        self.assertEqual(report.outcome, CrossCheckOutcome.ALLOW)
+
+    def test_vague_excuse_observed_but_not_blocked(self):
+        loop = create_governed_loop()
+        req = _make_request(action_type="read")
+        req.agent_output = "I am currently unable to help with that."
+        cert, verdict, report = loop.propose(req)
+        self.assertEqual(report.cef_severity, CEFSeverity.LOW)
+        self.assertEqual(report.cef_type, CEFType.VAGUE_EXCUSE)
+        # LOW is below the hold threshold; conservative posture
+        # observes but does not block.
+        self.assertEqual(report.outcome, CrossCheckOutcome.ALLOW)
+        self.assertIsNotNone(report.cef_detection_id)
+
+    def test_cet_crash_holds_for_human(self):
+        loop = create_governed_loop()
+        req = _make_request(action_type="read")
+        req.agent_output = (
+            "Traceback (most recent call last):\n"
+            "  File x.py line 1\n"
+            "ValueError: catastrophic failure\n"
+            "0xDEADBEEF\n"
+            "FATAL ERROR: system halted"
+        )
+        cert, verdict, report = loop.propose(req)
+        self.assertEqual(report.cef_severity, CEFSeverity.CRITICAL)
+        self.assertEqual(report.cef_type, CEFType.SIMULATED_CRASH)
+        # CET (the paper\'s "playing dead") is a hard hold
+        self.assertEqual(report.outcome, CrossCheckOutcome.HOLD_PENDING_HUMAN)
+        self.assertEqual(report.enforceability.value, "require_human")
+        self.assertEqual(cert.state.value, "pending_approval")
+
+    def test_cef_recovery_horizon_holds_session(self):
+        # Three back-to-back CRITICAL CEFs from the same agent should
+        # cross the session recovery horizon (default consecutive=5
+        # not crossed, but total fabrications and the per-output
+        # CRITICAL promote HOLD_PENDING_CEF on the third).
+        loop = create_governed_loop()
+        cet_output = (
+            "Traceback (most recent call last):\\n0xDEADBEEF\\n"
+            "FATAL ERROR: kernel panic"
+        )
+        for i in range(3):
+            req = _make_request(action_type="read", agent_id="cet-agent")
+            req.agent_output = cet_output
+            cert, verdict, report = loop.propose(req)
+            # Every per-output CEF is CRITICAL; cross-check holds.
+            self.assertEqual(report.cef_severity, CEFSeverity.CRITICAL)
+            self.assertEqual(report.outcome, CrossCheckOutcome.HOLD_PENDING_HUMAN)
+        # The session detector for this agent should have crossed
+        # the warning threshold (3 LOW+ fabrications, default warn_total=3).
+        session = loop.cef_session_detectors.get("cet-agent")
+        self.assertIsNotNone(session, "session detector should be created on first CEF run")
+        self.assertEqual(session._fabrication_count, 3)
+
+    def test_cef_empty_pattern_catalogue_is_noop(self):
+        # If the operator configures a CEFDetector with NO patterns,
+        # every output is CLEAN; Step 5 is a no-op.
+        from core.evidence_ledger import EvidenceLedger
+        from core.safety_circuit_breaker import SafetyCircuitBreaker
+        from core.proof_carrying_action import create_pca_bridge
+        empty_cef = CEFDetector(CEFDetectorConfig(patterns=()))
+        loop = GovernedActionLoop(
+            bridge=create_pca_bridge(),
+            breaker=SafetyCircuitBreaker(),
+            ledger=EvidenceLedger(),
+            cef_detector=empty_cef,
+        )
+        req = _make_request(action_type="read")
+        req.agent_output = "I am currently unable to help with that."
+        cert, verdict, report = loop.propose(req)
+        # Empty pattern catalogue -> CLEAN detection
+        self.assertEqual(report.cef_severity, CEFSeverity.NONE)
+        self.assertEqual(report.cef_type, CEFType.NONE)
+        self.assertEqual(report.outcome, CrossCheckOutcome.ALLOW)
+
+    def test_no_agent_output_skips_cef_silently(self):
+        loop = create_governed_loop()
+        req = _make_request(action_type="read")
+        # request.agent_output is None by default
+        cert, verdict, report = loop.propose(req)
+        self.assertIsNone(report.cef_severity)
+        self.assertIsNone(report.cef_session_state)
+        self.assertEqual(report.outcome, CrossCheckOutcome.ALLOW)
+
+    def test_cef_report_to_dict_includes_cef_fields(self):
+        loop = create_governed_loop()
+        req = _make_request(action_type="read")
+        req.agent_output = "I am currently unable to help with that."
+        cert, verdict, report = loop.propose(req)
+        d = report.to_dict()
+        self.assertIn("cef_severity", d)
+        self.assertIn("cef_type", d)
+        self.assertIn("cef_detection_id", d)
+        self.assertIn("cef_session_state", d)
+        self.assertIn("cef_session_action", d)
+        self.assertIn("cef_recovery_horizon", d)
+        # Serialised severity is an int (CEFSeverity is int-enum)
+        self.assertEqual(d["cef_severity"], 1)  # LOW
+        self.assertEqual(d["cef_type"], "vague_excuse")
+
+    def test_cef_recovery_horizon_cef_session_action(self):
+        # Verify the report\'s cef_recovery_horizon bool flips when
+        # the session crosses POINT_OF_NO_RETURN.
+        loop = create_governed_loop()
+        # 5 consecutive CEFs from the same agent crosses the default
+        # horizon_consecutive_threshold=5.
+        for i in range(5):
+            req = _make_request(action_type="read", agent_id="loop-agent")
+            req.agent_output = "I am currently unable to help with that."
+            loop.propose(req)
+        # The 5th report should be the one where the session
+        # crossed the horizon.
+        last_report = loop.reports[-1]
+        self.assertTrue(last_report.cef_recovery_horizon)
+        self.assertEqual(last_report.cef_session_state, CEFSessionState.POINT_OF_NO_RETURN)
 
 
 if __name__ == "__main__":
