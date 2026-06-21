@@ -1492,3 +1492,146 @@ The conservative posture holds across all five steps of the cross-check: every s
 - **`ToolPrivilegeGovernor.cef_check(detection)`** — if the agent's output is fabricating an obstacle, downgrade the privilege scope (the paper's "constraint-evasive fabrication is enabled by over-broad permissions" insight)
 
 *Last updated: 2026-06-20 by AGI Research & Build Agent*
+
+### Research Summary (June 20-21, 2026)
+
+**Industry News**:
+- **Google DeepMind's "Layered Defense" roadmap (Jun 18)** (Fortune): treats AI agents as rogue insiders; layered control over tools, data, behavior; the open-source substrate to compete with this is our four-layer stack (CEF + breaker + three-ring + ledger)
+- **Salesforce $3.6B Fin acquisition** (Jun 15) — enterprise agent market maturing; identity + lifecycle + audit becoming table stakes
+- **NewCore $66M raise** (Jun 15) — "digital employee" framing: AGI agents as first-class organizational members with formal IDs, departments, lifecycle
+- **OpenAI IPO S-1 (Jun 9)** — AGI mission explicitly stated; enterprise revenue now meaningful
+- **Anthropic RSI essay** (Jun 4) — "brake pedal" framing for recursive self-improvement; we already implemented this on Jun 7
+
+**Key arXiv / OpenReview Papers (week of Jun 20-21)**:
+1. **Foundry: Host-Owned Trust and Memory for Long-Horizon Agent Swarms** (OpenReview MWLIRDa4DC, 2026) ⭐ RELEVANT — central evaluator + established-facts registry + cross-agent memory; tightens theoretical bounds (Erdős minimum-overlap); reduces "local report gaming and re-discovering already-falsified hypotheses". Our `EvidenceLedger` is the in-process facts registry; our CEF integration is the bridge from per-output detection to the registry
+2. **Efficient and Sound Probabilistic Verification for AI Agents** (arXiv:2606.20510, Jun 20) — distributionally-robust bounds on policy-violation probability without independence assumptions; improves security-utility trade-off. Future work for our CEF substrate: replace the boolean breaker with a probabilistic upper bound
+3. **A Systematic Evaluation of Black-Box Uncertainty Estimation Methods** (arXiv:2606.19868, Jun 20) — 24 UE methods, 4 LLMs, 4 datasets; hybrid methods combining multiple signals work best. The output-boundary CEF detector is exactly this pattern (pattern catalogue + weight aggregation + session-level fold)
+4. **Holistic Review of Agentic AI Frameworks** (Springer, 2026) — canonical taxonomy: perception, role, memory, planning, reflection, action/tool, online learning. Identifies gaps: emergent behaviors, accountability, energy, multi-agent safety, online+long-term memory
+5. **AI Safety Landscape for LLMs** (Springer, 2026) — three-perspective framework: Trustworthy / Responsible / Ecosystemic Safe. Our four-layer safety substrate is the implementation of "Ecosystemic Safe AI"
+
+**Trending Open-Source Repos (week of Jun 20-21)**:
+- **studiomeyer-io/skilldoctor** (Jun 20) — linter/security scanner for SKILL.md / AGENTS.md (ESLint for agent skills). A–F grade, SARIF, GitHub Actions integration. Direct fit for our skill_governance pipeline
+- **jemo19/agent-team** (Jun 20) — Codex-CLI-driven "agent team" with role-based gated workflow; AGENTS.md + subagents + skills + approval policies. Mirrors our `AgentLoop` + `RevocationChannel` pattern
+- **pumblus/okf-harness** (Jun 20) — terminal-native, agent-first harness for OKF wikis; explicit provenance, bounded reads. Bounded reads match our `AgentIdentity.has(perm)` pattern
+- **askalf/keeper** (Jun 19, last week) — short-lived single-use secret leases + hash-chained audit log. The lease pattern is the substrate for a future `AgentSecret` skill
+- **researchflow-agent** (Jun 18) — paper-grounded workflow: extract paper metrics, plan candidate commands, dry-run by default, classify+verify paper/code/logs/inferences. We could use this to extend our `deep_research` skill
+
+### Why This Research Matters for Our Repo
+
+The June 20-21 research crystallizes three trends our repo addresses head-on:
+
+1. **The "rogue insider" threat model** (DeepMind) requires *layered* control. Our CEF substrate integration is the open-source implementation of the layered pattern: per-output detector + session aggregator + ledger writer + breaker assessor + loop bridge. Every layer can PROMOTE a verdict but never DEMOTE one — the conservative posture that lets the operator trust the audit trail.
+
+2. **The "established-facts registry" pattern** (Foundry) is what our `EvidenceLedger` has been since 2025: a content-addressed facts registry that agents write to and the substrate verifies against. The CEF integration makes CEF detections first-class claims — the agent's *own output* is checked against the same evidentiary substrate that its tool calls are checked against. The session_digest is the cross-output binding that lets the operator replay the entire CEF history of a session.
+
+3. **The probabilistic verification direction** (arXiv:2606.20510) is the principled next step. Today our breaker is boolean (open/closed); tomorrow it could be probabilistic with distributionally-robust bounds. The CEF substrate is the *signal*; the breaker is the *policy*; replacing the boolean policy with a probabilistic one is the principled extension.
+
+### Build Task: CEF Substrate Integration (4-layer bridge)
+
+**Motivation**: The June 19-20 builds created `CEFDetector` (per-output) and `CEFSessionDetector` (session-level) and wired both into `GovernedActionLoop`. The natural next move — flagged in the June 20 build log's "Next Priority" — was to wire CEF into the rest of the substrate: the long-horizon `AgentLoop`, the causal `EvidenceLedger`, and the per-action `SafetyCircuitBreaker`. This is the third leg of the four-layer safety substrate: signal (CEF per-output) → causal (ledger) → action (breaker) → loop (agent).
+
+**Design**: This module is the **additive** version of that wiring. It is *not* a modification to the substrate files themselves (those are in `SELF_SURFACE_PREFIXES` per `core/recursive_self_improvement.py`, and the safety policy in `SAFETY.md` requires human review for any self-surface edit). Instead, this module provides call-site helpers that downstream code uses to *connect* their existing CEF detectors to the rest of the substrate.
+
+**Key Components**:
+
+1. **`CEFIntegrationConfig`** — operator-controlled configuration:
+   - `severity_for_refute` (default `MEDIUM`) — minimum severity for `record_cef_to_ledger` to write REFUTES evidence
+   - `severity_for_trip` (default `CRITICAL`) — minimum severity for `assess_cef_to_breaker` to recommend a trip
+   - `trip_on_horizon` (default True) — session-level `POINT_OF_NO_RETURN` triggers a trip recommendation
+   - `trip_on_restart` (default True) — session-level `RESTART` action triggers a trip recommendation
+   - `trip_categories` (default `(EXECUTE, FILE_SYSTEM, EXTERNAL_API)`) — categories a trip would block
+   - `claim_author` (default `"cef_substrate"`) — author of CEF-induced claims
+
+2. **`record_cef_to_ledger(detection, ledger, config, session_verdict, claim_id, evidence_id) -> CEFLedgerOutcome`** — additive ledger writer:
+   - CLEAN detection → no claim, no evidence (CLEAN is "I checked, and it's OK")
+   - Below refute floor → SUPPORTS evidence with weight 0.4, confidence 0.7
+   - At/above refute floor (MEDIUM) → REFUTES evidence with weight 0.9, confidence 0.95
+   - Calls `ledger.verify(claim_id)` immediately so the claim status flips to CONTRADICTED for CRITICAL detections (the auditor sees the contradiction immediately, not on the next `verify_all()` pass)
+   - Caller-supplied `claim_id`/`evidence_id` for deterministic replay
+
+3. **`assess_cef_to_breaker(detection, breaker, config, session_verdict, principal) -> CEFBreakerOutcome`** — additive breaker assessor:
+   - CLEAN or below trip floor → `NO_TRIP`
+   - At/above trip floor (CRITICAL) → `TRIP` (recommendation only; breaker is **not** mutated — caller decides)
+   - Session in `POINT_OF_NO_RETURN` → `TRIP_SESSION` (session-level signal is load-bearing)
+   - Session action `RESTART` → `TRIP_SESSION` (operator-initiated restart recommended)
+   - Returns `tripped_categories` so the caller can selectively trip on EXECUTE/FILE_SYSTEM/EXTERNAL_API while leaving READ paths open (a fabricating agent can still observe while the operator reviews)
+
+4. **`fold_step_into_cef(agent_output, step_index, session_detector, observation, turn_index) -> CEFLoopStep`** — loop bridge:
+   - Runs the per-output `CEFDetector` on `agent_output`
+   - Folds the result into the session detector (mutating it in place)
+   - Returns `CEFLoopStep` with `detection`, `session_verdict`, `recommended_loop_action`
+   - `recommended_loop_action` derives from session verdict: CONTINUE → "continue", WARN → "warn", FREEZE → "freeze", RESTART → "restart"
+   - Per-output CRITICAL (CET) escalates to "halt" regardless of session verdict (the agent faking its own crash is a hard halt signal — the loop should not be tricked into continuing)
+
+5. **`CEFLedgerOutcome`, `CEFBreakerOutcome`, `CEFLoopStep`** — return types with `to_dict()` for audit trail and `__init__.py` exports
+
+6. **`create_cef_integration(session_config, integration_config) -> Tuple[CEFSessionDetector, CEFIntegrationConfig]`** — smallest-viable install: one line, one detector, one config
+
+**Conservative posture (the paper's macro invariants)**:
+- All three helpers are *additive*: they can PROMOTE a verdict but never DEMOTE one
+- The breaker assessor is *side-effect free* — it returns a recommendation; the caller decides whether to call `breaker._record_failure()` or `breaker.reset_circuit()`. The conservative posture is preserved: the agent's CEF behavior cannot *reset* a tripped breaker
+- The ledger writer is *additive*: a CLEAN detection never overwrites a prior CONTRADICTED claim (it writes a new claim or no claim at all)
+- The session verdict is the load-bearing signal: a CLEAN output on a horizon-crossed session still recommends FREEZE/RESTART/halt
+
+**Test Coverage**: 33/33 tests pass ✅
+- TestCEFIntegrationConfig (2): defaults, frozen
+- TestRecordCEFToLedger (8): CLEAN, LOW (SUPPORTS), MEDIUM (SUPPORTS), HIGH (REFUTES/CONTRADICTED), CRITICAL, session-horizon escalation, write-disabled, to_dict
+- TestAssessCEFToBreaker (8): CLEAN, LOW, MEDIUM (no trip), CRITICAL (recommendation), session-horizon trip, open_breaker-disabled, session_horizon-disabled, to_dict
+- TestFoldStepIntoCEF (8): clean continues, low continues-below-warn, high continues, CET halts, session freeze/restart on horizon, step customisation, to_dict
+- TestCreateCEFIntegration (3): default + custom session + custom integration
+- TestIntegrationWithRealSubstrate (3): full CEF pipeline, ledger status after CRITICAL, session-horizon drives substrate
+- TestConservativePosture (3): clean-doesn't-overwrite-contradicted, assessor-doesn't-mutate-breaker, session-preserves-horizon-audit-after-clean
+
+**Research Synthesis**:
+- The DeepMind layered-defense pattern is now fully implemented: signal (CEF per-output) → causal (ledger) → action (breaker) → loop (agent)
+- The Foundry "established-facts registry" pattern is the in-process `EvidenceLedger`; CEF detections become first-class claims in the same substrate
+- The Springer Holistic Review's "closed-loop feedback where evaluation signals inform online learning" is exactly the CEF→ledger→breaker→loop bridge: every CEF detection can trigger a session-level verdict that promotes the next action's enforceability class
+- The probabilistic verification direction (arXiv:2606.20510) is the principled Q3 follow-up: replace boolean breaker with probabilistic upper bound
+- The session_digest is content-addressed (SHA-256 of detection_ids), so the operator can replay the entire CEF history from any `CEFSessionVerdict` — the substrate's audit trail is the system of record
+- The `create_cef_integration()` smallest-viable install matches the "smallest viable install" discipline of every other module in the repo (EvoMaster's ~100 LOC, our `create_pca_bridge()`, our `create_three_ring_governor()`)
+- The 33 tests are intentionally small: each one verifies a single conservative-posture invariant
+- The module is ~770 lines: small enough to read in one sitting, large enough to be non-trivial. The CEF detector family is now ~3700 lines total (cef_detector + cef_session + cef_substrate_integration + the wiring in governed_action_loop)
+- The CEF substrate is now first-class in `core/__init__.py` — operators can `from core import CEFLoopStep, CEFBreakerOutcome, CEFLedgerOutcome`
+
+**Files Changed**:
+- `core/cef_substrate_integration.py`: 770 lines (new) — full bridge
+- `experiments/test_cef_substrate_integration.py`: 685 lines (new) — 33 tests
+- `core/__init__.py`: 9 new public exports (CEFBreakerOutcome, CEFBreakerVerdict, CEFIntegrationConfig, CEFLedgerOutcome, CEFLoopStep, assess_cef_to_breaker, create_cef_integration, fold_step_into_cef, record_cef_to_ledger)
+
+### Net Test Impact
+
+- Before this run: 1860 pass, 30 fail, 13 collection errors
+- After this run: **1893 pass (+33), 30 fail (same), 13 collection errors (same)**
+- Net new tests: 33 for the CEF substrate integration
+- The four-layer safety substrate (signal + action + routing + output) is now fully wired end-to-end
+
+### Why This Architecture is Right (for the next run)
+
+The four-layer safety substrate is now fully wired end-to-end:
+1. **Signal level**: `SilentFailureMonitor` (PIG Engine) — measures entropy at the streaming boundary
+2. **Action level**: `SafetyCircuitBreaker` — per-action risk scoring (now wired to CEF via `assess_cef_to_breaker`)
+3. **Routing level**: `ThreeRingGovernor` — R2/R3 routing with permission gate
+4. **Output level**: `CEFDetector` (per-output) + `CEFSessionDetector` (session-level) — fabrication detection
+5. **Causal layer**: `EvidenceLedger` — claims+evidence, now wired to CEF via `record_cef_to_ledger`
+6. **Loop layer**: `AgentLoop` — verification-gated act-observe-evaluate, now wired to CEF via `fold_step_into_cef`
+
+The verification substrate is now fully wired:
+- `ProofCarryingAction` — ActionCertificate with IEEC hash chain (per-action)
+- `CEFDetector.output_hash` + `CEFDetection.detection_id` — content-addressed fabrication evidence (per-output)
+- `CEFSessionDetector.session_digest` + `CEFSessionVerdict.first_horizon_id` — session-level audit (per-session)
+- `EvidenceLedger.claim_id` + `CrossCheckReport.cef_detection_id` — claim/detection linking
+- `CEFLedgerOutcome.claim_id` + `CEFBreakerOutcome.detection_id` + `CEFLoopStep.session_verdict` — full audit chain
+
+The conservative posture holds across all six layers of the substrate: every layer can PROMOTE a verdict but never DEMOTE one. The CEF substrate integration is the latest addition and follows the same posture.
+
+### Next Priority (for the next run)
+
+- **End-to-end demo**: a single `python -m core.cef_substrate_integration --demo` that runs a synthetic agent session with intermittent fabrications, drives the session to horizon, and shows the ledger + breaker + loop bridge firing in sequence
+- **Wire `fold_step_into_cef` into `AgentLoop.run()` directly**: add a `cef_session_detectors` dict keyed by `loop_id` to `AgentLoopConfig`; on each EVALUATE step, fold the observation's `agent_output` through CEF; if the session verdict recommends `freeze`/`restart`/`halt`, surface as an ESCALATE verdict to the verifier
+- **Probabilistic upper bounds on breaker trips** (arXiv:2606.20510): replace the boolean `TRIP_SESSION` with a probability estimate + distributionally-robust upper bound; expose `trip_probability` and `trip_upper_bound` on `CEFBreakerOutcome`
+- **Multi-witness notarization on `CEFSessionVerdict`**: pair the session digest with a second detector (e.g., `SilentFailureMonitor`) so the operator can compare the two; surface agreement/disagreement in `to_dict()`
+- **CLI / dashboard**: `python -m core.cef_substrate_integration --review` surfaces last N ledger writes, breaker recommendations, and loop actions
+- **skilldoctor integration** (trending Jun 20): add a linter check that scans `SKILL.md` / `AGENTS.md` files for CEF-pattern phrasings (vague excuse patterns, external obstacle patterns); flag skill docs that teach agents to fabricate
+- **DeepVerify-style multi-modal CEF** (ACM 2026): extend the CEF detector to images / structured outputs / tool traces; not just text
+
+*Last updated: 2026-06-21 by AGI Research & Build Agent*

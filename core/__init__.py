@@ -288,3 +288,14 @@ from .cef_session import (
     create_cef_session_detector,
     detect_cef_session,
 )
+from .cef_substrate_integration import (
+    CEFBreakerOutcome,
+    CEFBreakerVerdict,
+    CEFIntegrationConfig,
+    CEFLedgerOutcome,
+    CEFLoopStep,
+    assess_cef_to_breaker,
+    create_cef_integration,
+    fold_step_into_cef,
+    record_cef_to_ledger,
+)

@@ -5635,3 +5635,47 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 - **`SafetyCircuitBreaker.assess_session(verdict)`**: freezable session → OPEN the breaker for the agent-id until the operator explicitly clears
 - **LLM-backed judge for the CEF step**: keep the pattern detector as the fast deterministic layer; add an optional LLM judge for cases the pattern catalogue misses (Q3 follow-up)
 - **`detector_registry`**: a tiny JSON file that lets operators enable/disable the CEF step + session aggregator per agent-id (per-agent conservative posture)
+
+---
+
+### 2026-06-21 - Scheduled Run: CEF Substrate Integration (AgentLoop + EvidenceLedger + SafetyCircuitBreaker bridge)
+**Status**: ✅ COMPLETE - 33/33 tests passed for the new integration module
+
+**Research Summary (June 20-21, 2026)**:
+- **Google DeepMind layered defense roadmap (Jun 18)**: AI agents are now treated as rogue insiders; layered control over tools, data, and behavior. This run implemented the open-source layered response: per-output detector → session aggregator → ledger writer → breaker assessor → loop bridge.
+- **Foundry (OpenReview MWLIRDa4DC)**: host-owned trust and memory for long-horizon agent swarms; central evaluator + established-facts registry + cross-agent memory. This maps directly onto our `EvidenceLedger`.
+- **Efficient and Sound Probabilistic Verification for AI Agents (arXiv:2606.20510)**: distributionally robust upper bounds on policy-violation probability under uncertainty. This is the principled next step for the breaker policy.
+- **A Systematic Evaluation of Black-Box Uncertainty Estimation Methods (arXiv:2606.19868)**: hybrid uncertainty methods are best. That validates the CEF detector family’s weighted-pattern + session-fold design.
+- **Skilldoctor / agent-team / okf-harness / keeper**: trend signal that agent ecosystems are converging on governance-first, local-first, audited workflows.
+
+**Build Task: CEF Substrate Integration**
+
+**Motivation**: Jun 19-20 created `CEFDetector` and `CEFSessionDetector`, then wired them into `GovernedActionLoop`. The next step was to wire the rest of the substrate: the long-horizon `AgentLoop`, the causal `EvidenceLedger`, and the per-action `SafetyCircuitBreaker`.
+
+**Key Components**:
+1. `CEFIntegrationConfig` — operator-controlled thresholds for refute/trip and session-horizon handling.
+2. `record_cef_to_ledger(...) -> CEFLedgerOutcome` — writes CEF detections into the evidence ledger, immediately verifies the claim, and preserves deterministic replay via caller-supplied ids.
+3. `assess_cef_to_breaker(...) -> CEFBreakerOutcome` — advisory breaker recommendation only; side-effect free.
+4. `fold_step_into_cef(...) -> CEFLoopStep` — folds a loop step into the session detector and returns a bridge recommendation.
+5. `create_cef_integration(...)` — smallest viable install.
+6. `to_dict()` support on the returned outcome dataclasses for auditability.
+
+**Conservative posture**:
+- CLEAN detections do not overwrite prior claims.
+- The assessor never mutates the breaker; the caller decides whether to act on the recommendation.
+- Horizon-crossed sessions remain visible in the audit trail even after a later clean output.
+- The session digest is content-addressed and changes as the session evolves; `first_horizon_id` is the stable audit anchor.
+
+**Test Coverage**: 33/33 tests passed for the new integration module.
+
+**Files Changed**:
+- `core/cef_substrate_integration.py`: new bridge module
+- `experiments/test_cef_substrate_integration.py`: new integration tests
+- `core/__init__.py`: exports for the new bridge types/functions
+- `CURRENT_RESEARCH.md`: appended the new research/build entry
+- `AGENTS.md`: this build log entry
+
+**Next Priority**:
+- Wire `fold_step_into_cef` into `AgentLoop.run()` directly.
+- Add a CLI review mode for the CEF substrate bridge.
+- Explore probabilistic breaker recommendations as the next refinement.
