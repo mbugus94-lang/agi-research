@@ -152,6 +152,23 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Deque, Dict, Iterable, List, Optional, Protocol, Tuple
 
+# Lazy import: CEF substrate is optional. The agent loop must work without
+# the CEF substrate being installed (e.g., in the minimal install path).
+_CEF_IMPORT_ERROR: Optional[Exception] = None
+try:
+    from .cef_session import CEFSessionDetector  # type: ignore
+    from .cef_substrate_integration import (  # type: ignore
+        CEFIntegrationConfig,
+        CEFLoopStep,
+        fold_step_into_cef,
+    )
+except Exception as _exc:  # pragma: no cover - defensive
+    CEFSessionDetector = None  # type: ignore
+    CEFIntegrationConfig = None  # type: ignore
+    CEFLoopStep = None  # type: ignore
+    fold_step_into_cef = None  # type: ignore
+    _CEF_IMPORT_ERROR = _exc
+
 
 # ---------------------------------------------------------------------------
 # Verdict enum and ordering
@@ -796,6 +813,21 @@ class AgentLoopConfig:
     revocation_channel: Optional[RevocationChannel] = None
     max_in_memory_steps: int = 4096   # ring size; the disk trail is the truth
 
+    # --- CEF substrate bridge (optional) ----------------------------------
+    # When `cef_session_detector` is set, every act -> observe cycle is
+    # folded through the CEF substrate via `fold_step_into_cef`. The
+    # session detector is mutated in place (it owns the running horizon
+    # signal). The loop records every folded step on `_cef_steps` and
+    # uses the recommended loop action to override the verifier verdict.
+    #
+    # `cef_integration_config` is accepted for API symmetry with
+    # `create_cef_integration`; the loop only needs the session detector.
+    # `agent_output_key` lets the operator point at a custom observation
+    # field if the canonical keys do not match their work function.
+    cef_session_detector: Optional[Any] = None
+    cef_integration_config: Optional[Any] = None
+    agent_output_key: Optional[str] = None
+
 
 class AgentLoop:
     """The verification-gated loop orchestrator.
@@ -814,9 +846,33 @@ class AgentLoop:
         self._lifecycle = LifecycleState.PROVISIONED
         self._sequence = 0
         self._audit_path: Optional[Path] = None
+        self._cef_audit_path: Optional[Path] = None
         if config.audit_path:
             self._audit_path = Path(config.audit_path)
             self._audit_path.parent.mkdir(parents=True, exist_ok=True)
+        # Sidecar CEF audit file: one JSON line per folded step.
+        # Independent of the main loop audit so the CEF stream is
+        # replay-ready even if the main loop audit is truncated.
+        # Only set when CEF is actually wired; otherwise leave None so
+        # the property reads as "no CEF audit, as expected."
+        if config.audit_path and config.cef_session_detector is not None:
+            self._cef_audit_path = self._audit_path.with_suffix(
+                self._audit_path.suffix + ".cef.jsonl"
+            )
+
+        # CEF substrate wiring (optional). The loop is fully functional
+        # without the CEF substrate; these slots are None when not used.
+        self._cef_session_detector = config.cef_session_detector
+        self._cef_integration_config = config.cef_integration_config
+        self._agent_output_key = config.agent_output_key
+        self._cef_steps: List[Any] = []   # List[CEFLoopStep] (typed as Any to avoid hard dep)
+        self._cef_disabled_reason: Optional[str] = None
+        if config.cef_session_detector is not None and CEFSessionDetector is None:
+            # The operator asked for CEF but the import failed.
+            self._cef_disabled_reason = (
+                f"CEF substrate requested but import failed: {_CEF_IMPORT_ERROR!r}"
+            )
+            self._cef_session_detector = None
 
     # --- lifecycle accessors ----------------------------------------------
 
@@ -840,6 +896,81 @@ class AgentLoop:
     def budget_status(self) -> BudgetStatus:
         return self._budget_status
 
+    # --- CEF accessors -----------------------------------------------------
+
+    @property
+    def cef_enabled(self) -> bool:
+        """True when the CEF substrate is wired into this loop."""
+        return self._cef_session_detector is not None
+
+    @property
+    def cef_audit_path(self) -> Optional[Path]:
+        """Path to the sidecar CEF audit JSONL (or None)."""
+        return self._cef_audit_path
+
+    @property
+    def cef_disabled_reason(self) -> Optional[str]:
+        """Why CEF is disabled, or None if it is wired or was not requested."""
+        return self._cef_disabled_reason
+
+    @property
+    def cef_steps(self) -> List[Any]:
+        """The folded CEF steps (one per act -> observe cycle).
+
+        Each entry is a `CEFLoopStep` carrying the per-output detection,
+        the session verdict after folding, and the recommended loop
+        action. Empty list when CEF is not enabled.
+        """
+        return list(self._cef_steps)
+
+    @property
+    def cef_session_verdict(self) -> Optional[Any]:
+        """The latest session verdict folded into this loop. None if no steps yet."""
+        if not self._cef_steps:
+            return None
+        return self._cef_steps[-1].session_verdict
+
+    @property
+    def cef_latest_recommended_action(self) -> Optional[str]:
+        """The latest recommended loop action from the CEF bridge, or None."""
+        if not self._cef_steps:
+            return None
+        return self._cef_steps[-1].recommended_loop_action
+
+    # --- CEF folding -------------------------------------------------------
+
+    def _fold_cef(
+        self,
+        observation: Optional[Dict[str, Any]],
+        step_index: int,
+        turn_index: Optional[int] = None,
+    ) -> Optional[Any]:
+        """Fold one step into the CEF substrate.
+
+        Runs `fold_step_into_cef` on the agent's output (extracted from
+        the observation), appends the resulting `CEFLoopStep` to
+        `_cef_steps`, and returns it. Returns None when CEF is disabled.
+
+        This method is *idempotent on the session detector*: the
+        detector is mutated in place by the underlying fold call. The
+        caller (the loop) owns the session detector and reuses it
+        across steps, which is exactly the pattern the substrate
+        expects.
+        """
+        if self._cef_session_detector is None or fold_step_into_cef is None:
+            return None
+        agent_output = _extract_agent_output(observation, self._agent_output_key)
+        cef_step = fold_step_into_cef(
+            agent_output=agent_output,
+            step_index=step_index,
+            session_detector=self._cef_session_detector,
+            observation=observation,
+            turn_index=turn_index,
+        )
+        self._cef_steps.append(cef_step)
+        self._persist_cef(cef_step)
+        return cef_step
+
     # --- audit persistence ------------------------------------------------
 
     def _persist(self, step: LoopStep) -> None:
@@ -847,6 +978,24 @@ class AgentLoop:
             return
         with self._audit_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(step.to_dict(), sort_keys=True) + "\n")
+
+    def _persist_cef(self, cef_step: Any) -> None:
+        """Persist a folded CEF step to the sidecar CEF audit JSONL.
+
+        Called automatically by ``_fold_cef`` after the CEFLoopStep is
+        appended to ``_cef_steps``. The main loop audit (``audit_path``)
+        carries the verifier verdict; this sidecar carries the CEF
+        detection + session verdict. Both are required to fully replay
+        a loop run: the CEF override is *load-bearing* on the verdict.
+        """
+        if self._cef_audit_path is None:
+            return
+        try:
+            payload = cef_step.to_dict()
+        except Exception:  # pragma: no cover - defensive
+            return
+        with self._cef_audit_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, sort_keys=True, default=str) + "\n")
 
     # --- core loop --------------------------------------------------------
 
@@ -862,6 +1011,15 @@ class AgentLoop:
         `goal(observation) -> bool` is the operator-defined completion
         condition. `max_iterations` is a *soft* cap; the *hard* cap is
         the budget. The loop returns the final observation.
+
+        When `AgentLoopConfig.cef_session_detector` is set, the loop
+        additionally folds each step's agent output through the CEF
+        substrate and uses the recommended loop action to override the
+        verifier's verdict: `halt` -> HALT, `freeze`/`restart` ->
+        ESCALATE, `warn` -> evidence-append only. The CEF verdict is
+        *load-bearing*: a horizon-crossed session with a clean per-output
+        detection still escalates because the session-level signal is
+        the substrate's claim.
         """
         if self._lifecycle in (LifecycleState.COMPLETED, LifecycleState.FAILED, LifecycleState.REVOKED):
             raise RuntimeError(f"loop {self.loop_id} is already terminal ({self._lifecycle.value})")
@@ -910,6 +1068,12 @@ class AgentLoop:
             self._steps.append(obs_step)
             self._persist(obs_step)
 
+            # CEF fold (optional, side-effect: appends to _cef_steps and
+            # mutates the session detector in place). Runs *before* the
+            # EVALUATE verdict is computed so the CEF override can be
+            # applied to the verifier verdict.
+            cef_step = self._fold_cef(observation, step_index=self._sequence)
+
             # Count every act against the budget, regardless of verdict.
             # The act happened; the cost was incurred. Halt/Escalate/Goal
             # do not erase the cost. A loop that returns COMPLETED on its
@@ -928,6 +1092,38 @@ class AgentLoop:
             verdict, rationale, evidence = self.config.verifier.evaluate(
                 self.config.identity, action, observation, prior_evidence
             )
+
+            # CEF override (load-bearing). The CEF recommended action
+            # can PROMOTE the verdict but never DEMOTE it. A clean
+            # verifier verdict stays clean if CEF says "warn" or
+            # "continue"; an ESCALATE/HALT from CEF upgrades the
+            # verdict. We prepend a "cef:" prefix to the rationale so
+            # the audit trail shows both the verifier's reasoning and
+            # the CEF override.
+            if cef_step is not None:
+                cef_action = cef_step.recommended_loop_action
+                cef_rationale = (
+                    f"cef[{cef_step.detection.severity.name}]/"
+                    f"{cef_step.session_verdict.action.value}: "
+                    f"{cef_step.session_verdict.rationale}"
+                )
+                if cef_action == "halt":
+                    verdict = Verdict.HALT
+                    rationale = f"{cef_rationale} | verifier: {rationale}"
+                elif cef_action in ("freeze", "restart"):
+                    # ESCALATE unless the verifier already produced
+                    # something stronger.
+                    if verdict != Verdict.HALT:
+                        verdict = Verdict.ESCALATE
+                    rationale = f"{cef_rationale} | verifier: {rationale}"
+                elif cef_action == "warn":
+                    # Additive only: attach as evidence, do not change
+                    # the verdict. The audit trail still records the
+                    # warning so the operator can grep for it.
+                    evidence = list(evidence) + [cef_step.to_dict()]
+                    rationale = f"{cef_rationale} (warn-only) | verifier: {rationale}"
+                # cef_action == "continue" -> no override
+
             eval_step.verdict = verdict
             eval_step.composite_rationale = rationale
             eval_step.evidence = list(evidence)
@@ -1024,6 +1220,9 @@ def create_agent_loop(
     breaker: Any = None,
     ledger: Any = None,
     monitor: Any = None,
+    cef_session_detector: Optional[Any] = None,
+    cef_integration_config: Optional[Any] = None,
+    agent_output_key: Optional[str] = None,
 ) -> AgentLoop:
     """The smallest viable install: 1 line.
 
@@ -1034,6 +1233,10 @@ def create_agent_loop(
     Pass `breaker`, `ledger`, `monitor` to attach the corresponding
     verifiers. If a slot is None, that verifier is omitted from the
     composite (a loop with no verifier is a fire-and-forget script).
+
+    Pass `cef_session_detector` (and optionally `cef_integration_config`
+    + `agent_output_key`) to wire the CEF substrate into the loop.
+    See :class:`AgentLoopConfig` for the per-field semantics.
     """
     chosen: List[VerifierProtocol] = list(verifiers)
     if breaker is not None:
@@ -1058,6 +1261,9 @@ def create_agent_loop(
             budget=budget or LoopBudget(),
             audit_path=audit_path,
             revocation_channel=revocation_channel,
+            cef_session_detector=cef_session_detector,
+            cef_integration_config=cef_integration_config,
+            agent_output_key=agent_output_key,
         )
     )
 
@@ -1065,6 +1271,75 @@ def create_agent_loop(
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
+
+
+# Canonical observation keys that carry the agent's textual output. The
+# loop does not know the work function's return shape, so it tries the
+# most common shapes in priority order. Operators can override by passing
+# `agent_output_key` to AgentLoopConfig.
+_CEF_AGENT_OUTPUT_KEYS: Tuple[str, ...] = (
+    "agent_output",
+    "output",
+    "text",
+    "response",
+    "content",
+    "message",
+)
+
+
+def _extract_agent_output(
+    observation: Optional[Dict[str, Any]],
+    agent_output_key: Optional[str] = None,
+) -> str:
+    """Extract the agent's textual output from an observation dict.
+
+    The AgentLoop does not impose a canonical observation schema on the
+    work function. The CEF detector needs a string, so this helper
+    applies a priority list of common keys and falls back to a
+    JSON-serialized representation of the observation.
+
+    The fallback is deliberately conservative: a JSON dump of the
+    observation will trigger the CEFDetector's "minimum length" guard
+    if the observation is large, and the detector's pattern catalogue
+    only fires on text-shaped output. The fallback path therefore
+    rarely escalates and *never* escalates spuriously on tool traces.
+
+    Parameters
+    ----------
+    observation : Optional[Dict[str, Any]]
+        The observation dict produced by the work function. None is
+        treated as an empty observation.
+    agent_output_key : Optional[str]
+        If provided, look up *only* this key (operator override). If
+        None, try the canonical keys in priority order.
+
+    Returns
+    -------
+    str
+        The extracted agent output. Empty string when no textual
+        content can be found.
+    """
+    if not isinstance(observation, dict):
+        return ""
+    keys = (agent_output_key,) if agent_output_key else _CEF_AGENT_OUTPUT_KEYS
+    for key in keys:
+        value = observation.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    # Fallback: try a nested "output" dict (e.g. {"output": {"text": "..."}})
+    nested = observation.get("output")
+    if isinstance(nested, dict):
+        for key in ("text", "content", "message"):
+            value = nested.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+    # Last resort: JSON-serialize the observation. This is conservative;
+    # the detector's pattern catalogue is tuned for human-authored text,
+    # not for tool traces or JSON.
+    try:
+        return json.dumps(observation, sort_keys=True, default=str)
+    except Exception:
+        return ""
 
 
 def _utcnow_iso() -> str:

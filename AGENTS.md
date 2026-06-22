@@ -5679,3 +5679,14 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 - Wire `fold_step_into_cef` into `AgentLoop.run()` directly.
 - Add a CLI review mode for the CEF substrate bridge.
 - Explore probabilistic breaker recommendations as the next refinement.
+
+### 2026-06-22 - Scheduled Run: AgentLoop ↔ CEF Substrate Bridge
+**Status**: ✅ COMPLETE - 20/20 new tests pass; 496/496 affected tests pass; 0 regressions
+
+**Build**: `core/agent_loop.py` (+182 lines) wires `fold_step_into_cef` into `AgentLoop.run()` so every act → observe cycle folds through the CEF substrate. The CEF recommended loop action is **load-bearing** on the verifier verdict (additive promotion only). Per-output CRITICAL (CET) escalates to HALT regardless of session verdict. New config: `AgentLoopConfig.cef_session_detector`, `cef_integration_config`, `agent_output_key`. New properties: `loop.cef_enabled`, `cef_steps`, `cef_session_verdict`, `cef_latest_recommended_action`, `cef_audit_path`. Sidecar audit trail: `<audit_path>.cef.jsonl`. `create_agent_loop()` now accepts CEF params for smallest-viable install.
+
+**Tests**: `experiments/test_agent_loop_cef_bridge.py` (676 lines, 20 tests). 8 test classes covering: CEF-disabled default, CEF-enabled happy path, CEF-HALT override, CEF-ESCALATE override, CEF-warn evidence-only, audit-trail integration, `create_agent_loop` with/without CEF, end-to-end with real `CEFSessionDetector`, and the conservative-promotion invariant (verifier ⊔ CEF → max(verifier, CEF)).
+
+**Research headlines**: Anthropic et al. "brake pedal" multi-lab convergence; MemRefine (arXiv:2606.13177); StreamMemBench (arXiv:2606.14571); PROJECTMEM (arXiv:2606.12329); arXiv:2606.20510 (probabilistic breaker bounds); ant-ai v1.4.0, microsoft/agent-framework v1.10.0, crewAI v1.14.7 trending.
+
+**Next**: probabilistic upper bounds on breaker trips (arXiv:2606.20510), multi-witness notarization on `CEFSessionVerdict`, end-to-end demo CLI, wire CEF into `GovernedActionLoop`, `CEFBrakePedal` runtime control, RSI gate integration with CEF sidecar, MemRefine + PROJECTMEM integrations.

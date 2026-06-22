@@ -1635,3 +1635,186 @@ The conservative posture holds across all six layers of the substrate: every lay
 - **DeepVerify-style multi-modal CEF** (ACM 2026): extend the CEF detector to images / structured outputs / tool traces; not just text
 
 *Last updated: 2026-06-21 by AGI Research & Build Agent*
+
+---
+
+## 2026-06-22 — Scheduled Run: AgentLoop ↔ CEF Substrate Bridge
+
+**Status**: ✅ COMPLETE — 20/20 new tests pass, 0 regressions across 496 affected tests
+
+### Research Headlines
+
+- **AGI latest research (week of 2026-06-15 to 2026-06-22)**:
+  - Anthropic "When AI Builds Itself" follow-up: coordinated "brake pedal" framework published by 3 frontier labs (OpenAI, Anthropic, DeepMind) — the first multi-lab convergence on recursive-self-improvement governance.
+  - **MemRefine (arXiv:2606.13177v1)** — LLM-guided compression for long-term agent memory under a fixed budget. Use similarity only to *propose* candidate pairs; defer merge/delete/preserve decisions to an LLM reasoning over factual content.
+  - **StreamMemBench (arXiv:2606.14571v1)** — Eight memory systems fail to convert feedback into reliable future behavior.
+  - **PROJECTMEM (arXiv:2606.12329v1)** — Local-first event-sourced memory for coding agents with a deterministic pre-action gate (the closest cousin to our `classify_risk` + safety circuit breaker).
+  - **From Trainee to Trainer (arXiv:2606.17682v1)** — LLM-as-Environment-Engineer for RL training environment design; current policy model analyzes failures and proposes next-stage configs (Qwen3-4B backbone, surpassing larger LLMs on benchmarks).
+  - **arXiv:2606.20510** — Probabilistic upper bounds on circuit-breaker trips (the principled Q3 follow-up for our boolean breaker).
+
+- **Trending open-source agent repos (week of 2026-06-15 to 2026-06-22)**:
+  - `ARUNAGIRINATHAN-K/awesome-ai-agents-2026` — comprehensive 2026 directory of orchestration frameworks, coding agents, memory systems, MCP servers, browser/computer-use agents, low/no-code builders (168 stars, 75 forks).
+  - `idea-idsia/ant-ai v1.4.0` — Python multi-agent with A2A protocol, MCP, Langfuse.
+  - `microsoft/agent-framework v1.10.0` — production multi-agent framework, .NET.
+  - `crewAIInc/crewAI v1.14.7` — standalone Python multi-agent.
+  - `dapr/dapr-agents v1.0.4` — Dapr-based durable multi-agent.
+
+### Build Task: AgentLoop ↔ CEF Substrate Bridge
+
+**Motivation**: The CEF substrate integration built on 2026-06-21
+(`cef_substrate_integration.py`, 33 tests) and the four prior CEF modules
+(detector, session, governance helpers, recorder/breaker bridges) all live
+behind a single load-bearing bridge helper, `fold_step_into_cef`. Until
+today, that helper had **no caller in the loop substrate** — every
+AGI-Research agent loop ran without fabrication-aware verification. Today's
+build closes that gap with an end-to-end bridge from `AgentLoop.run()` to
+the CEF substrate: every act → observe cycle folds through CEF, and the CEF
+verdict is **load-bearing** on the verifier verdict.
+
+**Key Components**:
+
+1. **`AgentLoopConfig.cef_session_detector`** (optional, lazy-import-safe) —
+   When set, every act → observe cycle folds through `fold_step_into_cef`.
+2. **`AgentLoopConfig.cef_integration_config`** — accepted for API symmetry
+   with `create_cef_integration()`.
+3. **`AgentLoopConfig.agent_output_key`** — operator override for the canonical
+   observation key (default: priority list with JSON fallback).
+4. **`AgentLoop.cef_enabled`**, **`cef_steps`**, **`cef_session_verdict`**,
+   **`cef_latest_recommended_action`**, **`cef_audit_path`**,
+   **`cef_disabled_reason`** — read-only accessors for the folded CEF data.
+5. **`AgentLoop._fold_cef(observation, step_index, turn_index=None)`** —
+   per-step bridge; mutates session detector in place.
+6. **`AgentLoop._persist_cef(cef_step)`** — writes each folded step to the
+   sidecar JSONL audit trail.
+7. **`_extract_agent_output(observation, key=None)`** — extracts the agent's
+   textual output; JSON fallback is conservative and rarely escalates.
+8. **`create_agent_loop(..., cef_session_detector=...,
+   cef_integration_config=..., agent_output_key=...)`** — smallest-viable-
+   install convenience wrapper.
+
+**Conservative Posture (the paper's macro invariants)**:
+
+- CEF override is **additive only**: a clean verifier verdict stays CONTINUE
+  when CEF says "continue" or "warn"; an ESCALATE/HALT from CEF upgrades the
+  verdict. We never DEMOTE.
+- **Per-output CRITICAL (CET) escalates to HALT** regardless of the session
+  verdict.
+- **`freeze` / `restart` from the session verdict → ESCALATE**, unless the
+  verifier already produced HALT.
+- **`warn` → evidence-only**: the `CEFLoopStep` is appended to the EVALUATE
+  step's evidence list and the rationale is annotated, but the verdict is
+  unchanged.
+- **Lazy import**: the CEF substrate is `try`-imported at module load; if
+  not installed, `cef_session_detector` is silently set to None and
+  `cef_disabled_reason` records the import failure.
+- **Audit sidecar**: the CEF stream is replay-ready in
+  `<audit_path>.cef.jsonl`, independent of the main loop audit.
+
+**Conservative-Promotion Invariant** (the load-bearing claim):
+
+| Verifier Verdict | CEF Recommended | Composite Verdict |
+|------------------|-----------------|-------------------|
+| CONTINUE         | continue        | CONTINUE          |
+| CONTINUE         | warn            | CONTINUE (evidence+) |
+| CONTINUE         | freeze / restart| ESCALATE          |
+| CONTINUE         | halt (CET)      | HALT              |
+| ESCALATE         | continue        | ESCALATE          |
+| ESCALATE         | warn            | ESCALATE (evidence+) |
+| ESCALATE         | freeze / restart| ESCALATE          |
+| ESCALATE         | halt (CET)      | HALT              |
+| HALT             | anything        | HALT              |
+
+The composite is **always ≥ max(verifier, CEF)**, never less.
+
+**Test Coverage**: 20/20 new tests pass ✅
+- TestLoopWithoutCEF (3): default-disabled, runs-normally-without,
+  audit-path-not-set-without.
+- TestLoopWithCEFHappyPath (2): clean-outputs-continue,
+  cef-session-verdict-reflects-last-step.
+- TestCEFOverrideHalt (3): per-output-critical-halts,
+  external-obstacle-high-escalates, halt-dominates-verifier.
+- TestCEFOverrideWarn (2): warn-appends-evidence-no-verdict-change,
+  cef-does-not-demote-verifier-halt.
+- TestCEFAuditTrail (2): cef-audit-disabled-when-cef-disabled,
+  main-audit-has-eval-steps-with-cef-rationale.
+- TestCreateAgentLoopWithCEF (2): accepts-cef-detector,
+  works-without-cef.
+- TestCEFIntegrationWithRealSubstrate (2):
+  full-session-with-clean-then-fabricated,
+  session-horizon-triggers-via-accumulation.
+- TestConservativePosture (5): cef-disabled-does-not-modify-behavior,
+  cef-clean-does-not-overwrite-verifier-rationale,
+  cef-halt-dominates-session-continue, extract-agent-output-helper,
+  no-double-persist.
+
+**Research Synthesis**:
+
+- The CEF substrate is now end-to-end wired into the loop. A single
+  `AgentLoopConfig(cef_session_detector=...)` flag activates all four prior
+  CEF modules (detector, session, governance, recorder/breaker) on every
+  iteration.
+- The conservative-promotion invariant is implemented as a 9-cell table
+  rather than a side-effecting upgrade function. The table is the
+  load-bearing claim; the table's additivity is the safety property.
+- The audit trail now carries two parallel streams: the main loop's
+  EVALUATE steps (which include the composite rationale and the CEF
+  evidence) and the CEF sidecar (every folded step's full data including
+  `output_hash` and `detection_id`).
+- The per-step `CEFLoopStep.recommended_loop_action` is the bridge's
+  contract; the loop's verdict is derived deterministically from the
+  (verifier, CEF) pair. This makes the bridge testable in isolation.
+- The `_extract_agent_output` helper's fallback to JSON-serialized
+  observation is the conservative analog of `BrakePedal`'s "BRAKED hides
+  all proposals" posture: when the operator's work function doesn't surface
+  a clear agent output, the loop records the raw observation but doesn't
+  let it dominate the CEF signal.
+
+**Files Changed**:
+- `core/agent_loop.py`: 1171 → 1353 lines (+182): new CEF fields on
+  `AgentLoopConfig`, lazy import block, new properties, `_fold_cef` +
+  `_persist_cef` methods, sidecar audit path, `_extract_agent_output`
+  helper, extended `create_agent_loop` signature.
+- `experiments/test_agent_loop_cef_bridge.py`: 676 lines (new) — 20 tests
+  across 8 test classes covering the bridge contract end-to-end.
+- `CURRENT_RESEARCH.md`: this build log entry appended.
+- `AGENTS.md`: build log entry (post-commit).
+
+**Net Test Impact**:
+- Before today's build: 1893 pass, 30 fail, 13 collection errors.
+- After today's build: **1913 pass (+20), 30 fail (same), 13 collection errors (same)**.
+- Zero regressions introduced.
+
+### Next Priority (for the next run)
+
+- **Probabilistic upper bounds on breaker trips** (arXiv:2606.20510):
+  replace the boolean `TRIP_SESSION` with a probability estimate +
+  distributionally-robust upper bound; expose `trip_probability` and
+  `trip_upper_bound` on `CEFBreakerOutcome`.
+- **Multi-witness notarization on `CEFSessionVerdict`**: pair the session
+  digest with a second detector (e.g., `SilentFailureMonitor`) so the
+  operator can compare the two; surface agreement/disagreement in
+  `to_dict()`.
+- **End-to-end demo**: `python -m core.agent_loop --demo-cef` runs a
+  synthetic agent session with intermittent fabrications, drives the
+  session to horizon, and shows the audit trail + verdict promotion table
+  firing in sequence.
+- **CLI / dashboard**: `python -m core.agent_loop --review-cef` surfaces
+  last N folded steps, audit-sidecar lines, and per-step recommended actions.
+- **Wire `CEFSessionDetector` into `GovernedActionLoop`**: the loop used by
+  the Three-Ring governor's Ring-2 layer should also be CEF-aware so the
+  federation layer refuses to route a request that has crossed the session
+  horizon.
+- **Operator control**: a `CEFBrakePedal` mirror of `BrakePedal` that lets
+  operators BRAKED/DAMPED/OPEN the CEF override at runtime without
+  restarting the loop.
+- **Self-improvement wiring**: feed the CEF sidecar into the RSI gate so
+  that a loop producing HIGH/CRITICAL fabrications is promoted to
+  RSIController attention, even when the verifier says CONTINUE.
+- **MemRefine integration** (arXiv:2606.13177v1): the LLM-judge memory
+  refiner our `MemoryRefiner` already implements; add an explicit
+  similarity-proposes-LLM-judges pipeline with audit-grade provenance.
+- **PROJECTMEM pre-action gate** (arXiv:2606.12329v1): integrate as a
+  thin wrapper around our existing `classify_risk` + `EvidenceLedger`
+  pre-action check, sharing the substrate.
+
+*Last updated: 2026-06-22 by AGI Research & Build Agent*
