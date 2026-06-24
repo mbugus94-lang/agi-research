@@ -135,6 +135,22 @@ from .safety_circuit_breaker import (
     SafetyCircuitBreaker,
 )
 
+# Optional: the arXiv:2606.20510 probabilistic verification
+# substrate. Imported lazily so the CEF substrate still works
+# without scipy; ``TripObservation`` is referenced as a global
+# inside ``assess_cef_to_breaker`` and guarded by an
+# ``is None`` check.
+try:
+    from .cef_probabilistic_verification import (
+        ProbabilisticTripEngine,
+        TripBand,
+        TripObservation,
+    )
+except ImportError:  # pragma: no cover -- scipy not installed
+    ProbabilisticTripEngine = None  # type: ignore[assignment]
+    TripBand = None  # type: ignore[assignment]
+    TripObservation = None  # type: ignore[assignment]
+
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -179,6 +195,15 @@ class CEFIntegrationConfig:
         keep observing while the operator reviews).
     claim_author : str
         The author of the CEF-induced claims. Default "cef_substrate".
+    probabilistic_engine : Optional["ProbabilisticTripEngine"]
+        Optional engine for the (1 - alpha) upper bound on the
+        trip rate. When supplied, every ``assess_cef_to_breaker``
+        call feeds the engine (trip / no-trip) and the outcome
+        carries ``trip_probability``, ``trip_upper_bound``,
+        ``trip_band``, and ``trip_n_samples``. See
+        ``core.cef_probabilistic_verification`` (arXiv:2606.20510).
+        Default ``None`` -- the engine is opt-in; existing call
+        sites are unaffected.
     """
 
     severity_for_refute: CEFSeverity = CEFSeverity.MEDIUM
@@ -191,6 +216,25 @@ class CEFIntegrationConfig:
         ActionCategory.EXTERNAL_API,
     )
     claim_author: str = "cef_substrate"
+    probabilistic_engine: Optional[Any] = None  # forward ref to ProbabilisticTripEngine
+
+
+# Late-bound forward import for the type hint. Done at module
+# scope so the type is resolvable in IDEs; the actual wiring in
+# ``assess_cef_to_breaker`` is duck-typed so the integration
+# remains decoupled.
+try:  # pragma: no cover -- import-time wiring
+    from .cef_probabilistic_verification import (  # noqa: F401
+        ProbabilisticTripEngine,
+        TripBand,
+        TripObservation,
+        band_for_upper_bound,
+    )
+except ImportError:  # pragma: no cover -- pre-integration import order
+    ProbabilisticTripEngine = None  # type: ignore[assignment]
+    TripBand = None  # type: ignore[assignment]
+    TripObservation = None  # type: ignore[assignment]
+    band_for_upper_bound = None  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +329,25 @@ class CEFBreakerOutcome:
         The categories a caller would block. Empty if NO_TRIP.
     should_open : bool
         Convenience: ``True`` iff the breaker should be opened.
+    trip_probability : float
+        The posterior-mean point estimate of the trip rate
+        (from the configured ``ProbabilisticTripEngine``).
+        ``0.0`` if no engine is configured. See
+        ``core.cef_probabilistic_verification`` (arXiv:2606.20510).
+    trip_upper_bound : float
+        The (1 - alpha) DRO upper bound on the trip rate
+        (sound, distribution-free). ``0.0`` if no engine is
+        configured. The caller can gate breaker-open decisions
+        on this bound (e.g., only open when bound >= 0.05).
+    trip_band : str
+        The discrete trip band (``"low"`` / ``"medium"`` /
+        ``"high"`` / ``"critical"`` / ``"unknown"``). Derived
+        from ``trip_upper_bound`` via
+        ``core.cef_probabilistic_verification.band_for_upper_bound``.
+        ``"unknown"`` if no engine is configured.
+    trip_n_samples : int
+        The number of observations that fed the engine. ``0``
+        if no engine is configured.
     """
 
     verdict: CEFBreakerVerdict
@@ -294,6 +357,13 @@ class CEFBreakerOutcome:
     rationale: str
     tripped_categories: List[ActionCategory] = field(default_factory=list)
     should_open: bool = False
+    # Probabilistic-verification fields (arXiv:2606.20510). All
+    # default to the "no engine" state so existing call sites
+    # that ignore these fields are unaffected.
+    trip_probability: float = 0.0
+    trip_upper_bound: float = 0.0
+    trip_band: str = "unknown"
+    trip_n_samples: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -304,7 +374,24 @@ class CEFBreakerOutcome:
             "rationale": self.rationale,
             "tripped_categories": [cat.value for cat in self.tripped_categories],
             "should_open": self.should_open,
+            "trip_probability": self.trip_probability,
+            "trip_upper_bound": self.trip_upper_bound,
+            "trip_band": self.trip_band,
+            "trip_n_samples": self.trip_n_samples,
         }
+
+
+# Backward-compat re-export: callers that imported the trip-band
+# enum from this module will resolve via the integration module.
+# The canonical home is ``core.cef_probabilistic_verification``.
+try:  # pragma: no cover -- import-time wiring
+    from .cef_probabilistic_verification import (  # noqa: F401
+        TripBand,
+        band_for_upper_bound,
+    )
+except ImportError:  # pragma: no cover -- pre-integration import order
+    TripBand = None  # type: ignore[assignment]
+    band_for_upper_bound = None  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -542,7 +629,7 @@ def record_cef_to_ledger(
 
 def assess_cef_to_breaker(
     detection: CEFDetection,
-    breaker: SafetyCircuitBreaker,
+    breaker: Optional[SafetyCircuitBreaker] = None,
     config: Optional[CEFIntegrationConfig] = None,
     session_verdict: Optional[CEFSessionVerdict] = None,
     principal: str = "cef_principal",
@@ -636,6 +723,46 @@ def assess_cef_to_breaker(
                 f"action={session_verdict.action.value}: no trip"
             )
 
+    # Optional: feed the probabilistic trip engine. The engine is
+    # the arXiv:2606.20510 (1 - alpha) upper bound; feeding it here
+    # gives the caller a *measurable* trip rate even when the
+    # boolean verdict is NO_TRIP. We feed AFTER computing the
+    # verdict so the engine's state always reflects the *current*
+    # decision, not a prior one.
+    trip_probability = 0.0
+    trip_upper_bound_v = 0.0
+    trip_band_v = "unknown"
+    trip_n_samples_v = 0
+    if cfg.probabilistic_engine is not None and TripObservation is not None:
+        try:
+            engine = cfg.probabilistic_engine
+            obs = TripObservation(
+                tripped=(verdict != CEFBreakerVerdict.NO_TRIP),
+                source="per_output",
+                detection_id=detection.detection_id,
+                session_digest=(
+                    session_verdict.session_digest if session_verdict else None
+                ),
+            )
+            engine.update(obs)
+            trip_probability = float(engine.trip_probability)
+            trip_upper_bound_v = float(engine.trip_upper_bound)
+            trip_band_v = (
+                engine.trip_band.value
+                if hasattr(engine.trip_band, "value")
+                else str(engine.trip_band)
+            )
+            trip_n_samples_v = int(engine.n_total)
+            rationale_parts.append(
+                f"probabilistic: n={trip_n_samples_v} "
+                f"p={trip_probability:.4f} "
+                f"ub={trip_upper_bound_v:.4f} band={trip_band_v}"
+            )
+        except Exception:  # pragma: no cover -- defensive
+            # Engine failure is never a load-bearing claim; we
+            # silently fall back to the boolean verdict.
+            pass
+
     return CEFBreakerOutcome(
         verdict=verdict,
         detection_id=detection.detection_id,
@@ -644,6 +771,10 @@ def assess_cef_to_breaker(
         rationale="; ".join(rationale_parts),
         tripped_categories=categories,
         should_open=verdict != CEFBreakerVerdict.NO_TRIP,
+        trip_probability=trip_probability,
+        trip_upper_bound=trip_upper_bound_v,
+        trip_band=trip_band_v,
+        trip_n_samples=trip_n_samples_v,
     )
 
 

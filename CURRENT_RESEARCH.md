@@ -1818,3 +1818,41 @@ The composite is **always ≥ max(verifier, CEF)**, never less.
   pre-action check, sharing the substrate.
 
 *Last updated: 2026-06-22 by AGI Research & Build Agent*
+
+---
+
+## Research Update: 2026-06-24 (Probabilistic CEF Verification, arXiv:2606.20510)
+
+**Paper anchor**: "Efficient and Sound Probabilistic Verification for AI Agents" (arXiv:2606.20510, Jun 20 2026). Distributionally-robust (DRO) Bernoulli upper bounds on policy-violation probability. Sound (true rate ≤ bound with probability ≥ 1 - alpha) and distribution-free (no independence / sub-Gaussianity assumption). The paper's empirical claim: the bound is *tight*, not conservative-for-no-reason; non-trivial even with a few dozen observations.
+
+**Why this matters for our substrate**: the CEF substrate (per-output `CEFDetector` + session `CEFSessionDetector`) produces a *point estimate* of the agent's fabrication rate. The per-action `SafetyCircuitBreaker` is a *boolean* trip. Between the two sits a fundamental safety-utility tradeoff: an agent that fabricates 1% of outputs is qualitatively different from one that fabricates 30%, but the boolean treats both as "below floor -> no trip" or "above floor -> trip". The DRO bound closes the gap with a *measurable* intermediate state.
+
+**What landed in this build**:
+1. `BetaPosterior` — conjugate Beta prior/posterior with `.mean`, `.variance`, `.upper_bound(confidence)` (Bayesian quantile bound, included for sanity check).
+2. `dro_bernoulli_upper_bound(n_success, n_total, confidence)` — the paper's DRO bound = `min(Hoeffding, Clopper-Pearson exact)`. Tighter than Hoeffding at small n or extreme rates; dominates for moderate n. Monotone in `n_total` and `confidence`.
+3. `TripBand` enum + `band_for_upper_bound(...)` — discrete bands (`LOW` < 0.01, `MEDIUM` < 0.05, `HIGH` < 0.20, `CRITICAL` ≥ 0.20) so the caller can act proportionally without re-reading the bound every time.
+4. `TripObservation` — frozen dataclass for one trip / no-trip event (per-output or session source).
+5. `ProbabilisticTripEngine` — composes posterior + DRO bound + history. `update(obs)` is the only mutator. `trip_probability` (point estimate), `trip_upper_bound` (sound bound), `trip_band` (discrete action recommendation), `summary()` / `to_dict()` for audit.
+6. Integration into `core.cef_substrate_integration.assess_cef_to_breaker`: when `CEFIntegrationConfig.probabilistic_engine` is set, every assessment feeds the engine and the `CEFBreakerOutcome` carries `trip_probability` / `trip_upper_bound` / `trip_band` / `trip_n_samples`. Default = engine is opt-in; existing call sites are unaffected.
+7. Relaxed `assess_cef_to_breaker` so `breaker` is optional — the function is pure (no mutation); callers can run it standalone to drive the probabilistic engine without touching a breaker.
+
+**Conservative posture**:
+- Default confidence = 0.95 (sound at 95% level).
+- Default prior = `Beta(1, 1)` (uninformative, max-entropy).
+- Empty history -> bound = 1.0 (no info -> worst case). The band in that state is `CRITICAL`.
+- Bands are monotone in the bound (a higher bound yields a higher band).
+- The engine never demotes historical records; `reset()` is explicit.
+- The boolean `verdict` + `should_open` are unchanged — the engine is *additive*, never replacing the breaker.
+
+**Test coverage**: 47/47 tests pass in `experiments/test_cef_probabilistic_verification.py`. The 146 CEF-adjacent tests (substrate integration, session detector, evidence ledger, safety breaker) all still pass — zero regressions.
+
+**What I learned fixing the broken tests**: the previous session wrote a test that asserted `obs.source == ""` while passing `source="per_output"` (the assertion contradicts the construction). And `for _ in range(9): ... self.assertEqual(o.trip_n_samples, _ + 1 if False else 1)` is a clear placeholder left behind. The lesson: when picking up an incomplete build, the first hour is reading every test and making sure it actually tests what its name says. Three small test bugs blocked a 600+ line module from landing.
+
+**Next priority**:
+- **Wire `ProbabilisticTripEngine` into `CEFSessionDetector`**: the session-level POINT_OF_NO_RETURN threshold is currently a point estimate; the bound would let the operator see "we're at HIGH band -> expect ≤ 20% of sessions to cross" as a steady-state safety claim, not a per-incident verdict.
+- **`GovernorCircuit`-style gating**: a single `circuit` that opens when `trip_upper_bound >= trip_threshold` and only re-closes when the bound drops below a reset threshold. The bound becomes the *policy input*, not just a measurement.
+- **Calibration tooling**: the default `Beta(1, 1)` prior is uninformative. An operator with a baseline trip rate (e.g., 1% on a known-good fleet) should be able to set `alpha_prior=1, beta_prior=99` and watch the bound tighten. A small `cli/calibrate.py` would make this one-line.
+- **Adversarial test pass**: 20 synthetic histories designed to expose bound gaps (small n with all-success, mixture of trip and no-trip at varying confidences, band-edge cases).
+- **Audit CLI**: `python -m core.cef_probabilistic_verification --summary <engine_dict>` reads a saved engine snapshot and prints the bound + band + history. The mirror of the JSONL audit pattern from prior builds.
+
+*Last updated: 2026-06-24 by AGI Research & Build Agent*

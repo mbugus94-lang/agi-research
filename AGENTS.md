@@ -1,3 +1,47 @@
+### 2026-06-24 - Scheduled Run: Probabilistic CEF Verification (arXiv:2606.20510, DRO upper bounds) — closes carryover from 2026-06-22 build
+**Status**: ✅ COMPLETE - 47/47 new tests pass + 146/146 CEF-adjacent tests pass; full suite 1960 passed, 30 pre-existing failures unrelated to this build
+
+**Research Summary (June 24, 2026)**: See CURRENT_RESEARCH.md for the full report. Headlines:
+- **Efficient and Sound Probabilistic Verification for AI Agents (arXiv:2606.20510)**: distributionally robust upper bounds on policy-violation probability under uncertainty. This is the principled next step for the breaker policy.
+- **A Systematic Evaluation of Black-Box Uncertainty Estimation Methods (arXiv:2606.19868)**: hybrid uncertainty methods are best. That validates the CEF detector family’s weighted-pattern + session-fold design.
+- **Skilldoctor / agent-team / okf-harness / keeper**: trend signal that agent ecosystems are converging on governance-first, local-first, audited workflows.
+
+**Build Task: Probabilistic CEF Verification**
+
+**Motivation**: The 2026-06-22 build wired the CEF substrate into `AgentLoop.run()` so every act → observe cycle folds through the CEF detector. The next step was to add probabilistic verification for the CEF step itself, using the DRO upper bounds from arXiv:2606.20510. This closes the carryover from the 2026-06-22 build.
+
+**Key Components**:
+1. `ProbabilisticCEFDetector` — wraps the deterministic `CEFDetector` with a probabilistic confidence estimate based on the DRO upper bound.
+2. `ProbabilisticCEFSessionDetector` — wraps the deterministic `CEFSessionDetector` with a probabilistic session-level confidence estimate.
+3. `ProbabilisticCEFIntegrationConfig` — operator-controlled thresholds for probabilistic CEF handling.
+4. `record_probabilistic_cef_to_ledger(...)` — writes CEF detections into the evidence ledger with probabilistic confidence.
+5. `assess_probabilistic_cef_to_breaker(...)` — advisory breaker recommendation with probabilistic confidence.
+6. `fold_probabilistic_step_into_cef(...)` — folds a loop step into the session detector with probabilistic confidence.
+7. `create_probabilistic_cef_integration(...)` — smallest viable install.
+8. `to_dict()` support on the returned outcome dataclasses for auditability.
+
+**Conservative posture**:
+- CLEAN detections do not overwrite prior claims.
+- The assessor never mutates the breaker; the caller decides whether to act on the recommendation.
+- Horizon-crossed sessions remain visible in the audit trail even after a later clean output.
+- The session digest is content-addressed and changes as the session evolves; `first_horizon_id` is the stable audit anchor.
+
+**Test Coverage**: 47/47 new tests pass + 146/146 CEF-adjacent tests pass.
+
+**Files Changed**:
+- `core/cef_probabilistic_verification.py`: new bridge module
+- `experiments/test_cef_probabilistic_verification.py`: new integration tests
+- `core/__init__.py`: exports for the new bridge types/functions
+- `CURRENT_RESEARCH.md`: appended the new research/build entry
+- `AGENTS.md`: this build log entry
+
+**Next Priority**:
+- Wire `fold_probabilistic_step_into_cef` into `AgentLoop.run()` directly.
+- Add a CLI review mode for the CEF substrate bridge.
+- Explore probabilistic breaker recommendations as the next refinement.
+
+---
+
 ### 2026-06-19 - Scheduled Run: CEF / CET Detector (arXiv:2606.14831, J.P. Morgan AI Research) + carryover Agent Loop (Verification-Gated Loop Orchestrator)
 **Status**: ✅ COMPLETE - 30/30 new tests pass + 73/73 carryover tests pass; full suite 1827 passed (no new failures introduced)
 

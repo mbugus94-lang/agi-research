@@ -299,3 +299,13 @@ from .cef_substrate_integration import (
     fold_step_into_cef,
     record_cef_to_ledger,
 )
+from .cef_probabilistic_verification import (
+    DEFAULT_BAND_THRESHOLDS,
+    BetaPosterior,
+    ProbabilisticTripEngine,
+    TripBand,
+    TripObservation,
+    band_for_upper_bound,
+    create_probabilistic_trip_engine,
+    dro_bernoulli_upper_bound,
+)
