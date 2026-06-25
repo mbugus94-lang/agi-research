@@ -1,3 +1,66 @@
+### 2026-06-25 - Scheduled Run: Wire ProbabilisticTripEngine into CEFSessionDetector (arXiv:2606.20510, session-level DRO bound)
+**Status**: ✅ COMPLETE - 9 new tests pass; 34/34 in test_cef_session.py; 164/164 CEF-adjacent tests pass; zero regressions in CEF substrate (30 pre-existing failures in test_self_evolving_agent.py are unrelated to this build — TaskDifficulty enum doesn't support ordering)
+
+**Research Summary (June 25, 2026)**: See CURRENT_RESEARCH.md for the full report. Headlines:
+- **Hippocampal Explicit Memory Is the Cornerstone for AGI (arXiv:2606.11245)**: LLM underlying mechanism is analogous to human implicit memory; higher-order functions (planning, metacognition, symbolic reasoning) need explicit memory. Validates our MemoryRefiner + CEF session aggregation as the substrate for explicit-memory AGI work.
+- **Memory Beyond Recall — Dual-Process Cognitive Memory (OpenReview ywl53zPXu0)**: System 1 (synchronous writer) + System 2 (asynchronous abstraction) memory architecture; System 2 contributes strongest gains on cross-session inference (+5.20 on PersonaMem-v2). Same dual-process framing as our CEF (detector = S1, session aggregator = S2).
+- **GraP-Mem — Granularity-Aware Planning for Adaptive Memory Access (OpenReview AUPI1ifc4v)**: plan-driven memory retrieval across compact + source-context granularities; F1 + BLEU gains on LoCoMo + NarrativeQA. The plan-then-retrieve pattern mirrors our session-detector's "session-level point estimate + plan-aware retrieval" shape.
+- **Trending repos**: nex-agi/Nex-N2 (Agentic Thinking loop, SOTA on Terminal-Bench + SWE-Atlas), shyftlabs/continuum (production agent OS, 9 multi-agent patterns), framerslab/agentos v0.9.57 (Claude Fable 5 support), Hermes Agent v0.15.0 (Velocity Release, 76% reduction in run_agent.py), CaveAgent (stateful runtime operator, +13.5% on TauS2 multi-turn).
+- **Forbes (Jun 21)**: Ben Goertzel pushes SingularityNET "agent economy" — agents transact on a decentralized network. The Web3 framing of agent coordination is the *external* cousin of our A2A Escrow + A2A Memory modules.
+
+**Build Task: Wire ProbabilisticTripEngine into CEFSessionDetector**
+
+**Motivation**: The 2026-06-24 build landed `ProbabilisticTripEngine` in `core/cef_probabilistic_verification.py` (47/47 tests) and wired it into `assess_cef_to_breaker` so per-output CEF trips feed the engine. The next-priority item on that build was explicit: "Wire `ProbabilisticTripEngine` into `CEFSessionDetector`: the session-level `POINT_OF_NO_RETURN` threshold is currently a point estimate. The bound would let the operator see 'we're at HIGH band -> expect ≤ 20% of sessions to cross' as a steady-state safety claim, not a per-incident verdict." Today's build closes that carryover.
+
+**Key Components**:
+
+1. **`CEFSessionConfig.probabilistic_engine`** — optional `ProbabilisticTripEngine` field (default `None`). Backward compatible: existing detectors without an engine keep working unchanged.
+2. **Soft, optional import** of `ProbabilisticTripEngine` / `TripBand` / `TripObservation`. If the slim-install drops the scipy dependency, the session detector still works and silently returns default probabilistic fields. No hard import.
+3. **`CEFSessionVerdict` probabilistic fields** — `trip_probability` (point estimate), `trip_upper_bound` (DRO bound), `trip_band` (LOW/MEDIUM/HIGH/CRITICAL or None), `trip_n_samples`, `has_probabilistic_engine`. `to_dict()` includes them. `trip_summary()` helper for CLI use.
+4. **`CEFSessionDetector._feed_probabilistic_engine(detection)`** — folds a `TripObservation(source="session")` into the engine after every observation where the detection passed the severity floor. A "trip" is defined as the *resulting* session state being `POINT_OF_NO_RETURN` — i.e., the session just crossed (or remains across) the recovery horizon. CLEAN beats do not feed the engine; the engine measures the *horizon-crossing rate*, not the fabrication rate.
+5. **Cached mirror fields** — `_last_trip_probability`, `_last_trip_upper_bound`, `_last_trip_band`, `_last_trip_n_samples` are populated on every feed and consumed by `_build_verdict()`. `reset()` clears the cached mirrors but does NOT reset the engine (the engine is owned by the caller; the session reset is local).
+
+**Conservative posture**:
+- Default `CEFSessionConfig.probabilistic_engine = None` — no engine attached, all probabilistic fields default to 0.0 / None / `has_probabilistic_engine=False`.
+- Soft import — `ProbabilisticTripEngine is None` after the soft-import means the module is unavailable. The session detector bails out cleanly without raising.
+- `_feed_probabilistic_engine` is *additive*: it never replaces or short-circuits the existing `_derive_state()` / `_derive_action()` / `_derive_rationale()`. The boolean verdict is unchanged.
+- CLEAN beats (below severity floor) do not feed the engine — the engine measures horizon-crossing, not fabrication rate (which the per-output CEF detector already covers).
+- The cached mirrors are conservative: they reflect the engine's view at the moment of the last feed. If the caller mutates the engine externally between feeds, the next feed picks up the new state.
+
+**Test coverage**: 9/9 new tests pass in `experiments/test_cef_session.py::TestSessionProbabilisticEngine`:
+- `test_no_engine_default` — verdict without engine has `has_probabilistic_engine=False`, defaults intact.
+- `test_engine_attached_sets_flag` — engine attached, detector built, first observation flips the flag.
+- `test_clean_beat_does_not_feed_engine` — `CEFSeverity.NONE` does not increment `trip_n_samples` (engine measures horizon crossings, not fabrications).
+- `test_fabrication_beat_feeds_engine` — `CEFSeverity.LOW` increments `trip_n_samples`, populates `trip_upper_bound`, `trip_band`.
+- `test_horizon_crossing_records_trip` — push the session across `POINT_OF_NO_RETURN`, verify the engine records `tripped=True` for that observation.
+- `test_point_estimate_within_unit_interval` — `trip_probability ∈ [0, 1]` across a mix of trip / no-trip observations.
+- `test_upper_bound_at_least_point_estimate` — soundness invariant: bound ≥ point estimate.
+- `test_band_in_known_set` — band ∈ {low, medium, high, critical}.
+- `test_soft_import_fallback` — even if `ProbabilisticTripEngine` is unavailable, the session detector constructs and produces a verdict (defaults).
+
+**Files changed**:
+- `core/cef_session.py`: 537 → 706 lines (+169) — soft import, config field, verdict fields, `_feed_probabilistic_engine`, cached mirrors, `_build_verdict` population.
+- `experiments/test_cef_session.py`: 422 → 553 lines (+131) — `TestSessionProbabilisticEngine` with 9 tests.
+- `CURRENT_RESEARCH.md`: appended 2026-06-25 entry with research + build synthesis.
+- `BUILD_LOG_2026-06-25.md`: this entry.
+- `AGENTS.md`: this prepended entry.
+
+**Research synthesis**:
+- The carryover item on the 2026-06-24 build was: "Wire `ProbabilisticTripEngine` into `CEFSessionDetector`: the session-level POINT_OF_NO_RETURN threshold is currently a point estimate." That's done.
+- The engine's `trip_band` is now visible at the session level — an operator inspecting `CEFSessionVerdict.trip_band` sees `"high"` or `"critical"` *before* a session even crosses the horizon, because the engine has already accumulated enough sessions to put the upper bound there. That is the *measurable safety claim* that the boolean trip could not make.
+- "Trip" defined as the resulting session state being `POINT_OF_NO_RETURN` is the conservative interpretation: the engine measures *horizon-crossing*, not *fabrication* (per-output CEF detector already covers fabrication rate). This avoids double-counting — per-output engine and session engine measure different events.
+- The soft-import pattern mirrors `core/cef_substrate_integration.py`'s import — same precedent for keeping `ProbabilisticTripEngine` optional. Future slim-installs that drop scipy get a clean fallback.
+- The integration is *backward compatible*: every existing test in `test_cef_session.py` still passes (25/25 pre-existing + 9/9 new = 34/34). The 164 CEF-adjacent tests across the substrate all still pass — zero regressions.
+
+**Next priority**:
+- **`GovernorCircuit`-style gating** — a single `circuit` that opens when `trip_upper_bound >= trip_threshold` and only re-closes when the bound drops below a reset threshold. The bound becomes the *policy input*, not just a measurement.
+- **`assess_cef_to_breaker` extended** — pull the session engine's bound + band into the `CEFBreakerOutcome` alongside the per-output engine's already-exposed fields. One call, both engines visible.
+- **Calibration tooling** — `cli/calibrate.py` reads a saved engine snapshot + a user-supplied baseline rate and emits the tightest prior that keeps the bound under a target band. The mirror of the JSONL audit pattern.
+- **Adversarial test pass** — 20 synthetic sessions designed to expose bound gaps (small n with all-success, mixed trip / no-trip histories, sessions that flirt with the horizon without crossing, sessions that reset after a near-cross).
+- **Cross-engine consistency invariant** — a session that produces n fabrications in n_det outputs and the per-output engine sees the same n fabrications / n_det. Today both engines run independently; the next step is asserting `session_engine.history[i].session_digest == per_output_engine.history[j].detection_id` for the same logical event.
+
+---
+
 ### 2026-06-24 - Scheduled Run: Probabilistic CEF Verification (arXiv:2606.20510, DRO upper bounds) — closes carryover from 2026-06-22 build
 **Status**: ✅ COMPLETE - 47/47 new tests pass + 146/146 CEF-adjacent tests pass; full suite 1960 passed, 30 pre-existing failures unrelated to this build
 

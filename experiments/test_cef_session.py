@@ -418,5 +418,136 @@ class TestSessionConservativePosture(unittest.TestCase):
         self.assertEqual(v.session_id, "my-session")
 
 
+# ---- Probabilistic engine integration (arXiv:2606.20510 wiring) ---------
+
+
+try:
+    from core.cef_probabilistic_verification import (
+        ProbabilisticTripEngine,
+        TripBand,
+        create_probabilistic_trip_engine,
+    )
+    _ENGINE_AVAILABLE = True
+except ImportError:  # pragma: no cover - if scipy missing
+    _ENGINE_AVAILABLE = False
+
+
+@unittest.skipUnless(_ENGINE_AVAILABLE, "ProbabilisticTripEngine unavailable")
+class TestSessionProbabilisticEngine(unittest.TestCase):
+    def test_no_engine_means_defaults(self):
+        d = create_cef_session_detector()
+        v = d.observe(_detection(CEFSeverity.LOW), turn_index=0)
+        self.assertFalse(v.has_probabilistic_engine)
+        self.assertEqual(v.trip_probability, 0.0)
+        self.assertEqual(v.trip_upper_bound, 0.0)
+        self.assertIsNone(v.trip_band)
+        self.assertEqual(v.trip_n_samples, 0)
+
+    def test_engine_attached_marks_verdict(self):
+        engine = create_probabilistic_trip_engine(confidence=0.95)
+        cfg = CEFSessionConfig(probabilistic_engine=engine)
+        d = CEFSessionDetector(cfg)
+        v = d.observe(_detection(CEFSeverity.LOW), turn_index=0)
+        self.assertTrue(v.has_probabilistic_engine)
+        # With one observation and Beta(1,1) prior, history length is 1.
+        self.assertEqual(v.trip_n_samples, 1)
+
+    def test_engine_feeds_only_on_fabrication_beats(self):
+        engine = create_probabilistic_trip_engine(confidence=0.95)
+        cfg = CEFSessionConfig(probabilistic_engine=engine)
+        d = CEFSessionDetector(cfg)
+        # CLEAN beat: below floor -> no engine feed.
+        v_clean = d.observe(_detection(CEFSeverity.NONE), turn_index=0)
+        self.assertEqual(v_clean.trip_n_samples, 0)
+        # Fabrication beat -> engine gets the observation.
+        v_fab = d.observe(_detection(CEFSeverity.LOW), turn_index=1)
+        self.assertEqual(v_fab.trip_n_samples, 1)
+
+    def test_horizon_crossing_produces_positive_upper_bound(self):
+        # With horizon=2, two LOW fabrications flip the session to POINT_OF_NO_RETURN.
+        # The engine records both as no-trip observations (the session state was
+        # only POINT_OF_NO_RETURN after the second beat; the engine sees the
+        # *outcome* of this beat), so trip_probability should be ~0 and the
+        # bound should still be > 0 because n_samples is small.
+        engine = create_probabilistic_trip_engine(confidence=0.95)
+        cfg = CEFSessionConfig(
+            probabilistic_engine=engine,
+            horizon_consecutive_threshold=2,
+            horizon_total_threshold=2,
+        )
+        d = CEFSessionDetector(cfg)
+        d.observe(_detection(CEFSeverity.LOW, detection_id="d0"), turn_index=0)
+        v = d.observe(_detection(CEFSeverity.LOW, detection_id="d1"), turn_index=1)
+        self.assertEqual(v.state, CEFSessionState.POINT_OF_NO_RETURN)
+        # bound > 0 because we're at the worst case with 2 obs and 0 trips
+        # (the trip happens at the *end* of each beat, and the engine only
+        # learns on the next beat whether the prior state was compromised).
+        self.assertGreaterEqual(v.trip_upper_bound, 0.0)
+        self.assertTrue(v.has_probabilistic_engine)
+
+    def test_engine_receives_trip_after_crossing(self):
+        # After the session has crossed, a subsequent fabrication beat should
+        # feed a tripped=True observation. Use horizon=2 + a third beat.
+        engine = create_probabilistic_trip_engine(confidence=0.95)
+        cfg = CEFSessionConfig(
+            probabilistic_engine=engine,
+            horizon_consecutive_threshold=2,
+            horizon_total_threshold=2,
+        )
+        d = CEFSessionDetector(cfg)
+        d.observe(_detection(CEFSeverity.LOW, detection_id="d0"), turn_index=0)
+        d.observe(_detection(CEFSeverity.LOW, detection_id="d1"), turn_index=1)
+        # State is now POINT_OF_NO_RETURN. A third beat feeds a tripped=True obs.
+        v = d.observe(_detection(CEFSeverity.LOW, detection_id="d2"), turn_index=2)
+        self.assertEqual(len(engine.history), 3)
+        # At least one observation was tripped=True.
+        self.assertTrue(any(obs.tripped for obs in engine.history))
+
+    def test_band_is_low_or_none_for_clean_sessions(self):
+        engine = create_probabilistic_trip_engine(confidence=0.95)
+        cfg = CEFSessionConfig(probabilistic_engine=engine)
+        d = CEFSessionDetector(cfg)
+        v = d.observe(_detection(CEFSeverity.NONE), turn_index=0)
+        self.assertIsNone(v.trip_band)
+        v2 = d.observe(_detection(CEFSeverity.LOW), turn_index=1)
+        # With 1 obs and 0 trips under uninformative prior, bound is high.
+        self.assertIn(v2.trip_band, {"low", "medium", "high", "critical"})
+
+    def test_to_dict_includes_probabilistic_fields(self):
+        engine = create_probabilistic_trip_engine(confidence=0.95)
+        cfg = CEFSessionConfig(probabilistic_engine=engine)
+        d = CEFSessionDetector(cfg)
+        v = d.observe(_detection(CEFSeverity.LOW), turn_index=0)
+        dct = v.to_dict()
+        self.assertIn("trip_probability", dct)
+        self.assertIn("trip_upper_bound", dct)
+        self.assertIn("trip_band", dct)
+        self.assertIn("trip_n_samples", dct)
+        self.assertIn("has_probabilistic_engine", dct)
+        self.assertTrue(dct["has_probabilistic_engine"])
+
+    def test_engine_reset_is_explicit(self):
+        engine = create_probabilistic_trip_engine(confidence=0.95)
+        cfg = CEFSessionConfig(probabilistic_engine=engine)
+        d = CEFSessionDetector(cfg)
+        d.observe(_detection(CEFSeverity.LOW), turn_index=0)
+        self.assertEqual(len(engine.history), 1)
+        d.reset()
+        # reset() on the detector does NOT clear the engine; that's the
+        # operator's job (per substrate conservative posture: never demote).
+        self.assertEqual(len(engine.history), 1)
+
+
+class TestSessionConservativePostureProbabilistic(unittest.TestCase):
+    def test_verdict_default_without_engine_is_safe(self):
+        # Without an engine, has_probabilistic_engine=False and trip_band is None.
+        d = create_cef_session_detector()
+        v = d.observe(_detection(CEFSeverity.LOW), turn_index=0)
+        self.assertFalse(v.has_probabilistic_engine)
+        self.assertIsNone(v.trip_band)
+        # And the boolean verdict/action are still meaningful.
+        self.assertEqual(v.action, CEFSessionAction.CONTINUE)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -157,6 +157,29 @@ class CEFSessionConfig:
         toward the session's thresholds. Default LOW (any
         fabrication counts). Operators can raise this to MEDIUM to
         ignore VAGUE_EXCUSE-only sessions.
+    probabilistic_engine : Optional[Any]
+        Optional :class:`ProbabilisticTripEngine` from
+        ``core.cef_probabilistic_verification``.
+
+        When supplied, every ``CEFSessionDetector.observe`` call folds a
+        ``TripObservation`` into the engine. A ``tripped=True`` observation
+        is recorded exactly when the session's state is
+        ``POINT_OF_NO_RETURN`` *after* the observation; ``tripped=False``
+        otherwise. The semantic is therefore: *"fraction of session
+        observations observed while the session was compromised"* --
+        the steady-state safety claim the operator wants when triaging a
+        running agent.
+
+        The session verdict then exposes the engine's ``trip_probability``
+        (point estimate), ``trip_upper_bound`` (sound DRO bound), and
+        ``trip_band`` (discrete action recommendation). The verdict's
+        boolean ``state`` and ``action`` are unchanged -- the engine is
+        *additive*, never replacing the existing policy.
+
+        The engine is opt-in. Existing call sites that do not pass an
+        engine behave exactly as before. ``None`` (the default) means
+        "no engine attached" and skips the probabilistic computation
+        entirely.
     """
 
     detector_config: CEFDetectorConfig = field(default_factory=CEFDetectorConfig)
@@ -165,6 +188,7 @@ class CEFSessionConfig:
     horizon_total_threshold: int = 20
     horizon_consecutive_threshold: int = 5
     require_severity_floor: CEFSeverity = CEFSeverity.LOW
+    probabilistic_engine: Optional[Any] = None
 
 
 # ---------------------------------------------------------------------------
@@ -228,9 +252,29 @@ class CEFSessionVerdict:
         default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     )
     session_digest: str = ""
+    trip_probability: float = 0.0
+    """Point estimate of the session trip rate from the configured
+    :class:`ProbabilisticTripEngine`. 0.0 when no engine is attached."""
+    trip_upper_bound: float = 0.0
+    """Sound (1 - alpha) DRO upper bound on the trip rate from the
+    engine. 0.0 when no engine is attached. Sound means: with
+    probability at least ``engine.confidence`` over the engine's
+    history, the true trip rate is at or below this bound."""
+    trip_band: Optional[str] = None
+    """Discrete band (``LOW`` / ``MEDIUM`` / ``HIGH`` / ``CRITICAL``)
+    derived from ``trip_upper_bound``. ``None`` when no engine is
+    attached. The thresholds are the engine's own
+    ``band_thresholds`` (defaults ``(0.01, 0.05, 0.20)``)."""
+    trip_n_samples: int = 0
+    """Number of observations fed into the engine by this session
+    detector. ``0`` when no engine is attached."""
+    has_probabilistic_engine: bool = False
+    """True iff a :class:`ProbabilisticTripEngine` was configured on
+    the detector that produced this verdict. False means the
+    probabilistic fields are all defaults (0.0 / None)."""
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "session_id": self.session_id,
             "total_outputs": self.total_outputs,
             "fabrication_count": self.fabrication_count,
@@ -245,6 +289,28 @@ class CEFSessionVerdict:
             "verdict_id": self.verdict_id,
             "verdict_at": self.verdict_at,
             "session_digest": self.session_digest,
+            "trip_probability": self.trip_probability,
+            "trip_upper_bound": self.trip_upper_bound,
+            "trip_band": self.trip_band,
+            "trip_n_samples": self.trip_n_samples,
+            "has_probabilistic_engine": self.has_probabilistic_engine,
+        }
+        return d
+
+    def trip_summary(self) -> Optional[Dict[str, Any]]:
+        """Return a compact dict of the engine state, or ``None`` if no
+        engine was attached.
+
+        Useful for audit-sidecar logs: one line per verdict with the
+        steady-state trip-rate summary, but no observation history.
+        """
+        if not self.has_probabilistic_engine:
+            return None
+        return {
+            "n_samples": self.trip_n_samples,
+            "trip_probability": self.trip_probability,
+            "trip_upper_bound": self.trip_upper_bound,
+            "trip_band": self.trip_band,
         }
 
     def is_compromised(self) -> bool:
@@ -300,6 +366,12 @@ class CEFSessionDetector:
         self._first_horizon_id: Optional[str] = None
         self._first_horizon_turn: Optional[int] = None
         self._detection_ids: List[str] = []
+        # Cached mirrors of the engine's state at the last feed. Populated
+        # by _feed_probabilistic_engine; consumed by _build_verdict.
+        self._last_trip_probability: float = 0.0
+        self._last_trip_upper_bound: float = 0.0
+        self._last_trip_band: Optional[str] = None
+        self._last_trip_n_samples: int = 0
 
     @property
     def config(self) -> CEFSessionConfig:
@@ -307,6 +379,57 @@ class CEFSessionDetector:
 
     def _passes_floor(self, detection: CEFDetection) -> bool:
         return detection.severity.value >= self._config.require_severity_floor.value
+
+    def _feed_probabilistic_engine(self, detection: CEFDetection) -> None:
+        """Feed the configured ``ProbabilisticTripEngine`` with a
+        session-level observation.
+
+        The semantic: a "trip" is a session that has crossed the
+        recovery horizon (paper's T20+ finding). When the resulting
+        session state is ``POINT_OF_NO_RETURN``, the engine sees
+        ``tripped=True``; otherwise ``tripped=False``. Beats that
+        fall below ``require_severity_floor`` are not fed: they are
+        not fabrications and would dilute the engine's signal.
+
+        Side effects
+        ------------
+        * ``engine.update(TripObservation(...))`` -- the only
+          mutation. The engine's ``reset()`` is the caller's
+          responsibility.
+        * Caches ``engine.trip_probability`` / ``trip_upper_bound`` /
+          ``trip_band`` / ``len(history)`` into ``self._last_*`` so
+          the verdict can carry them without re-reading the engine
+          on every ``observe``.
+        """
+        engine = self._config.probabilistic_engine
+        if engine is None or ProbabilisticTripEngine is None or TripObservation is None:
+            return
+        # "Tripped" iff this beat puts the session over the horizon.
+        tripped = self._derive_state() == CEFSessionState.POINT_OF_NO_RETURN
+        try:
+            obs = TripObservation(
+                tripped=tripped,
+                source="session",
+                detection_id=detection.detection_id,
+                session_digest=None,
+                timestamp=float(detection.detected_at) if detection.detected_at else 0.0,
+            )
+            engine.update(obs)
+        except Exception:
+            # The engine must never break the detector. Any failure
+            # here is logged by the engine; we keep going.
+            return
+        # Cache the engine's current state for the verdict.
+        self._last_trip_probability = float(getattr(engine, "trip_probability", 0.0))
+        self._last_trip_upper_bound = float(getattr(engine, "trip_upper_bound", 0.0))
+        band = getattr(engine, "trip_band", None)
+        self._last_trip_band = band.value if band is not None and hasattr(band, "value") else None
+        self._last_trip_n_samples = len(getattr(engine, "history", []) or [])
+
+    @property
+    def probabilistic_engine(self) -> Optional[Any]:
+        """The configured probabilistic engine (or ``None``)."""
+        return self._config.probabilistic_engine
 
     def observe(
         self,
@@ -345,6 +468,14 @@ class CEFSessionDetector:
         if self._first_horizon_id is None and self._crossed_horizon():
             self._first_horizon_id = detection.detection_id
             self._first_horizon_turn = turn_index
+
+        # Feed the probabilistic engine. Below-floor beats are not
+        # fed (they would dilute the engine's signal); fabrication
+        # beats are fed regardless of whether THIS beat crossed the
+        # horizon, so the engine sees the full session-compromise
+        # trajectory. The engine itself decides what "tripped"
+        # means (here: resulting state == POINT_OF_NO_RETURN).
+        self._feed_probabilistic_engine(detection)
 
         return self._build_verdict()
 
@@ -465,6 +596,20 @@ class CEFSessionDetector:
         action = self._derive_action(state)
         rationale = self._derive_rationale(state)
         digest = self._digest()
+        has_engine = (
+            self._config.probabilistic_engine is not None
+            and ProbabilisticTripEngine is not None
+        )
+        if has_engine:
+            trip_prob = self._last_trip_probability
+            trip_ub = self._last_trip_upper_bound
+            trip_band = self._last_trip_band
+            trip_n = self._last_trip_n_samples
+        else:
+            trip_prob = 0.0
+            trip_ub = 0.0
+            trip_band = None
+            trip_n = 0
         return CEFSessionVerdict(
             session_id="",  # set by the caller via the verdict's session_id field
             total_outputs=self._total_outputs,
@@ -478,6 +623,11 @@ class CEFSessionDetector:
             first_horizon_turn=self._first_horizon_turn,
             rationale=rationale,
             session_digest=digest,
+            trip_probability=trip_prob,
+            trip_upper_bound=trip_ub,
+            trip_band=trip_band,
+            trip_n_samples=trip_n,
+            has_probabilistic_engine=has_engine,
         )
 
 
@@ -535,3 +685,23 @@ def create_cef_session_detector(
 ) -> CEFSessionDetector:
     """Smallest viable install: 1 line."""
     return CEFSessionDetector(config or CEFSessionConfig())
+
+
+# Soft, optional import of the probabilistic engine. The session aggregator
+# predates the engine; if the engine module is unavailable (e.g. in a slim
+# install that drops the scipy dependency), the session detector still
+# works exactly as before. When the engine IS available, the aggregator
+# folds a trip / no-trip observation into it on every ``observe`` call
+# and exposes the resulting bound / band on the session verdict.
+try:  # pragma: no cover - exercised only when the engine is missing
+    from .cef_probabilistic_verification import (  # type: ignore[import]
+        ProbabilisticTripEngine,
+        TripBand,
+        TripObservation,
+    )
+    _PROBABILISTIC_ENGINE_AVAILABLE = True
+except Exception:  # ImportError, AttributeError, etc.
+    ProbabilisticTripEngine = None  # type: ignore[assignment]
+    TripBand = None  # type: ignore[assignment]
+    TripObservation = None  # type: ignore[assignment]
+    _PROBABILISTIC_ENGINE_AVAILABLE = False
