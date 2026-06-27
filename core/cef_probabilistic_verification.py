@@ -472,6 +472,16 @@ class ProbabilisticTripEngine:
         return len(self.history)
 
     @property
+    def n_observations(self) -> int:
+        """Number of observations in history (alias for ``n_total``).
+
+        Exposed under both names so the :class:`BoundSource` protocol
+        used by :class:`GovernorCircuit` can access the count of
+        observations.
+        """
+        return len(self.history)
+
+    @property
     def empirical_rate(self) -> float:
         """The empirical trip rate (``n_success / n_total``).
 

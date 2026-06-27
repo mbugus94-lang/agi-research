@@ -5797,3 +5797,68 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Research headlines**: Anthropic et al. "brake pedal" multi-lab convergence; MemRefine (arXiv:2606.13177); StreamMemBench (arXiv:2606.14571); PROJECTMEM (arXiv:2606.12329); arXiv:2606.20510 (probabilistic breaker bounds); ant-ai v1.4.0, microsoft/agent-framework v1.10.0, crewAI v1.14.7 trending.
 
 **Next**: probabilistic upper bounds on breaker trips (arXiv:2606.20510), multi-witness notarization on `CEFSessionVerdict`, end-to-end demo CLI, wire CEF into `GovernedActionLoop`, `CEFBrakePedal` runtime control, RSI gate integration with CEF sidecar, MemRefine + PROJECTMEM integrations.
+
+---
+
+### 2026-06-27 - Scheduled Run: Governor Circuit (closes next-priority from 2026-06-25)
+
+**Status**: ✅ COMPLETE - 56/56 new tests, 216/216 CEF-adjacent, 2023/2056 total (33 pre-existing failures unrelated), zero new regressions
+
+**Research Summary (June 26-27, 2026)**: See CURRENT_RESEARCH.md for the full report. Headlines:
+
+- **AgentRiskBOM (arXiv:2606.21877, IEEE Cyber-AI 2026, Jun 25)** ⭐ BUILDS ON THIS — independently arrives at the same three-layer safety decomposition: capability inventory + control lineage + evidence ledger. Our `GovernorCircuit` + `ProbabilisticTripEngine` + `EvidenceLedger` is the closest functional equivalent.
+- **CEF substrate completes its three legs**: measurement (`ProbabilisticTripEngine`, arXiv:2606.20510), observation (`CEFSessionDetector` + `CEFIntegrationConfig`), and now **policy** (`GovernorCircuit`). The bound is now both a measurement and a policy input.
+- **Cold-engine-silent posture** (this build's signature fix): a fresh `Beta(1, 1)` engine has `trip_upper_bound = 1.0` (CRITICAL) at zero observations because the prior is uniform on [0, 1]. Without treatment, the gate would trip on the first feed — the opposite of conservative. The gate now treats cold engines (n_observations == 0) as silent (contribute bound=0 to the two-layer max). A cold engine means "no evidence", not "maximal risk".
+- **Warm-up grace window** (the policy refinement): `config.warm_up_min_obs` (default 5) suppresses CLOSED -> OPEN transitions during the first N observations. The suppressed decision is recorded as a `warming_grace` transition so the audit trail is complete. Without warm-up, a gate could trip on the wide posterior quantile of one observation (Beta(2, 1) bound ≈ 0.78).
+- **AgentRiskBOM distinction** "capability opacity" vs "demonstrated behavior" — the cold-engine-silent posture is the operational form. Absence of evidence is a fact about the engine's state, never conflated with absence of risk.
+- **Trending repos**: Hephaestus (v0.7.23), Hermes Agent (v0.15.0), Continuum (v0.2.3), OpenLAIR/OpenSkill (Jun 2026) — all converging on the same verifier-above-stateful-memory pattern; our substrate is the closest functional equivalent.
+
+**Build Task: Governor Circuit — stateful policy gate driven by `ProbabilisticTripEngine` bounds**
+
+**Motivation**: every safety measurement built so far produces a sound (1 - alpha) bound on the agent's failure rate. But a measurement that nobody reads is a hidden alarm. Today's build is the operational instrument: a stateful policy gate that *acts* on the bound. This closes the 2026-06-25 next-priority item.
+
+**Key Components**:
+1. `GovernorCircuit` + `GovernorCircuitConfig` + `GateState` (CLOSED / OPEN / HALF_OPEN) + `GateAction` (ALLOW / BLOCK / PROBE) + `GateObservation` + `GateTransition` + `GovernorDecision`. Mirrors `SafetyCircuitBreaker` contract.
+2. **Three-state hysteresis** with `reset_threshold < trip_threshold` invariant: CLOSED -> OPEN on `bound >= trip_threshold`, OPEN -> HALF_OPEN on `bound <= reset_threshold`, HALF_OPEN -> CLOSED on `consecutive_good >= probe_count`.
+3. **Two-layer max** when two engines configured (per_output + session): the gate's bound is the *maximum* of the two engines' bounds. Gate trips when EITHER layer reports high; recovers when BOTH are low.
+4. **Cold-engine-silent posture**: fresh engine with `Beta(1, 1)` prior and zero observations has `trip_upper_bound = 1.0` (CRITICAL). Gate now treats cold engines (n_observations == 0) as silent (bound=0 contribution to two-layer max). Cold engine means "no evidence", not "maximal risk".
+5. **Warm-up grace**: `config.warm_up_min_obs` (default 5) suppresses CLOSED -> OPEN during the first N observations. Suppressed decision recorded as `warming_grace` transition for audit completeness.
+6. **`n_observations` property** added to `ProbabilisticTripEngine` (alias for `n_total`) so the `BoundSource` protocol can express cold-vs-warmed state explicitly.
+7. **Append-only transition log** with `write_audit(path)` JSONL output, idempotent on repeated calls.
+8. **`decide()` is read-only** — does not transition state, does not increment `consecutive_good`. `feed(observation)` is the state-mutating call; `decide()` is the read-only "what would the gate do now" query.
+
+**Conservative posture (the paper's invariants)**:
+- Trip band is the union of the per-output and session bands.
+- Transitions are append-only; the transition log is the audit trail.
+- The bound is never demoted by the gate (only by the engines).
+- `reset_threshold < trip_threshold` enforced in `__post_init__`.
+- The OPEN -> HALF_OPEN transition itself counts as the first good probe.
+- HALF_OPEN -> OPEN recovery-failure resets `consecutive_good` to 0.
+- Cold engines are silent — bound=0 contribution to the two-layer max.
+- Warm-up grace is conservative: a gate that might otherwise have tripped stays CLOSED, with the suppressed decision recorded in the audit log.
+- Engines that do not expose `n_observations` (legacy stubs) are assumed warmed — back-compat with prior tests.
+
+**Test Coverage**: 56/56 tests passed ✅
+- TestGovernorCircuitConfig (7), TestGateEnums (2), TestGateObservation (3), TestGateTransition (3), TestGovernorDecision (2)
+- TestGovernorCircuitNoEngine (5), TestGovernorCircuitSingleLayer (3), TestGovernorCircuitTwoLayerMax (3)
+- TestGovernorCircuitHysteresis (6), TestGovernorCircuitAudit (4), TestGovernorCircuitConvenience (4)
+- TestGovernorCircuitIntegration (3), TestGovernorCircuitConservativePosture (3)
+- TestGovernorCircuitWarmUp (4), TestGovernorCircuitFeedValidation (3)
+
+**Cross-suite regression check**: 216/216 CEF-adjacent tests pass across `test_governor_circuit` (56), `test_cef_probabilistic_verification` (47), `test_cef_substrate_integration` (44), `test_agent_loop_cef_bridge` (24), `test_cef_detector` (15), `test_cef_session` (34). Total 216/216.
+
+**Files Changed**:
+- `core/governor_circuit.py`: 1105 lines (new)
+- `experiments/test_governor_circuit.py`: 865 lines (new) — 56 tests
+- `core/cef_probabilistic_verification.py`: +10 lines — `n_observations` property
+- `CURRENT_RESEARCH.md`: 2026-06-27 research update appended
+- `BUILD_LOG_2026-06-27.md`: this entry
+- `AGENTS.md`: this build log entry
+
+**Next Priority**:
+- **`assess_cef_to_breaker` session-band integration**: surface the session band alongside the per-output band in the breaker outcome when the session is in `POINT_OF_NO_RETURN`. Operator sees both layers' measurements in one place — and both layers feed the same `GovernorCircuit`.
+- **CLI / dashboard for the gate**: `python -m core.governor_circuit --summary <gate_dict>` prints current state, bound, band, transition count, and audit-path JSONL line count.
+- **Multi-session engine persistence** (carried from 2026-06-25): engine should be backed by append-only JSONL for fleet-scale.
+- **Calibration tooling** (carried): `cli/calibrate.py` takes baseline trip rate and prints recommended `alpha_prior` / `beta_prior`.
+- **Adversarial gate test pass**: 20 synthetic histories — small-N all-trip, band-edge cases, recovery after horizon crossing, multi-session without reset, mid-warmup trip suppression verification.
+- **`detect_cef_session()` engine passthrough** (carried from 2026-06-25): add optional `probabilistic_engine` parameter to the end-to-end convenience.
