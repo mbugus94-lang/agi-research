@@ -816,12 +816,10 @@ class TestGovernorCircuitWarmUp:
         # Engine has 1 observation and a high bound; gate stays CLOSED.
         eng = self._engine_with_count(bound=0.50, band="critical", n=1)
         g = GovernorCircuit(
-            config=GovernorCircuitConfig(),
+            config=GovernorCircuitConfig(warm_up_min_obs=5),
             per_output_engine=eng,
-            warm_up_min_obs=5,
         )
-        d = g.decide()
-        assert d.action == GateAction.ALLOW
+        g.feed(per_output_observation=GateObservation(tripped=True, label="trip"))
         assert g.state == GateState.CLOSED
 
     def test_warm_up_completes_then_trips(self) -> None:
@@ -832,6 +830,7 @@ class TestGovernorCircuitWarmUp:
             config=GovernorCircuitConfig(warm_up_min_obs=5),
             per_output_engine=eng,
         )
+        g.feed(per_output_observation=GateObservation(tripped=True, label="trip"))
         d = g.decide()
         assert g.state == GateState.OPEN
         assert d.action == GateAction.BLOCK
@@ -860,6 +859,7 @@ class TestGovernorCircuitWarmUp:
             config=GovernorCircuitConfig(warm_up_min_obs=0),
             per_output_engine=eng,
         )
+        g.feed(per_output_observation=GateObservation(tripped=True, label="trip"))
         d = g.decide()
         assert g.state == GateState.OPEN
         assert d.action == GateAction.BLOCK
