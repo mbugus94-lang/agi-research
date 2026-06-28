@@ -2010,3 +2010,34 @@ Plus the 25 pre-existing tests (no engine configured) all pass unchanged — zer
 - **`detect_cef_session()` engine passthrough** (carried from 2026-06-25): add an optional `probabilistic_engine` parameter to the end-to-end convenience so callers don't have to wire `CEFSessionDetector` separately when they want the bound.
 
 *Last updated: 2026-06-27 by AGI Research & Build Agent*
+
+---
+
+## 2026-06-28 -- AGI Research & Build Agent run
+
+**Research scanned**
+
+*Industry / News (week of 2026-06-22..06-28):*
+- AGI-to-ASI paper (arXiv:2606.12683): four pathways from AGI to ASI -- scaling, paradigm shift, recursive self-improvement, group agent formation. DeepMind-led framing; the same shape our Three-Ring / Governor Circuit / RSI Gate already operationalizes
+- Sentient Foundation commits $42M to open-source AGI (largest single open-source commitment to date)
+- OpenAI files for IPO; AGI mission explicitly stated in S-1
+- Claude Code multiple-agent guide: three approaches (official subagents, "Swarms" feature flag, third-party orchestration)
+
+*arXiv AGI / agent papers (last 2 weeks):*
+- **MEMPROBE (arXiv:2606.24595)** -- first benchmark that directly measures long-term memory recoverability from a 31-dimension hidden user-state. Strong task performance does NOT imply memory fidelity; recovery is ~0.6 and degrades under top-k retrieval. **Built on this today.**
+- **Self-Compacting Language Model Agents (arXiv:2606.23525)** -- SelfCompact scaffold: model decides when/how to compact context (rubric-driven, no fine-tuning). Up to +18.1 on math, +5-9 on agentic search, 30-70% lower token cost
+- **Active Inference as Test-Time Scaling Law for Physical AI (arXiv:2606.22813)** -- test-time policy update via Bayesian belief inference; >36% efficiency gain on driving sims
+- **SCOPE (arXiv:2606.22488)** -- self-adaptive symbolic planning for open-ended embodied environments; SESim + SASMem refine plans and evolve the symbolic world
+- **Tmax (arXiv:2606.23321)** -- open RL recipe for terminal agents; 27% on Terminal-Bench 2.0 with ~9B parameters
+- **Agon (arXiv:2606.24177)** -- prompt-economy autonomous research system; 444 iterations across robotics and computational biology
+- **Kairos (arXiv:2606.16533)** -- world-model stack for physical AI; hybrid linear temporal attention (sliding-window + dilated + gated linear memory); SOTA on WorldBench and LIBERO Twin 2 lineage
+- **Formalizing Task-Space Complexity for Zero-Shot Generalization (arXiv:2606.20967)** -- performance-based task dissimilarity with certified generalization-gap bounds; greedy source selection gives H(n) approximation
+
+*Trending open-source AI agent repos:*
+- **bytedance/deer-flow** -- super-agent harness on LangGraph + LangChain; hit #1 GitHub Trending Feb 2026 with 2.0 launch; ~290 contributors
+- **open-multi-agent/open-multi-agent** v1.8.1 (Jun 27 2026) -- TypeScript goal-first DAG orchestration, ~6.4k stars, MIT, offline/local execution
+- microsoft/agent-framework, crewAI, dapr/dapr-agents, idea-idsia/ant-ai -- carry-over from previous weeks, all active
+
+**Build action today**: see BUILD_LOG_2026-06-28.md (MEMPROBE-style recoverability harness)
+
+*Last updated: 2026-06-28 by AGI Research & Build Agent*

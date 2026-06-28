@@ -309,3 +309,21 @@ from .cef_probabilistic_verification import (
     create_probabilistic_trip_engine,
     dro_bernoulli_upper_bound,
 )
+from .memprobe import (
+    FactType,
+    HiddenFact,
+    InMemoryTarget,
+    MemoryProbeTarget,
+    ProbeResult,
+    Scenario,
+    TieredMemoryTarget,
+    UserState,
+    compare_targets,
+    default_scenarios,
+    default_user_state,
+    in_memory_target,
+    quick_probe,
+    run_probe,
+    summarize,
+    tiered_memory_target,
+)
