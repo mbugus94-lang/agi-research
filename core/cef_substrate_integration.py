@@ -364,6 +364,15 @@ class CEFBreakerOutcome:
     trip_upper_bound: float = 0.0
     trip_band: str = "unknown"
     trip_n_samples: int = 0
+    # Session-band fields (Jun 29 build). These are the
+    # *session-layer* counterparts of the per-output fields above.
+    # The session band is *categorical* (derived from the session
+    # state via ``band_for_session_state``); the per-output band
+    # is *measured* (derived from the engine's upper bound). Both
+    # are reported so the operator sees the two layers' verdicts
+    # in the same place.
+    session_band: str = "unknown"
+    session_should_trip: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -378,6 +387,8 @@ class CEFBreakerOutcome:
             "trip_upper_bound": self.trip_upper_bound,
             "trip_band": self.trip_band,
             "trip_n_samples": self.trip_n_samples,
+            "session_band": self.session_band,
+            "session_should_trip": self.session_should_trip,
         }
 
 
@@ -392,6 +403,80 @@ try:  # pragma: no cover -- import-time wiring
 except ImportError:  # pragma: no cover -- pre-integration import order
     TripBand = None  # type: ignore[assignment]
     band_for_upper_bound = None  # type: ignore[assignment]
+
+
+# ---------------------------------------------------------------------------
+# Session-band helper
+# ---------------------------------------------------------------------------
+#
+# The probabilistic ``band_for_upper_bound`` maps a *measured* trip
+# probability to a discrete band. The session verdict, by contrast, is
+# already a *categorical* state (``CLEAN`` / ``EARLY`` / ``WARNING`` /
+# ``POINT_OF_NO_RETURN``). Operators want to see both bands in the
+# same place: the per-output band (measured) and the session band
+# (categorical). ``band_for_session_state`` is the categorical
+# analogue of ``band_for_upper_bound`` so the two can be reported in
+# the same vocabulary.
+#
+# Mapping (conservative):
+#   CLEAN              -> LOW        (nothing to do)
+#   EARLY              -> LOW        (still within tolerance)
+#   WARNING            -> MEDIUM     (operator attention)
+#   POINT_OF_NO_RETURN -> CRITICAL   (session is compromised)
+#   None / unknown     -> UNKNOWN
+#
+# Mirrors the CEFSessionAction recommendations in spirit: CONTINUE
+# is LOW, WARN is MEDIUM, FREEZE/RESTART is CRITICAL. The mapping
+# is intentionally pure and deterministic so it can be reused by
+# dashboards, CLIs, and tests without surprise.
+
+
+_SESSION_STATE_TO_BAND: Dict[CEFSessionState, str] = {
+    CEFSessionState.CLEAN: "low",
+    CEFSessionState.EARLY: "low",
+    CEFSessionState.WARNING: "medium",
+    CEFSessionState.POINT_OF_NO_RETURN: "critical",
+}
+
+
+def band_for_session_state(
+    state: Optional[CEFSessionState],
+) -> str:
+    """Map a CEFSessionState to a discrete TripBand *value*.
+
+    Returns the *string* form (``"low"`` / ``"medium"`` /
+    ``"critical"`` / ``"unknown"``) so the helper is callable from
+    contexts that don't have the ``TripBand`` enum in scope. The
+    mapping is pure and total over ``CEFSessionState``; ``None``
+    and unknown values fall through to ``"unknown"``.
+
+    This is the categorical analogue of
+    :func:`band_for_upper_bound` so the two can be reported
+    side-by-side in ``CEFBreakerOutcome``.
+    """
+    if state is None:
+        return "unknown"
+    return _SESSION_STATE_TO_BAND.get(state, "unknown")
+
+
+def session_should_trip(
+    session_verdict: Optional["CEFSessionVerdict"],
+    trip_on_horizon: bool,
+    trip_on_restart: bool,
+) -> bool:
+    """Return True iff the session layer alone would trip the breaker.
+
+    Mirrors the session-level branch in
+    :func:`assess_cef_to_breaker` exactly so the boolean is
+    deterministic and easy to test. ``None`` verdict -> False.
+    """
+    if session_verdict is None:
+        return False
+    if trip_on_horizon and session_verdict.state == CEFSessionState.POINT_OF_NO_RETURN:
+        return True
+    if trip_on_restart and session_verdict.action == CEFSessionAction.RESTART:
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -712,6 +797,25 @@ def assess_cef_to_breaker(
                 f"session {session_verdict.session_id} action=RESTART: trip"
             )
 
+    # Session-band synthesis (Jun 29 build). Computed *after* the
+    # verdict so the band reflects the actual session state, not the
+    # pre-decision view. The two helpers are pure / total so this
+    # is always safe -- even when no session verdict was supplied,
+    # in which case both fields fall through to their defaults.
+    session_band_v: str = "unknown"
+    session_should_trip_v: bool = False
+    if session_verdict is not None:
+        session_band_v = band_for_session_state(session_verdict.state)
+        session_should_trip_v = session_should_trip(
+            session_verdict,
+            trip_on_horizon=cfg.trip_on_horizon,
+            trip_on_restart=cfg.trip_on_restart,
+        )
+        rationale_parts.append(
+            f"session_band={session_band_v} "
+            f"session_should_trip={session_should_trip_v}"
+        )
+
     if verdict == CEFBreakerVerdict.NO_TRIP:
         rationale_parts.append(
             f"per-output {detection.severity.value} below "
@@ -775,6 +879,8 @@ def assess_cef_to_breaker(
         trip_upper_bound=trip_upper_bound_v,
         trip_band=trip_band_v,
         trip_n_samples=trip_n_samples_v,
+        session_band=session_band_v,
+        session_should_trip=session_should_trip_v,
     )
 
 

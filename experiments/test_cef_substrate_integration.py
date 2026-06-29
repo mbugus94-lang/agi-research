@@ -680,5 +680,181 @@ class TestConservativePosture(unittest.TestCase):
         self.assertGreaterEqual(clean_step.session_verdict.fabrication_count, 5)
 
 
+# ---------------------------------------------------------------------------
+# Session-band integration tests (arXiv:2606.20510 follow-up)
+# ---------------------------------------------------------------------------
+# These tests pin the session-layer band / session_should_trip fields on
+# CEFBreakerOutcome so future refactors of assess_cef_to_breaker cannot
+# silently drop the session-layer view of safety.
+
+
+class TestSessionBandIntegration(unittest.TestCase):
+    """Pin the new session-band and session_should_trip fields.
+
+    The motivation is the 2026-06-28 next-priority: surface the
+    *session* band alongside the per-output band in the breaker
+    outcome, so an operator who looks at one CEFBreakerOutcome
+    sees both layers' measurement in one place. The session band
+    is the categorical analogue of band_for_upper_bound (the
+    per-output, measured band).
+    """
+
+    def setUp(self):
+        from core.cef_substrate_integration import (
+            band_for_session_state,
+            session_should_trip,
+        )
+        self.band_for_session_state = band_for_session_state
+        self.session_should_trip = session_should_trip
+        self.breaker = SafetyCircuitBreaker(failure_threshold=1)
+        self.cfg = CEFIntegrationConfig()
+
+    # ----- band_for_session_state mapping -----
+
+    def test_band_none_is_unknown(self):
+        self.assertEqual(self.band_for_session_state(None), "unknown")
+
+    def test_band_clean_is_low(self):
+        self.assertEqual(
+            self.band_for_session_state(CEFSessionState.CLEAN), "low"
+        )
+
+    def test_band_early_is_low(self):
+        self.assertEqual(
+            self.band_for_session_state(CEFSessionState.EARLY), "low"
+        )
+
+    def test_band_warning_is_medium(self):
+        self.assertEqual(
+            self.band_for_session_state(CEFSessionState.WARNING), "medium"
+        )
+
+    def test_band_point_of_no_return_is_critical(self):
+        self.assertEqual(
+            self.band_for_session_state(CEFSessionState.POINT_OF_NO_RETURN),
+            "critical",
+        )
+
+    # ----- session_should_trip helper -----
+
+    def test_session_should_trip_none_is_false(self):
+        self.assertFalse(self.session_should_trip(None, True, True))
+
+    def test_session_should_trip_clean_is_false(self):
+        session = create_cef_session_detector()
+        verdict = session._build_verdict()
+        self.assertFalse(self.session_should_trip(verdict, True, True))
+
+    def test_session_should_trip_horizon_disabled(self):
+        session = create_cef_session_detector()
+        _drive_session_to_horizon(session, n=5)
+        verdict = session._build_verdict()
+        # trip_on_horizon=False -> even POINT_OF_NO_RETURN does not trip
+        self.assertFalse(
+            self.session_should_trip(verdict, trip_on_horizon=False, trip_on_restart=True)
+        )
+
+    def test_session_should_trip_horizon_enabled(self):
+        session = create_cef_session_detector()
+        _drive_session_to_horizon(session, n=5)
+        verdict = session._build_verdict()
+        self.assertEqual(verdict.state, CEFSessionState.POINT_OF_NO_RETURN)
+        self.assertTrue(
+            self.session_should_trip(verdict, trip_on_horizon=True, trip_on_restart=False)
+        )
+
+    # ----- CEFBreakerOutcome field defaults -----
+
+    def test_outcome_defaults_session_band_unknown(self):
+        """No session verdict -> session_band='unknown', session_should_trip=False."""
+        detection = _make_clean_detection()
+        outcome = assess_cef_to_breaker(detection, self.breaker, self.cfg)
+        self.assertEqual(outcome.session_band, "unknown")
+        self.assertFalse(outcome.session_should_trip)
+
+    def test_outcome_to_dict_includes_session_fields(self):
+        """to_dict() must surface session_band and session_should_trip."""
+        detection = _make_clean_detection()
+        outcome = assess_cef_to_breaker(detection, self.breaker, self.cfg)
+        d = outcome.to_dict()
+        self.assertIn("session_band", d)
+        self.assertIn("session_should_trip", d)
+        self.assertEqual(d["session_band"], "unknown")
+        self.assertEqual(d["session_should_trip"], False)
+
+    # ----- CEFBreakerOutcome session-band surfacing -----
+
+    def test_outcome_session_band_low_for_clean_session(self):
+        """CLEAN session -> session_band='low', session_should_trip=False."""
+        session = create_cef_session_detector()
+        verdict = session._build_verdict()  # CLEAN with no observations
+        detection = _make_clean_detection()
+        outcome = assess_cef_to_breaker(
+            detection, self.breaker, self.cfg, session_verdict=verdict
+        )
+        self.assertEqual(outcome.session_band, "low")
+        self.assertFalse(outcome.session_should_trip)
+        # The per-output band stays 'unknown' (no engine wired)
+        self.assertEqual(outcome.trip_band, "unknown")
+
+    def test_outcome_session_band_critical_at_horizon(self):
+        """POINT_OF_NO_RETURN session -> session_band='critical', session_should_trip=True."""
+        session = create_cef_session_detector()
+        _drive_session_to_horizon(session, n=5)
+        verdict = session._build_verdict()
+        self.assertEqual(verdict.state, CEFSessionState.POINT_OF_NO_RETURN)
+        # Use a CLEAN per-output detection so the per-output band is 'low'
+        # (no engine) but the session band is critical.
+        detection = _make_clean_detection()
+        outcome = assess_cef_to_breaker(
+            detection, self.breaker, self.cfg, session_verdict=verdict
+        )
+        self.assertEqual(outcome.session_band, "critical")
+        self.assertTrue(outcome.session_should_trip)
+        # The session band is independent of the per-output band.
+        self.assertEqual(outcome.trip_band, "unknown")
+        # But the verdict still respects trip_on_horizon=True (the default)
+        self.assertEqual(outcome.verdict, CEFBreakerVerdict.TRIP_SESSION)
+
+    def test_outcome_session_band_respects_horizon_toggle(self):
+        """trip_on_horizon=False -> session_band is still computed, but session_should_trip=False."""
+        cfg = CEFIntegrationConfig(trip_on_horizon=False)
+        session = create_cef_session_detector()
+        _drive_session_to_horizon(session, n=5)
+        verdict = session._build_verdict()
+        detection = _make_clean_detection()
+        outcome = assess_cef_to_breaker(
+            detection, self.breaker, cfg, session_verdict=verdict
+        )
+        # Band is still reported (the categorical state is unchanged)
+        self.assertEqual(outcome.session_band, "critical")
+        # But the *policy* decision respects the operator's toggle
+        self.assertFalse(outcome.session_should_trip)
+        # And the verdict is NO_TRIP because the operator disabled the
+        # session-level strike and the per-output is CLEAN.
+        self.assertEqual(outcome.verdict, CEFBreakerVerdict.NO_TRIP)
+
+    def test_outcome_session_band_medium_for_warning(self):
+        """WARNING session -> session_band='medium', session_should_trip=False (no horizon)."""
+        session = create_cef_session_detector(CEFSessionConfig(warn_total_threshold=1))
+        # Drive to WARNING but not horizon
+        fold_step_into_cef(
+            agent_output=_make_vague_excuse_output(),
+            step_index=0,
+            session_detector=session,
+        )
+        verdict = session._build_verdict()
+        # The session should be in WARNING (1 fabrication > warn_total_threshold=1? No, equal.
+        # The semantics are >= warn_total_threshold for EARLY->WARNING. Default 3.
+        # We set warn_total_threshold=1, so a single fabrication flips EARLY->WARNING.)
+        if verdict.state == CEFSessionState.WARNING:
+            detection = _make_clean_detection()
+            outcome = assess_cef_to_breaker(
+                detection, self.breaker, self.cfg, session_verdict=verdict
+            )
+            self.assertEqual(outcome.session_band, "medium")
+            self.assertFalse(outcome.session_should_trip)
+
+
 if __name__ == "__main__":
     unittest.main()

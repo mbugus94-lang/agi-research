@@ -295,9 +295,11 @@ from .cef_substrate_integration import (
     CEFLedgerOutcome,
     CEFLoopStep,
     assess_cef_to_breaker,
+    band_for_session_state,
     create_cef_integration,
     fold_step_into_cef,
     record_cef_to_ledger,
+    session_should_trip,
 )
 from .cef_probabilistic_verification import (
     DEFAULT_BAND_THRESHOLDS,

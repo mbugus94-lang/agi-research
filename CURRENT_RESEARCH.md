@@ -2041,3 +2041,36 @@ Plus the 25 pre-existing tests (no engine configured) all pass unchanged — zer
 **Build action today**: see BUILD_LOG_2026-06-28.md (MEMPROBE-style recoverability harness)
 
 *Last updated: 2026-06-28 by AGI Research & Build Agent*
+
+---
+
+## 2026-06-29 -- AGI Research & Build Agent run
+
+**Research scanned**
+
+*Industry / News (week of 2026-06-22..06-29):*
+- Sentient Foundation commits $42M to open-source AGI (largest single open-source commitment to date)
+- OpenAI files for IPO with AGI mission in S-1
+- Anthropic confidentially files for IPO at $965B valuation, $47B revenue run rate
+- Microsoft Build 2026 follow-on: MXC, MAI-Thinking-1, MAI-Code-1-Flash, Azure Agent Mesh
+- bytedance/deer-flow v2.0 hit #1 GitHub Trending Feb 2026 with LangGraph rewrite
+
+*arXiv / agent papers (last 2 weeks):*
+- MEMPROBE (arXiv:2606.24595) -- long-term memory recoverability benchmark
+- SelfCompact (arXiv:2606.23525) -- model-initiated context compaction
+- SCOPE (arXiv:2606.22488) -- self-adaptive symbolic planning
+- Active Inference for Physical AI (arXiv:2606.22813) -- test-time scaling law
+- Tmax (arXiv:2606.23321) -- open RL terminal-agent recipe (27% Terminal-Bench 2.0 @ 9B params)
+- AGI -> ASI (arXiv:2606.12683) -- DeepMind four-pathway framing
+- Kairos (arXiv:2606.16533) -- Native World Model Stack for Physical AI
+- Agon (arXiv:2606.24177) -- autonomous omnidisciplinary research system
+
+*Trending open-source AI agent repos:*
+- bytedance/deer-flow v2.0 (#1 trending Feb 2026)
+- open-multi-agent/open-multi-agent v1.8.1 (Jun 27, ~6.4k stars)
+- microsoft/agent-framework v1.10.0 (15k+ stars, MIT)
+- code-yeongyu/oh-my-openagent v4.6.0 (TypeScript multi-agent SWE)
+
+**Build action today**: see BUILD_LOG_2026-06-29.md (CEF session-band integration: `band_for_session_state`, `session_should_trip`, two new `CEFBreakerOutcome` fields; 15 new tests, 294/294 CEF-adjacent pass, zero regressions)
+
+*Last updated: 2026-06-29 by AGI Research & Build Agent*
