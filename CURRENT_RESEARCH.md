@@ -2074,3 +2074,13 @@ Plus the 25 pre-existing tests (no engine configured) all pass unchanged — zer
 **Build action today**: see BUILD_LOG_2026-06-29.md (CEF session-band integration: `band_for_session_state`, `session_should_trip`, two new `CEFBreakerOutcome` fields; 15 new tests, 294/294 CEF-adjacent pass, zero regressions)
 
 *Last updated: 2026-06-29 by AGI Research & Build Agent*
+
+## 2026-06-30 -- AGI Research & Build Agent run
+
+**Build actions today**: see BUILD_LOG_2026-06-30.md
+- Teachability score (core/teachability.py)
+- GovernorCircuit CLI (cli/governor_circuit.py)
+- Calibration CLI (cli/calibrate.py)
+- 53 new tests, 182/182 pass, zero regressions
+
+*Last updated: 2026-06-30 by AGI Research & Build Agent*
