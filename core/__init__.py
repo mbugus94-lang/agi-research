@@ -188,6 +188,19 @@ from .typed_verb_library import (
     static_check,
 )
 
+from .typed_verb_cef_guard import (
+    CEFGuardAvailability,
+    GuardedVerbRuntime,
+    GuardedVerbStepResult,
+    VerbCEFGuard,
+    VerbCEFGuardConfig,
+    VerbGuardAction,
+    VerbOutputCEFInspection,
+    create_guarded_verb_runtime,
+    create_verb_cef_guard,
+    record_cef_to_evidence_ledger,
+)
+
 __all__ = [
     "BaseAgent",
     "AgentState",
