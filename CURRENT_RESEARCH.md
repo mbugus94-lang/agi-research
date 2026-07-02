@@ -2084,3 +2084,12 @@ Plus the 25 pre-existing tests (no engine configured) all pass unchanged — zer
 - 53 new tests, 182/182 pass, zero regressions
 
 *Last updated: 2026-06-30 by AGI Research & Build Agent*
+
+## 2026-07-01 -- AGI Research & Build Agent run
+
+**Build actions today**: see BUILD_LOG_2026-07-01.md
+- Added `core/typed_verb_library.py` as a typed web-verb layer with schema-checked verbs, pre/postconditions, runtime execution, and hash-chained audit logs
+- Exported typed-verb primitives from `core/__init__.py`
+- Added `experiments/test_typed_verb_library.py` covering registration, static checks, runtime execution, and audit-chain verification
+
+*Last updated: 2026-07-01 by AGI Research & Build Agent*
