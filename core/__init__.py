@@ -201,6 +201,22 @@ from .typed_verb_cef_guard import (
     record_cef_to_evidence_ledger,
 )
 
+from .verb_policy_bundle import (
+    BundledGuardConfig,
+    BundledVerbRuntime,
+    BundledVerbStepResult,
+    PolicyAuditEventKind,
+    PolicyResolutionSource,
+    VerbPolicyAuditLog,
+    VerbPolicyBundle,
+    VerbPolicyEntry,
+    WILDCARD_VERSION,
+    create_bundled_verb_runtime,
+    create_verb_policy_bundle,
+    enable_policy_audit,
+    resolve_policy,
+)
+
 __all__ = [
     "BaseAgent",
     "AgentState",
