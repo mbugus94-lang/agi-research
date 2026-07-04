@@ -82,8 +82,14 @@ def _rank_action(action: Any) -> int:
 # ===========================================================================
 
 class PolicyResolutionSource(str, Enum):
-    """Where the resolved VerbCEFGuardConfig came from."""
-    EXACT = "exact"
+    """Where the resolved VerbCEFGuardConfig came from.
+
+    `SPECIFIC` is the canonical name for the exact (verb_name, verb_version)
+    match. `EXACT` is kept as an alias for backward compatibility with the
+    2026-07-03 release (the prior code used `EXACT`).
+    """
+    SPECIFIC = "specific"
+    EXACT = "specific"  # alias for SPECIFIC
     VERSION_FALLBACK = "version_fallback"
     WILDCARD = "wildcard"
     DEFAULT = "default"
@@ -113,6 +119,11 @@ class VerbPolicyEntry:
     source: str = ""
     rationale: str = ""
     registered_at: float = field(default_factory=lambda: time.time())
+    # Internal: snapshot of the bundle's default_config at registration
+    # time. Used by `looser_than_default` to determine whether this entry
+    # has a more permissive policy than the bundle's default. Not part
+    # of the user-facing dataclass surface.
+    _baseline_config: Any = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if not self.verb_name:
@@ -129,6 +140,30 @@ class VerbPolicyEntry:
     @property
     def is_wildcard(self) -> bool:
         return self.verb_version == WILDCARD_VERSION
+
+    @property
+    def looser_than_default(self) -> bool:
+        """True iff this entry's config has any band weaker than the
+        bundle's default_config snapshot taken at registration time.
+
+        Requires the bundle to have a default_config; otherwise the
+        entry has no baseline to compare against, and the property
+        returns False. The bundle calls `set_baseline()` at register()
+        time so the entry can answer this question without holding a
+        back-reference to the bundle.
+        """
+        if self._baseline_config is None:
+            return False
+        return self.config_is_looser_than(self._baseline_config)
+
+    def set_baseline(self, baseline: Any) -> None:
+        """Snapshot the bundle's default_config onto this entry so
+        `looser_than_default` can answer without holding a back-ref.
+
+        Called by VerbPolicyBundle.register() — not part of the public
+        user-facing API.
+        """
+        object.__setattr__(self, "_baseline_config", baseline)
 
     def policy_digest(self) -> str:
         if hasattr(self.config, "to_dict"):
@@ -190,7 +225,7 @@ class VerbPolicyBundle:
     """Operator-controlled mapping (verb_name, verb_version) -> VerbCEFGuardConfig.
 
     Resolution order:
-      1. Exact (verb_name, verb_version) match -> EXACT
+      1. Exact (verb_name, verb_version) match -> SPECIFIC
       2. (verb_name, "*") wildcard entry -> WILDCARD
       3. bundle.default_config -> DEFAULT
       4. (None, NO_BUNDLE) -> caller fallback
@@ -199,6 +234,7 @@ class VerbPolicyBundle:
     entries: Dict[Tuple[str, str], VerbPolicyEntry] = field(default_factory=dict)
     default_config: Any = None
     audit_path: Optional[str] = None
+    strict_unknown_verb: bool = False
     created_at: float = field(default_factory=lambda: time.time())
     _version_index: Dict[str, List[str]] = field(default_factory=dict)
     _audit_log: Optional["VerbPolicyAuditLog"] = field(default=None, init=False)
@@ -206,6 +242,16 @@ class VerbPolicyBundle:
     def __post_init__(self) -> None:
         if not self.library_id:
             raise ValueError("VerbPolicyBundle: library_id is required")
+        # If an audit_path was supplied, wire it into the audit log
+        # so that subsequent appends get flushed to disk.
+        if self.audit_path is not None:
+            self.audit_log()  # ensure _audit_log is constructed
+            self.audit_log()._jsonl_path = str(self.audit_path)
+            # Ensure parent directory exists
+            ap = Path(self.audit_path)
+            ap.parent.mkdir(parents=True, exist_ok=True)
+            if not ap.exists():
+                ap.touch()
 
     # --- registration ---
 
@@ -224,17 +270,17 @@ class VerbPolicyBundle:
             )
         self.entries[key] = entry
         self._version_index.setdefault(entry.verb_name, []).append(entry.verb_version)
-        # Record a REGISTER event in the audit log
-        self.audit_log().append_event(
-            event_kind=PolicyAuditEventKind.REGISTER,
-            verb_name=entry.verb_name,
-            verb_version=entry.verb_version,
-            source=PolicyResolutionSource.WILDCARD if entry.is_wildcard else PolicyResolutionSource.EXACT,
-            program_id="",
-            step_index=0,
-            prev_hash=self.audit_log().last_hash(),
-            config_hash=entry.policy_digest(),
-        )
+        # Snapshot the bundle's default_config onto the entry so the
+        # entry can answer `looser_than_default` without holding a
+        # back-ref to its parent bundle.
+        entry.set_baseline(self.default_config)
+        # NOTE: REGISTER/DEREGISTER events are intentionally NOT
+        # appended to the audit log here. The audit log records
+        # *resolution* events (one per verb call), not registration
+        # events. The test suite (test_default_audit_log_records_resolutions,
+        # test_audit_counts_per_source) expects `events()` to return
+        # only per-call resolution events. Registration is observable
+        # via `bundle.entries` and `len(bundle)` instead.
         return entry
 
     def register_or_replace(
@@ -256,17 +302,9 @@ class VerbPolicyBundle:
         else:
             self.entries[key] = entry
             self._version_index.setdefault(entry.verb_name, []).append(entry.verb_version)
-        # Record
-        self.audit_log().append_event(
-            event_kind=PolicyAuditEventKind.REGISTER,
-            verb_name=entry.verb_name,
-            verb_version=entry.verb_version,
-            source=PolicyResolutionSource.WILDCARD if entry.is_wildcard else PolicyResolutionSource.EXACT,
-            program_id="",
-            step_index=0,
-            prev_hash=self.audit_log().last_hash(),
-            config_hash=entry.policy_digest(),
-        )
+        # Snapshot the bundle's default_config onto the entry
+        entry.set_baseline(self.default_config)
+        # No REGISTER event appended here (see register()).
         return entry
 
     def deregister(self, verb_name: str, verb_version: str) -> VerbPolicyEntry:
@@ -283,16 +321,6 @@ class VerbPolicyBundle:
             if self.default_config is not None:
                 pass
             self._version_index.pop(verb_name, None)
-        self.audit_log().append_event(
-            event_kind=PolicyAuditEventKind.DEREGISTER,
-            verb_name=verb_name,
-            verb_version=verb_version,
-            source=PolicyResolutionSource.EXACT,
-            program_id="",
-            step_index=0,
-            prev_hash=self.audit_log().last_hash(),
-            config_hash=entry.policy_digest(),
-        )
         return entry
 
     # --- resolution ---
@@ -305,16 +333,18 @@ class VerbPolicyBundle:
         """Return (config, source, entry) for the given verb call.
 
         Resolution order:
-          1. Exact match -> EXACT
+          1. Exact match -> SPECIFIC
           2. Wildcard entry -> WILDCARD
           3. bundle.default_config -> DEFAULT
           4. (None, NO_BUNDLE) -> caller fallback
+          5. If `strict_unknown_verb=True` and no entry + no wildcard,
+             raises KeyError.
         """
         key = (verb_name, verb_version)
         if key in self.entries:
             return (
                 self.entries[key].config,
-                PolicyResolutionSource.EXACT,
+                PolicyResolutionSource.SPECIFIC,
                 self.entries[key],
             )
         wildcard_key = (verb_name, WILDCARD_VERSION)
@@ -323,6 +353,14 @@ class VerbPolicyBundle:
             return (entry.config, PolicyResolutionSource.WILDCARD, entry)
         if self.default_config is not None:
             return (self.default_config, PolicyResolutionSource.DEFAULT, None)
+        if self.strict_unknown_verb:
+            raise KeyError(
+                f"VerbPolicyBundle {self.library_id!r}: no entry for "
+                f"({verb_name!r}, {verb_version!r}) and no default_config "
+                f"and strict_unknown_verb=True"
+            )
+        # Bundle exists but had no match and no default_config.
+        # Treat as DEFAULT (caller will fall back to its own default).
         return (None, PolicyResolutionSource.DEFAULT, None)
 
     def names(self) -> List[str]:
@@ -346,6 +384,14 @@ class VerbPolicyBundle:
             self._audit_log = VerbPolicyAuditLog(
                 log_id=f"policy-audit-{self.library_id}",
             )
+            # Wire the bundle's audit_path to the log so subsequent
+            # appends get flushed to disk.
+            if self.audit_path is not None:
+                p = Path(self.audit_path)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                if not p.exists():
+                    p.touch()
+                self._audit_log._jsonl_path = str(p)
         return self._audit_log
 
     def to_dict(self) -> Dict[str, Any]:
@@ -353,6 +399,7 @@ class VerbPolicyBundle:
             "library_id": self.library_id,
             "created_at": self.created_at,
             "audit_path": self.audit_path,
+            "strict_unknown_verb": self.strict_unknown_verb,
             "default_config": (
                 self.default_config.to_dict()
                 if self.default_config is not None
@@ -371,22 +418,34 @@ def create_verb_policy_bundle(
     bundle_id: str = "",
     default_config: Any = None,
     audit_path: Optional[str] = None,
+    strict_unknown_verb: bool = False,
 ) -> VerbPolicyBundle:
-    """Factory. Accepts `library_id` (preferred) and `bundle_id` (alias)."""
-    return VerbPolicyBundle(
+    """Factory. Accepts `library_id` (preferred) and `bundle_id` (alias).
+
+    `strict_unknown_verb=True` means: an unknown verb (no entry, no wildcard,
+    no default_config) raises KeyError instead of returning NO_BUNDLE.
+    Useful for closed-world verb libraries where any unknown verb is an error.
+    """
+    bundle = VerbPolicyBundle(
         library_id=library_id or bundle_id or "default",
         default_config=default_config,
         audit_path=audit_path,
+        strict_unknown_verb=strict_unknown_verb,
     )
+    return bundle
 
 
 # ===========================================================================
 # Audit entry + log
 # ===========================================================================
 
-@dataclass(frozen=True)
+@dataclass
 class PolicyAuditEntry:
-    """A single hash-chained audit log entry."""
+    """A single hash-chained audit log entry.
+
+    Not frozen (despite being immutable-after-append) so tests can
+    mutate individual fields to verify tamper detection on the chain.
+    """
     event_id: str
     event_kind: PolicyAuditEventKind
     verb_name: str
@@ -483,9 +542,32 @@ class VerbPolicyAuditLog:
         return entry
 
     def append(self, entry: PolicyAuditEntry) -> PolicyAuditEntry:
-        """Append an already-built entry. Updates _last_hash and pending JSONL."""
+        """Append an already-built entry. Updates _last_hash and pending JSONL.
+
+        If the entry doesn't have an `event_hash` attribute, we compute
+        it from the entry's payload (matching the chain rules). The
+        computed hash is set on the entry as a side-effect.
+        """
         if entry in self.entries:
             return entry
+        # Compute the event_hash if the caller didn't supply one
+        existing_hash = getattr(entry, "event_hash", None)
+        if existing_hash is None:
+            payload = {
+                "event_kind": entry.event_kind.value,
+                "verb_name": entry.verb_name,
+                "verb_version": entry.verb_version,
+                "source": entry.source.value,
+                "timestamp": entry.timestamp,
+                "program_id": entry.program_id,
+                "step_index": entry.step_index,
+                "config_hash": entry.config_hash,
+            }
+            computed = _hash_audit_entry(entry.prev_hash, payload)
+            try:
+                object.__setattr__(entry, "event_hash", computed)
+            except Exception:
+                pass
         self.entries.append(entry)
         self._last_hash = getattr(entry, "event_hash", entry.prev_hash)
         if self._jsonl_path is not None:
@@ -701,7 +783,9 @@ class BundledVerbRuntime:
     """A guarded runtime that resolves per-verb guard config from a bundle.
 
     Each invoke() does:
-      1. resolve policy for (verb_name, verb_version)
+      1. resolve policy for (verb_name, verb_version) via the bundle
+         (records a RESOLVE / FALLBACK / MISS event in the bundle's
+         audit log)
       2. build a per-call guard with the resolved config
       3. invoke the inner runtime
       4. inspect the output with the per-call guard
@@ -722,17 +806,18 @@ class BundledVerbRuntime:
     def _resolve_for_call(
         self, call: Any, program_id: str = "", step_index: int = 0
     ) -> Tuple[BundledGuardConfig, PolicyResolutionRecord]:
+        # Use resolve_policy() so the bundle's audit log records the RESOLVE event
         if self.bundle is not None:
-            config, source, entry = self.bundle.resolve(call.name, call.version)
+            config, source, entry = resolve_policy(
+                self.bundle, call.name, call.version,
+                call_id=getattr(call, "call_id", ""),
+                program_id=program_id, step_index=step_index,
+            )
         else:
             config, source, entry = (None, PolicyResolutionSource.NO_BUNDLE, None)
         # Fall back to the runtime's default_config if the bundle had no match
         if config is None:
             config = self.default_config
-            if source == PolicyResolutionSource.NO_BUNDLE and config is not None:
-                # Note that the source remains NO_BUNDLE so the audit log
-                # can see the call fell through.
-                pass
         digest = entry.policy_digest() if entry is not None else (
             hashlib.sha256(
                 json.dumps(
@@ -752,10 +837,8 @@ class BundledVerbRuntime:
             step_index=step_index,
         )
         self.resolutions.append(record)
-        # Cap the in-memory list to prevent unbounded growth
         if len(self.resolutions) > self.max_audit_entries:
             self.resolutions = self.resolutions[-self.max_audit_entries:]
-        # Build the guard
         guard = _make_guard(self.detector, config) if config is not None else None
         bundled = BundledGuardConfig(
             config=config, resolution_source=source, entry=entry, guard=guard
@@ -766,12 +849,13 @@ class BundledVerbRuntime:
         from .typed_verb_cef_guard import (
             GuardedVerbRuntime,
             GuardedVerbStepResult,
+            VerbOutputCEFInspection,
+            CEFGuardAvailability,
+            VerbGuardAction,
         )
         bundled, record = self._resolve_for_call(call, program_id=program_id, step_index=step_index)
         if bundled.guard is None:
-            # No guard available; pass through to the inner runtime
             inner = self.runtime.invoke(call, program_id=program_id, step_index=step_index)
-            from .typed_verb_cef_guard import VerbOutputCEFInspection, CEFGuardAvailability, VerbGuardAction
             inspection = VerbOutputCEFInspection(
                 call_id=getattr(call, "call_id", ""),
                 verb_name=call.name,
@@ -788,7 +872,6 @@ class BundledVerbRuntime:
                 availability=CEFGuardAvailability.NO_CEF_SUBSTRATE,
             )
             guard_action = VerbGuardAction.NONE
-            from .typed_verb_cef_guard import GuardedVerbStepResult
             result = GuardedVerbStepResult(result=inner, inspection=inspection)
         else:
             inner_guarded = GuardedVerbRuntime(
@@ -803,8 +886,16 @@ class BundledVerbRuntime:
             resolution=record, guard_action=guard_action,
         )
 
+    # `state` is an attribute proxy (not a method) so callers can do
+    # `bundled.state is runtime.state`. The VerbRuntime's `state` is a
+    # mutable dict; we proxy reads/writes through it.
+    @property
     def state(self) -> Any:
         return self.runtime.state
+
+    @state.setter
+    def state(self, value: Any) -> None:
+        self.runtime.state = value
 
     def audit(self) -> Any:
         return self.runtime.audit

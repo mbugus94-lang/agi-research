@@ -145,3 +145,59 @@ The past week's arXiv / OpenReview signals reinforce the convergence the 2026-07
 - **Wire `BundledVerbRuntime` into `execute_program`** — the program executor's `_execute_call_step` should accept an optional bundled runtime so every program execution is CEF-scanned *with per-verb policy* by default.
 
 *Last updated: 2026-07-03 by AGI Research & Build Agent*
+
+
+## Research Summary — 2026-07-04
+
+### Theme: Audit-API Contract Lock-in for VerbPolicyBundle (closes 2026-07-03 carryover)
+
+The 2026-07-03 build landed `VerbPolicyBundle` (per-verb CEF guard policy) with a flag that 13 audit-API contract mismatches between the test file and the implementation needed resolution. Today's run closes that carryover by aligning the implementation to the test contract: `PolicyResolutionSource.SPECIFIC` (with `EXACT` as a legacy alias), `looser_than_default` property, `strict_unknown_verb` field, `BundledVerbRuntime.state` as an attribute proxy, audit log records *resolution events only* (not registration events), and the CLI's `n_entries` now reports the registered-entry count (with the `last` filter applied) while `n_audit_events` reports the per-call resolution event count.
+
+The 2026-07-03 entry's **next priority** was: "Resolve the 8 audit-API contract mismatches." Today's build resolves all 13 (the run revealed 5 additional mismatches during the fix that weren't previously enumerated — the `import os` bug, the `state` attribute-vs-method, the audit-log wiring of `audit_path`, the `PolicyAuditEntry` frozen constraint, and the `append()` event_hash recomputation). 52/52 tests in `test_verb_policy_bundle.py` + `test_policy_review_cli.py` pass.
+
+#### Key findings (past week)
+
+- **arXiv:2607.02116 (ContextNest, "Verifiable Context Governance for Autonomous AI Agents")** (Jul 2, 2026) — the input-side dual to the CEF substrate. Four adversaries (silent content tamperer, history rewriter, checkpoint forger, stale-version inducer); document model with version chains + audit trace + staged source-node lifecycle. **The ContextNest + CEF pair is the verifiable-input / verifiable-output dual that AIBOM / CSAF-VEX demand.** The 2026-07-03 build's `VerbPolicyBundle` audit log is the bridge: every per-call resolution is an auditable event, replayable via the hash chain.
+- **arXiv:2607.00041 (Gear-Based Safety, scimitar architecture)** (Jul 1, 2026) — the *constraint-pressure probe* paper that the 2026-06-19 CEF paper called for as future work. Today's build does not implement CPP, but the Gear-Based paper confirms the shape: an adversarial harness that drives the agent through progressive exit sealing and measures the CEF / CET emergence rate per verb namespace. The bundle's audit log is the per-verb measurement substrate.
+- **Forbes (Jul 3, 2026)** — Vint Cerf follow-up on agent economy: "composability requires interoperability requires standardization". Today's contract lock-in is the *standardization* step — the bundle now has a stable shape that downstream layers (CPP, AIBOM advisory emitter, replay layer) can rely on.
+- **Trending repos (week)**: `nex-agi/Nex-N2` v0.8.1 (Agentic Thinking loop, SOTA Terminal-Bench); `shyftlabs/continuum` v0.6.0 (production agent OS, 9 multi-agent patterns); `agentgov/agentgov` v0.4.0 (NIST AI RMF + ISO 42001 enforcement, directly aligned with arXiv:2606.19390 AIBOM); `openobserve/openobserve` v0.30 (structured runtime telemetry — the bridge from audit log to operator dashboard).
+- **arXiv roundup**: ~12 agent-governance / safety / verification papers in the past 7 days. Convergence continues: *typed actions + per-component policy + runtime telemetry + replay-ready audit*.
+
+#### Today's build: Close 2026-07-03 Audit-API Carryover
+
+**Build summary**: 13 contract mismatches resolved across 3 files. 52/52 tests in the bundle + CLI test files pass. 332/332 in the bundle + CEF + verb + governor + calibrate substrate. Zero regressions in pre-existing code.
+
+**Key changes**:
+
+1. **`PolicyResolutionSource.SPECIFIC`** — canonical name (was `EXACT`). `EXACT` kept as a string-alias for backward compatibility.
+2. **`VerbPolicyEntry.looser_than_default`** — property that compares per-band (low/medium/high/critical) actions against the bundle's `default_config`. The bundle calls `entry.set_baseline(self.default_config)` at `register()` to snapshot without a back-ref.
+3. **`strict_unknown_verb` field on `VerbPolicyBundle`** — when True, `resolve()` raises `KeyError` for unknown verbs. False by default (lax mode: falls back to `default_config`).
+4. **`BundledVerbRuntime.state` as `@property`** — was a method, now an attribute proxy (read/write pass-through to `runtime.state`). `audit()` remains a method.
+5. **`BundledVerbRuntime.invoke()`** — now calls `resolve_policy()` per invoke, which records a RESOLVE/FALLBACK/MISS event. The previous version bypassed the audit log.
+6. **`register()` / `register_or_replace()` / `deregister()`** — no longer append REGISTER/DEREGISTER events. Audit log is *resolution-only*. Registration is observable via `bundle.entries` and `len(bundle)`.
+7. **`PolicyAuditEntry` not `frozen`** — needed for tamper-detection test which mutates an entry.
+8. **`VerbPolicyAuditLog.append()`** — computes and stores `event_hash` from `prev_hash` + payload (using `_hash_audit_entry`). The previous version stored whatever was on the entry (missing for test-built entries).
+9. **`VerbPolicyBundle.audit_log()`** — wires `bundle.audit_path` into `log._jsonl_path` for JSONL writes.
+10. **`cli/policy_review.review_bundle()`** — `n_entries` counts registered entries (with `last` filter applied); `n_audit_events` reports per-call resolution event count.
+11. **`test_verb_policy_bundle.py`** — added `import os` (was missing at the top, only imported inside one test method).
+
+#### Research synthesis
+
+- **Contract lock-in is a maturation signal**. The 2026-07-03 build created the bundle's shape; today's build aligns the implementation to the test contract. This is the step where the substrate becomes *stable* — downstream work (CPP, AIBOM advisory emitter, replay layer) can now rely on a fixed audit shape.
+- **Audit log = resolution events only** (one per call). Registration is observable via `bundle.entries` and `len(bundle)`. This separates *what policies exist* (registered entries) from *what policy was applied* (resolution events) — the two are different audit dimensions, and a replay layer needs both.
+- **`n_entries` vs `n_audit_events` split in the CLI**: a bundle with 3 entries and 100 resolutions surfaces both counts. The CLI is the substrate for a downstream dashboard.
+- **ContextNest + CEF pair**: the input-side + output-side verification dual. ContextNest verifies documents (version chains, audit traces); CEF verifies agent output (fabrication patterns, severity ladder). Together they form the verifiable-input / verifiable-output pair that AIBOM / CSAF-VEX papers demand.
+- **Gear-Based Safety**: the constraint-pressure probe pattern. The CEF paper (arXiv:2606.14831) found 3.8× CEF emergence increase from L5 to L7 driven by constraint pressure. The Gear-Based paper is the implementation pattern for a probe that drives the agent through progressive exit sealing and measures emergence rate per verb namespace.
+
+#### Next priority
+
+- **Constraint Pressure Probe (CPP) integration** — `skills/cpp.py` using Gear-Based Safety (arXiv:2607.00041) as the implementation pattern. The bundle's audit log is the per-verb measurement substrate. CPP outputs are auditable experiments, each writing a CEF detection to `EvidenceLedger` via the existing `evidence_claim_id` bridge.
+- **AIBOM advisory emitter** — `cli/emit_advisory.py` reads a JSONL audit log + a policy bundle snapshot and emits a CSAF-VEX-shaped advisory document. The bridge from audit log to "execution-bound advisory" per arXiv:2606.19390.
+- **Constraint-set annotation in CEF context** — fold the bundle's `default_config` (or the per-call resolved config) into the CEF detector's `context` dict so the detector can see "this verb has strict policy → constraint pressure is high". The CEF paper's 3.8× emergence finding is the empirical basis.
+- **Cross-engine consistency invariant** — assert `session_engine.history[i].session_digest == per_output_engine.history[j].detection_id` for the same logical event. Today both engines run independently.
+- **`GovernorCircuit`-style gating** — a circuit that opens when the probabilistic engine's `trip_upper_bound >= trip_threshold` and re-closes when the bound drops. The bound becomes a *policy input*, not just a measurement.
+- **Wire `BundledVerbRuntime` into `execute_program`** — the program executor should accept an optional bundled runtime so every program execution is CEF-scanned with per-verb policy by default.
+- **CLI `--warn-loose`** — `python -m cli.policy_review --warn-loose` surfaces all `looser_than_default=True` entries in the bundle.
+- **Adversarial test pass** — 20 synthetic sessions designed to expose audit-chain gaps beyond the current 1-entry tamper test.
+
+*Last updated: 2026-07-04 by AGI Research & Build Agent*

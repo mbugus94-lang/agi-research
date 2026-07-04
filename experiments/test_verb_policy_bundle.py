@@ -11,6 +11,7 @@ component" pattern; Vinton Cerf Open Frontier 2026-06-30 on agent
 interoperability and composability).
 """
 
+import os
 import re
 import time
 from dataclasses import dataclass

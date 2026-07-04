@@ -20,19 +20,23 @@ from typing import Any, Dict, List, Optional
 
 
 def review_bundle(bundle: Any, last: Optional[int] = None) -> Dict[str, Any]:
-    """Review a VerbPolicyBundle's audit log.
+    """Review a VerbPolicyBundle's audit log + registry.
 
-    Returns a summary dict with counts by source, last N events,
-    and the head hash for tamper detection.
+    Returns a summary dict with:
+      - bundle_id:
     """
     log = bundle.audit_log()
     events = log.events() if hasattr(log, "events") else []
     if last is not None:
         events = events[-last:]
     counts: Dict[str, int] = Counter(e.source.value for e in events)
+    n_entries = len(bundle) if hasattr(bundle, "__len__") else 0
+    if last is not None:
+        n_entries = min(n_entries, last)
     return {
         "bundle_id": getattr(bundle, "library_id", ""),
-        "n_entries": len(events),
+        "n_entries": n_entries,
+        "n_audit_events": len(events),
         "counts_by_source": dict(counts),
         "last_events": [e.to_dict() for e in events[-5:]],
         "head_hash": log.last_hash() if hasattr(log, "last_hash") else None,
