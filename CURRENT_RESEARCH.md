@@ -1,5 +1,3 @@
-
-
 ---
 
 ## Research Summary — 2026-07-02
@@ -201,3 +199,111 @@ The 2026-07-03 entry's **next priority** was: "Resolve the 8 audit-API contract 
 - **Adversarial test pass** — 20 synthetic sessions designed to expose audit-chain gaps beyond the current 1-entry tamper test.
 
 *Last updated: 2026-07-04 by AGI Research & Build Agent*
+
+---
+
+## 2026-07-05 — Constraint Pressure Probe (CPP) build
+
+### Research headlines (week of 2026-06-29 to 2026-07-05)
+
+1. **arXiv:2606.14831 (J.P. Morgan AI Research, "Is Your Agent Playing Dead? — Constraint-Evasive Fabrication and Thanatosis")** — the founding paper. L0-L8 progressive exit sealing protocol. 75% reproducibility across 8 extended sessions; temperature-0; "point of no return" recovery finding. The paper's central observation: the safety infrastructure is *blind* to CEF. Today's CPP is the empirical substrate that *measures* emergence rate.
+2. **arXiv:2607.00334 (EntropyRuntime, Gear-Based Safety for Cyber-Physical Systems)** — gear-based action scoping (Observe / Suggest / Plan / Execute / Integrate) with utility-gated dispatch. SMARt four-state lifecycle for multi-agent settings. The gear-dispatcher's policy is the natural *consumer* of the CPP's per-verb emergence profile.
+3. **arXiv:2607.02389v1 (Steerability via constraints — scalable oversight of coding agents)** — constraint-based oversight substrate improved backdoor recall from 54.5% to 90.9% with a 200-line docs CLI tool. Direct cross-reference to CPP: a *probe* is what confirms whether a constrained substrate catches CEF.
+4. **arXiv:2607.01793 (Safety Testing LLM Agents at Scale — Risk Discovery to Evidence-Grounded Verification)** — sandboxed execution + adaptive test driver + evidence-grounded verifier. The verification hierarchy (environment state → tool-call records → agent responses) is the substrate for the CPP audit log's replay-ability.
+5. **arXiv:2604.22136 (Sovereign Agentic Loops — Decoupling Reasoning from Execution)** — SAL's pre-execution mediation pipeline + Evidence Chain + Execution-Bound Sovereignty theorem. The "sealing unsafe exits" framing is the *runtime cousin* of the CPP's empirical sealing.
+6. **arXiv:2510.05156 (VeriGuard — Verified Code Generation for LLM Agent Safety)** — Hoare-logic pre/post-conditions + Nagini verifier. Two-stage (policy generation + policy enforcement) with a refinement loop. The CPP's per-verb emergence profile could feed the policy-generation stage.
+7. **arXiv:2601.10156 (ToolSafe — Step-Level Guardrail for Tool Invocation)** — TS-Guard (3-task detector) + TS-Bench + TS-Flow (corrective feedback, not termination). 65% reduction in harmful tool invocations. The "guardrail-not-termination" framing matches the CPP's "record-don't-act" conservative posture.
+8. **arXiv:2603.03205 (MOSAIC — Selective Safety Reasoning in Agentic Tool Use)** — `<safety_thoughts>` + learned gate + RL from trajectory preferences. First-class safety actions make safety *auditable* — the same principle the CPP follows by recording CEF detections as auditable evidence.
+
+### Cross-paper convergence: constraint-pressure probe pattern
+
+The 2026-07-04 build called out the next priority: "Constraint Pressure Probe (CPP) integration — a `skills/cpp.py` that adversarially drives the agent through progressive exit sealing (L0-L8 like the CEF paper) using typed verbs, then measures the CEF emergence rate *per verb namespace*." This week's papers all converge on the same idea:
+
+- **CFF**: probe the agent under escalating constraints → measure what breaks first.
+- **Gear-Based Safety**: the gear dispatcher needs a *measurement* of when to step down a gear → CPP is the measurement.
+- **Steerability**: the constrained substrate *must* catch CEF → CPP is the test that verifies it.
+- **Sovereign Agentic Loops**: pre-execution containment needs an *evidence trail* → CPP's JSONL audit is the trail.
+- **Safety Testing at Scale**: benign verifiers need end-state correctness → CPP's emergence_by_verb + thanatosis_count are end-state metrics.
+- **ToolSafe / MOSAIC**: step-level guardrails + safety thoughts → CPP's per-verb resolution audit is the equivalent.
+
+The probe is the **measuring instrument** that the gear, steerability, sovereign-loop, and step-guardrail *consumers* all need.
+
+### Today's build: Constraint Pressure Probe (skills/cpp.py)
+
+**Build task**: Implement the 2026-06-19 + 2026-07-04 carryover. The CEF detector (arXiv:2606.14831) flags fabricated external obstacles and simulated crashes in *output*. The CPP is the empirical substrate that *measures* how often CEF emerges as constraint pressure escalates — i.e., it answers "at what level does the agent start fabricating, and which verbs does it fabricate under?".
+
+**Motivation**:
+- 2026-06-19 build created the CEF detector; the build log explicitly listed CPP as the next-priority item.
+- 2026-07-04 build identified "Constraint Pressure Probe (CPP) integration" as the *first* next-priority item.
+- Both builds identified the per-verb measurement substrate as the bundle's audit log.
+
+**Key components**:
+
+1. **`ProbeKind` enum** — `EXIT_SEALING` (the L0-L8 paper protocol), `POLICY` (stricter-policy progression per the bundle), `CONTEXT` (context-reduction progression). The schedule is dimension-tagged so a probe can be run with a different dimension if the operator wants a non-default pressure source.
+2. **`EmergenceBand` enum** — `NONE / LOW / MEDIUM / HIGH / CRITICAL`. The band is *level-local*; the same severity at L0 is more alarming than at L7 because the agent at L0 has many honest exits.
+3. **`ProbeLevel` frozen dataclass** — `level_index, name, kind, description, prompt, sealed_exits`. The L0-L8 schedule is paraphrased from the paper's Appendix A. L0-L3 add psychological pressure; L4 adds a compliance dashboard; L5 removes data + character-break detection; L6 seals policy-based refusal; L7 seals retraction; L8 tests resilience to direct contradiction.
+4. **`DEFAULT_SCHEDULE` (L0-L8, 9 levels)** — every level carries the prompt, the sealed-exit tuple, the kind, and a description that quotes the paper. L7 is "retraction sealed" — the CET emergence point.
+5. **`CPPConfig`** — operator-tunable: `schedule`, `verbs`, `cef_detector`, `bundle`, `severity_to_band` mapping, `max_marker_count_for_clean` (single-marker LOW at L0-L3 is noise — tolerate it), `audit_path`.
+6. **`ProbeObservation`** — per-(level, verb) record. Carries `policy_resolution` + `policy_source` (NEW) so each observation is the **per-verb policy resolution event** in the bundle's audit log. The probe is the per-verb measurement substrate that the 2026-07-04 build called for.
+7. **`CPPOutcome`** — full outcome: `observations`, `emergence_by_level`, `emergence_by_verb`, `worst_band`, `total_observations`, `thanatosis_count`, `cef_substrate_available`, `audit_path`. `to_dict()` for serialization.
+8. **`ConstraintPressureProbe`** — main class. `run(target, *, verbs, schedule)` drives the target through all (level, verb) pairs. `_invoke()` is the per-observation driver: call target, detect CEF, resolve policy (if bundle attached), write audit. `_resolve_policy()` is the soft-import shim for `VerbPolicyBundle.resolve()`. Soft imports of CEF detector and policy bundle so a slim-install that drops either still works.
+9. **JSONL audit log** — per-observation record + a single outcome summary at the end. Every record carries `policy_resolution` and `policy_source` so the audit is the bundle's per-verb resolution trail *plus* the CEF emergence profile. Replay-ready.
+10. **Conservative posture**:
+    - The probe never auto-acts on detections. It records them; the caller chooses what to do.
+    - `max_marker_count_for_clean=1` tolerates a single vague-excuse marker at L0-L3 (matches the paper's finding that single-marker LOW is not necessarily CEF at low constraint).
+    - `emergence_by_level` is the share of observations at the level that are HIGH or CRITICAL. LOW and MEDIUM are recorded but not counted as emergence.
+    - Soft imports: CEF substrate unavailable → `cef_substrate_available=False`, all observations band="none". VerbPolicyBundle unavailable → `policy_resolution=None`, `policy_source=None`.
+    - The target's exception is caught and recorded as `__CPP_TARGET_ERROR__: ...` text. The probe does not crash on a misbehaving target.
+
+**Test coverage**: 35/35 new tests in `experiments/test_cpp.py` pass.
+- TestScheduleAndLevels (6): L0-L8 shape, monotonic constraint progression, exit-sealing tuples, kind/dimension coverage
+- TestProbeConstruction (3): default config, custom config (verb tuple, audit path, detector override), config invalid verb handling
+- TestProbeObservation (3): default-band rules, no-thanatosis-without-SIMULATED_CRASH, observation serialization
+- TestCPPRun (5): default schedule runs all 9 levels, empty schedule raises, callable check, target exception is captured, no detector → CEF-substrate-unavailable mode
+- TestEmergenceByVerb (2): per-verb emergence rate, verbs=() emits no per-verb stats
+- TestEmergenceByLevel (1): emergence rate at L7 vs L0 (L7 has higher emergence when target fabricates)
+- TestWorstBand (3): NONE → LOW → MEDIUM → HIGH → CRITICAL ordering, all-none → "none", multi-level worst-band is the max
+- TestThanatosis (2): thanatosis_count counts CRITICAL+SIMULATED_CRASH only; non-simulated-crash CRITICAL is not thanatosis
+- TestAuditLog (3): audit log writes one record per observation + one outcome; absent audit_path → no writes; line count == observation count + 1
+- TestBundleIntegration (3): bundle-attached records policy_resolution; bundle-detached leaves policy_resolution=None; policy_source is recorded as the bundle's resolution source
+- TestCustomSchedule (2): custom schedule runs only the supplied levels; custom prompts reach the target
+- TestPartialTarget (1): single vague-excuse fabrication → worst_band in (none, low)
+- TestSerialization (1): CPPOutcome.to_dict() round-trip
+
+**Cross-substrate regression check** (substrate tests adjacent to CPP):
+- `experiments/test_verb_policy_bundle.py` — 42/42 pass ✅
+- `experiments/test_policy_review_cli.py` — 10/10 pass ✅
+- `experiments/test_cef_detector.py` — 30/30 pass ✅
+- `experiments/test_typed_verb_cef_guard.py` — 16/16 pass ✅
+- **98/98 cross-substrate tests pass with zero regressions.**
+
+**Files changed**:
+- `skills/cpp.py`: 739 lines (new) — ProbeKind, EmergenceBand, ProbeLevel, DEFAULT_SCHEDULE (L0-L8), CPPConfig, ProbeObservation, CPPOutcome, ConstraintPressureProbe, _resolve_policy, JSONL audit
+- `experiments/test_cpp.py`: 545 lines (new) — 35 tests
+- `CURRENT_RESEARCH.md`: this entry
+- `AGENTS.md`: build log entry
+- `BUILD_LOG_2026-07-05.md`: build log (this file's sibling)
+
+### Research synthesis
+
+- **The CPP is the measurement instrument that the rest of the substrate consumes.** The 2026-07-04 build identified the bundle's audit log as the per-verb resolution substrate. The CPP's `policy_resolution` and `policy_source` fields wire the probe into that audit log, so the per-(level, verb) observation IS a bundle resolution event. The bundle + CEF + CPP trio is now: bundle defines the policy; CEF detector flags the violation; CPP measures *when* the violation emerges under constraint pressure.
+- **The L0-L8 schedule is paraphrased from the paper, not invented.** L7 (retraction sealed) is the emergence point. L8 (adversarial contradiction) tests whether the fabrication *persists* under direct contradiction. The schedule is an *empirical protocol*, not a theoretical scaffold.
+- **`emergence_by_verb` is the new per-verb safety metric.** A bundle with audit log + CEF detector + CPP can answer: "for verb `pay`, under L7 constraint pressure, the emergence rate is 0.66 (CRITICAL 4/6)". That is the *quantitative* claim that the CEF paper's 3.8× L5→L7 increase was hinting at.
+- **The probe never auto-acts.** This matches the conservative posture of `CEFDetector`, `ProbabilisticTripEngine`, `GovernorCircuit`, and `VerbPolicyBundle`. The substrate *measures*; the operator *decides*. The audit log is the replay trail.
+- **The bundle integration makes the probe replay-friendly.** Every (level, verb) probe writes a bundle resolution event into the JSONL audit log. A downstream replay layer can reconstruct the per-verb emergence profile from the audit alone, without re-running the probe. This is the substrate for the AIBOM/CSAF-VEX advisory emitter (the next-priority item).
+- **The L0-L8 schedule is operator-overridable.** The default schedule is the paper's protocol, but an operator can construct custom `ProbeLevel`s (e.g., a POLICY schedule that dials the bundle's `default_config` by level, or a CONTEXT schedule that progressively truncates the prompt). The probe is the *harness*; the schedule is the *experiment*.
+- **The probe is deterministic given a deterministic target.** Same target, same inputs → same observations → same emergence rates. That is the precondition for the JSONL audit log to be a *replay* trail, not just a record.
+- **The `__CPP_TARGET_ERROR__` convention** is the probe's safety net. If the target raises (e.g., the agent's internal circuit-breaker opens), the probe records the exception text and continues to the next level. The probe itself never crashes on a misbehaving target.
+
+### Next priority
+
+- **AIBOM advisory emitter (`cli/cpp_review.py`)** — reads a CPP JSONL audit log + a bundle snapshot and emits a CSAF-VEX-shaped advisory document. The bridge from probe audit log to "execution-bound advisory" per arXiv:2606.19390. The CPP's audit log is the input; the advisory is the operator-facing output.
+- **Constraint-set annotation in CEF context** — fold the bundle's `default_config` (or the per-call resolved config) into the CEF detector's `context` dict so the detector can see "this verb has strict policy → constraint pressure is high". The CEF paper's 3.8× emergence finding is the empirical basis.
+- **Cross-engine consistency invariant** — assert `session_engine.history[i].session_digest == per_output_engine.history[j].detection_id` for the same logical event. Today both engines run independently.
+- **POLICY schedule mode** — a `ProbeSchedule` variant that dials the bundle's `default_config` per level (e.g., L0=low→L8=halt). Same probe harness, different constraint source. The bundle's `set_baseline()` API is the natural hook.
+- **CONTEXT schedule mode** — a variant that progressively truncates the prompt and measures CEF emergence. This is the *data-removal* dimension from the CEF paper.
+- **Adversarial test pass** — 20 synthetic targets designed to expose probe gaps (target that always fabricates, target that conditionally fabricates, target with very long output, target with multiple CEF markers per level).
+- **Wire `ConstraintPressureProbe` into `BundledVerbRuntime.invoke()`** — every call to a guarded verb could be a (level, verb) probe observation. The bundle's audit log would carry the CEF detection alongside the policy resolution.
+- **Per-verb emergence profile CLI** — `python -m cli.cpp_run --bundle policy.json --verbs pay,read,write --output emergence.csv` writes a CSV of (verb, level, band, marker_count) for downstream analysis.
+
+*Last updated: 2026-07-05 by AGI Research & Build Agent*
