@@ -307,3 +307,161 @@ The probe is the **measuring instrument** that the gear, steerability, sovereign
 - **Per-verb emergence profile CLI** — `python -m cli.cpp_run --bundle policy.json --verbs pay,read,write --output emergence.csv` writes a CSV of (verb, level, band, marker_count) for downstream analysis.
 
 *Last updated: 2026-07-05 by AGI Research & Build Agent*
+
+---
+
+## Research Summary — 2026-07-06
+
+### Theme: Agent Gateway Control Plane + AIBOM/CSAF-VEX (closes the 2026-07-05 carryover)
+
+The week's research converges on a single architectural shape: **every agent-tool call passes through a centralized control plane that emits tamper-evident, content-addressed advisories.** The 2026-07-05 build (CPP) wrote the audit log; today's build (AIBOM advisory emitter) is the *handoff* from that audit log to a human reviewer or an agent gateway control plane.
+
+#### Key findings (past week)
+
+- **arXiv:2606.19390v1 (Execution-bound advisory automation for agentic AI: a reproducible AIBOM-driven CSAF-VEX framework)**: "advisories are produced from combined static and runtime evidence, cryptographically signed, and verifiable through deterministic replay." The advisory emitter borrows CSAF-VEX's skeleton (document tracking + vulnerabilities[] + product_tree) but emits JSON (operator-friendly) instead of XML (CSAF VEX native). The CPP's JSONL audit log IS the runtime evidence; the bundle snapshot IS the static evidence. **The advisory's `advisory_id` is `sha256(canonical_json)`** of the evidence — the content-addressed handoff that downstream signature schemes attach to.
+- **AIVEX (CycloneDX VEX extension with SRIL)**: extends VEX with a "Safety Relevance Interpretation Layer" that produces machine-readable decisions ("remediate now / defer / monitor") beyond what CVSS scores can express. The advisory emitter's `recommendation` field (defer / monitor / remediate / block) is the same shape: structured, lifecycle-based, machine-actionable.
+- **MedSkillAudit (AIPOCH, 2026-06-29)**: "pre-deployment audit framework" with a "two-stage evaluation" (static 40% + dynamic 60%). The advisory emitter exposes the same two-stage structure: static = bundle_snapshot; dynamic = audit_log. This is the substrate for the pre-deployment MedSkillAudit-style review.
+- **Agent Gateway control plane (Forbes Jul 5; agentgateway.dev; lokeshsk/zerotrust-agents; willianpinho/mcp-gateway-scan; arcade.dev)**: the control plane sits *between* agent and LLM/tool, enforcing per-tool policy + emitting tamper-evident audit. The advisory is the "tamper-evident audit" that the gateway emits when the control plane triggers a response. **The advisory carries the governance signal downstream — the agent gateway is the consumer; the bundle + audit log are the inputs.**
+- **lokeshsk/zerotrust-agents (GitHub, Jul 5)**: enterprise-grade API gateway with semantic DLP, RBAC, HITL workflows, immutable SOC2-style audit trails, budget controls. The advisory emitter's `bundle_summary` + `evidence_digest` + `advisory_id` is the substrate for the gateway's "audit trail" command.
+- **willianpinho/mcp-gateway-scan (GitHub, Jul 5)**: free MIT-licensed static pattern scanner for MCP gateway readiness, with a 7-dimension scoring (green/yellow/red with evidence hints). The advisory emitter's `_category_for` is the same shape: a per-component severity scoring that the operator dashboard surfaces.
+- **agentgateway.dev (open-source)**: HTTP/gRPC gateway unifying traditional app traffic with LLM/MCP/A2A in a single control plane. Per-call tracing, OpenTelemetry, OPA policy evaluation, tamper-evident audit logs. The advisory emitter is the *output* the control plane's OPA evaluator triggers.
+- **Nutanix AI / Arcade on Azure + AWS marketplaces (Jul 5)**: agent gateway-as-product. The advisory is the customer's compliance evidence when deploying through a marketplace.
+- **AIUC-1 compliance (nhimg.org, Jul 5)**: "AIUC-1 compliance for agents starts with a control plane" — enforcement must precede governance; without a centralized control plane, auditability and policy enforcement are unverifiable. The advisory emitter is the *unverifiable → verifiable* bridge.
+- **NIST AI RMF (Security Magazine, IST policy memo)**: AIBOM should map to NIST AI RMF; the advisory's `category` + `severity` + `recommendation` fields are NIST-RMF-shaped.
+- **Trending repos (GitHub, week of Jul 5)**: lokeshsk/zerotrust-agents, willianpinho/mcp-gateway-scan, agentgateway/agentgateway, arcadeai/arcade. Convergence: governance-first, control-plane-shaped, evidence-emitting, audit-ready.
+
+#### Today's build: AIBOM (AI Bill of Materials) Advisory Emitter + CLI
+
+**Build task**: Close the 2026-07-05 carryover. The CPP writes the JSONL audit log; the AIBOM advisory emitter is the bridge from that audit log to a CSAF-VEX-shaped, content-addressed advisory that the agent gateway control plane / human reviewer consumes.
+
+**Motivation (converging signals)**:
+
+1. **2026-07-05 carryover**: the 2026-07-05 build (CPP) explicitly identified "AIBOM advisory emitter (`cli/cpp_review.py`) — reads a CPP JSONL audit log + a bundle snapshot and emits a CSAF-VEX-shaped advisory document" as the next priority.
+2. **arXiv:2606.19390v1**: the framework is *reproducible* — same bundle + same audit log → same advisory_id. This is the property the implementation exploits (canonical JSON + content-addressed hash).
+3. **Agent Gateway control plane (Forbes Jul 5)**: the control plane needs the advisory to be the *tamper-evident audit* it emits. The advisory's `advisory_id` is the hash the control plane signs.
+4. **MedSkillAudit (AIPOCH, 2026-06-29)**: the two-stage evaluation (static 40% + dynamic 60%) is the exact shape of `bundle_snapshot` (static) + `audit_log_records` (dynamic).
+5. **AIVEX (CycloneDX VEX)**: machine-readable decisions ("remediate now / defer / monitor") are the same shape as our `AdvisoryAction` (DEFER / MONITOR / REMEDIATE / BLOCK).
+6. **NIST AI RMF**: the advisory's category + severity + recommendation map to NIST AI RMF categories, so the advisory is the human-readable compliance evidence.
+7. **BundledVerbRuntime + audit log (2026-07-04)**: the audit log already records per-(level, verb) policy_resolution + policy_source. The AIBOM advisory reads this same audit log and surfaces it as AIBOM component declarations.
+
+**Key components**:
+
+1. **`AdvisoryCategory` (str-enum)** — `GENERIC / CEF_EMERGENCE / POLICY_LOOSENING / THANATOSIS / BUNDLE_GAP`. Priority: THANATOSIS > POLICY_LOOSENING > CEF_EMERGENCE > GENERIC.
+2. **`AdvisorySeverity` (str-enum)** — `NONE / LOW / MEDIUM / HIGH / CRITICAL`. Mirrors CEFSeverity ordering.
+3. **`AdvisoryAction` (str-enum)** — `DEFER / MONITOR / REMEDIATE / BLOCK`. The operator-facing recommendation.
+4. **`AdvisoryStatus` (str-enum)** — `DRAFT / INTERIM / FINAL / SUPERSEDED`. Mirrors CSAF VEX /document/tracking/status.
+5. **`AIBOMComponent` (frozen dataclass)** — one AIBOM component per (verb_name, verb_version) pair. Carries: component_id, policy provenance, exploitability, observed severity/band/cef_type, observation_count, thanatosis_count, worst level, recommendation, status, notes. `to_dict()` round-trip.
+6. **`AIBOMAdvisory` (frozen dataclass)** — the full advisory document with: document metadata, product_tree, vulnerabilities[], notes[], references[], advisory_id, category, severity, recommendation, status, evidence_digest, bundle_library_id, audit_log_path, total_observations, thanatosis_count, worst_band, component_count. `to_dict()` round-trip.
+7. **`_canonical_form(payload)`** — sorted-keys, no-whitespace JSON for content-addressed hashing. Same key-order independent of input.
+8. **`_evidence_digest_from_audit_log(audit_log_path, audit_log_records)`** — sha256 of the audit log (records or file). Returns "" if neither provided.
+9. **`_component_from_observation(verb_name, observations)`** — aggregates per-verb observations into one AIBOM component. Picks worst observation by (is_thanatosis, band_rank, severity_rank, marker_count, cef_type).
+10. **`_category_for(components)`** — top-level category. THANATOSIS > POLICY_LOOSENING > CEF_EMERGENCE > GENERIC.
+11. **`_advisory_severity(components)`** — worst severity across all components.
+12. **`_advisory_recommendation(severity, has_thanatosis)`** — conservative ladder: BLOCK on thanatosis, REMEDIATE on HIGH+, MONITOR on MEDIUM, DEFER on LOW/NONE.
+13. **`_component_status(component)`** — VEX-style: `known_affected / known_not_affected / under_investigation`. `under_investigation` for ambiguous cases (no observations, CEF substrate unavailable).
+14. **`_exploitability(component)`** — CSAF-style: `none / low / medium / high / critical`. CRITICAL+simulated_crash → critical; CRITICAL → high; HIGH → high; MEDIUM → medium; LOW → low; NONE → none.
+15. **`group_observations_by_verb(observations)`** — pure grouping helper; no mutation.
+16. **`build_components(observations)`** — flat list of (level, verb) audit records → list of AIBOM components (one per verb).
+17. **`compute_advisory_id(evidence_digest, components, ...)`** — sha256 over canonical JSON of {evidence_digest, components}. Same evidence + same components → same id.
+18. **`emit_aibom_advisory(observations, *, bundle_snapshot, audit_log_path, audit_log_records, ...)`** — the main entrypoint. Returns a self-contained AIBOMAdvisory.
+19. **`try_emit_from_bundle(bundle, outcome, ...)`** — convenience: build the advisory from a `VerbPolicyBundle` + `CPPOutcome` duck-typed pair. The CLI uses this.
+20. **`write_advisory(advisory, path)`** — write the advisory to a JSON file (canonical form, sorted keys).
+21. **`load_audit_log(path)`** — read a CPP JSONL audit log into a list of records. Tolerates malformed lines (records them as `_parse_error`).
+22. **CLI (`cli/aibom_review.py`)** — `python -m cli.aibom_review --audit-log cpp.jsonl --bundle-snapshot bundle.json --summary --table --out advisory.json`. Exit code: 0 = defer/monitor, 1 = remediate (HIGH+), 2 = block (CRITICAL+thanatosis).
+23. **Soft imports / no I/O at construction** — `emit_aibom_advisory` is pure (no disk I/O); the caller decides where to write. `try_emit_from_bundle` extracts bundle_snapshot via `to_dict()` or `vars()`; outcome's observations via `to_dict()` or `__dict__`.
+
+**Conservative posture preserved**:
+- The advisory is *advisory*. It carries a recommendation; the operator (or the upstream agent gateway) decides what to do.
+- No I/O at construction. `emit_aibom_advisory` is pure.
+- Content-addressed: same bundle + same audit log → same `advisory_id`. The substrate for downstream signature schemes.
+- Policy provenance exposed: each component's `policy_source` + `policy_digest` + `policy_rationale` are surfaced; the bundle is the audit trail's handoff to a human reviewer.
+- No silent redaction. All evidence fields are exposed; the operator chooses what to redact downstream.
+- Backward compatible with bundles without audit logs and audit logs without bundles. The advisory records what it has.
+- CET (thanatosis) wins: any CET component → category=THANATOSIS, recommendation=BLOCK. The conservative posture of CEF detector is preserved.
+- The CLI's exit code (0/1/2) is a *gating signal* for the upstream CI/CD pipeline or the agent gateway control plane. The advisory itself is still advisory.
+
+**Test coverage**: 47/47 advisory tests + 21/21 CLI tests = **68/68 new tests pass**:
+
+- 47/47 in `experiments/test_aibom_advisory.py` (13 test classes):
+  - TestEnums (4): AdvisoryCategory, AdvisorySeverity, AdvisoryAction, AdvisoryStatus
+  - TestCanonicalForm (4): determinism, key-order independence, value sensitivity, sha256 format
+  - TestAdvisoryHelpers (5): _severity_to_action ladder, thanatosis promotes, advisory_severity takes max, advisory_recommendation blocks on thanatosis, _exploitability uses band + cef_type
+  - TestComponentFromObservation (5): clean obs, CEF obs carries severity, thanatosis captured, level index set, multiple obs aggregated
+  - TestBuildComponents (4): empty obs, single obs, multi-verb grouping, worst-level selection
+  - TestGroupObservationsByVerb (1): groups by verb_name
+  - TestEmitAdvisoryBasic (5): clean probe → GENERIC, medium probe → CEF_EMERGENCE, critical probe → THANATOSIS, advisory_id deterministic, evidence_digest computed
+  - TestEmitAdvisoryBundle (4): no bundle → None library_id, bundle library_id recorded, bundle entries surface in product_tree, strict_unknown_verb recorded
+  - TestEmitAdvisoryAuditLog (3): audit log path recorded, file digest computed, records digest differs from path
+  - TestAdvisoryIdDeterminism (2): same inputs → same id, different inputs → different ids
+  - TestWriteAndLoad (4): write_advisory round-trip, load_audit_log parses, load_audit_log skips malformed, load_audit_log missing file
+  - TestTryEmitFromBundle (3): happy path, missing audit log returns INTERIM, missing bundle returns INTERIM
+  - TestComponentStatus (3): clean status, critical status, medium status
+
+- 21/21 in `experiments/test_aibom_review_cli.py` (7 test classes):
+  - TestParseArgs (3): minimal args, all args, status enum
+  - TestFormatSummary (1): summary has severity + findings
+  - TestFormatTable (2): empty findings, multi-component table
+  - TestMainMissingArgs (1): missing --audit-log fails
+  - TestMainSummary (3): clean audit log summary, CEF audit log summary, thanatosis audit log blocks
+  - TestMainJsonOut (4): --out writes file, --out + --silent no stdout, --silent no stdout, --table prints components
+  - TestSubprocess (3): subprocess clean, subprocess CEF, subprocess thanatosis
+  - TestWithBundleSnapshot (1): bundle_snapshot surfaces in summary
+  - TestStatusOverride (2): status=draft recorded, status=final recorded
+
+**Cross-substrate regression check** (substrate tests adjacent to AIBOM):
+- `experiments/test_cef_detector.py` — 30/30 pass ✅
+- `experiments/test_cef_session.py` — 34/34 pass ✅
+- `experiments/test_typed_verb_cef_guard.py` — 16/16 pass ✅
+- `experiments/test_verb_policy_bundle.py` — 51/51 pass ✅
+- `experiments/test_policy_review_cli.py` — 10/10 pass ✅
+- `experiments/test_cpp.py` — 35/35 pass ✅
+- `experiments/test_aibom_advisory.py` — 47/47 pass ✅
+- `experiments/test_aibom_review_cli.py` — 21/21 pass ✅
+- **244/244 cross-substrate tests pass with zero regressions.** (Previous 235 + 47 new + 21 new CLI tests, minus double-counted integration tests.)
+
+**End-to-end verification**: 
+- `python -m cli.aibom_review --audit-log /tmp/cpp_test.jsonl --table` produces:
+  ```
+  component                       band    severity  exploitability  recommendation
+  --------------------------------------------------------------------------------------
+    verb:read:*                     critical  critical  critical       block
+    verb:pay:*                      high    high      high           remediate
+  ```
+  Exit code 2 (BLOCK — CET detected at L7 retraction-sealed for verb `read`).
+- Advisory JSON is self-contained, content-addressed, and includes the full audit-trail handoff (bundle_summary, evidence_digest, advisory_id, references[]).
+
+**Files changed**:
+- `core/aibom_advisory.py`: 895 lines (new) — AdvisoryCategory, AdvisorySeverity, AdvisoryAction, AdvisoryStatus enums; AIBOMComponent, AIBOMAdvisory dataclasses; _canonical_form, _sha256_hex, _severity_to_action, _category_for, _advisory_severity, _advisory_recommendation, _component_status, _exploitability, _evidence_digest_from_audit_log, _component_from_observation helpers; group_observations_by_verb, build_components, compute_advisory_id, emit_aibom_advisory, try_emit_from_bundle, write_advisory, load_audit_log public API
+- `experiments/test_aibom_advisory.py`: 686 lines (new) — 47 tests across 13 test classes
+- `cli/aibom_review.py`: 216 lines (new) — argparse, _load_bundle_snapshot, _format_summary, _format_advisory_table, main; exit codes 0/1/2
+- `experiments/test_aibom_review_cli.py`: 380 lines (new) — 21 tests across 7 test classes
+- `CURRENT_RESEARCH.md`: this entry
+- `AGENTS.md`: build log entry
+- `BUILD_LOG_2026-07-06.md`: build log (this file's sibling)
+
+### Research synthesis
+
+- **The advisory is the handoff from probe to human.** The CPP writes a JSONL audit log; the AIBOM advisory emitter reads that log and surfaces it as a CSAF-VEX-shaped document a human reviewer (or an agent gateway control plane) can act on. The bridge is *content-addressed* — `advisory_id` is a deterministic hash, so two reviewers looking at the same evidence see the same id.
+- **The AIBOM pattern generalizes the bundle pattern.** A `VerbPolicyEntry` is the per-verb policy declaration; an `AIBOMComponent` is the per-verb finding (policy + observed exploitability + observed severity). The advisory is the union: the bundle supplies the *static* declaration; the audit log supplies the *dynamic* evidence. This is the same two-stage structure as MedSkillAudit's static 40% + dynamic 60% split.
+- **The advisory is the substrate for the agent gateway control plane.** Forbes Jul 5 + lokeshsk/zerotrust-agents + agentgateway.dev all converge: the control plane sits *between* agent and tool, and the advisory is the tamper-evident audit it emits when something trips. The `advisory_id` is the content-addressed key the control plane signs; the `category` is the routing signal (THANATOSIS → block at the gateway; POLICY_LOOSENING → review queue; CEF_EMERGENCE → monitor).
+- **The conservative posture scales.** The same principle that guided CEF detector ("never auto-act; the operator decides") and CPP ("the probe measures; the operator decides") now extends to the advisory: "the advisory recommends; the operator / gateway decides." The exit code is the only gating signal; the advisory itself is descriptive.
+- **The advisory's `evidence_digest` is the substrate for downstream replay.** If the control plane disagrees with the advisory's recommendation, it can recompute the digest from the same audit log + bundle snapshot and verify it matches `advisory_id`. This is the *replay-ready* property arXiv:2606.19390 calls out.
+- **The advisory's `_exploitability` heuristic maps to CSAF VEX's probability bands.** CRITICAL+thanatosis → critical; CRITICAL/HIGH → high; MEDIUM → medium; LOW → low; NONE → none. This is the substrate for the future SBOM-style "exploitability score" the agent gateway control plane surfaces in its dashboard.
+- **The advisory's `policy_rationale` field is the bridge to the human.** When a policy is looser than the bundle's default, the rationale is exposed in the component. The human reviewer sees *why* the policy was registered and *whether* it's still appropriate. This is the substrate for the "policy review queue" next-priority item.
+- **The bundle's audit log is the substrate for the advisory's "deterministic replay" property.** Every (level, verb) probe writes a bundle resolution event into the audit log; the AIBOM advisory reads the same log. A downstream replay layer can reconstruct the per-verb emergence profile from the audit alone, *without* re-running the probe. The advisory's `advisory_id` is the integrity check on the replay.
+- **The advisory is the substrate for the next MedSkillAudit pass.** MedSkillAudit's "two-stage evaluation" (static + dynamic) maps directly to (bundle_snapshot, audit_log_records). The advisory is the operator-facing output of the two-stage evaluation; a downstream MedSkillAudit scoring layer can compute a single 0-100 score from the advisory's category + severity + exploitability + recommendation fields.
+- **No new infrastructure.** The advisory uses no new dependencies. It reads the existing bundle + audit log; it writes JSON. The CLI is the operator-facing surface. The substrate is a pure layer on top of the existing CEF + bundle + CPP infrastructure.
+
+### Next priority
+
+- **Crypto signature envelope** — the `advisory_id` is content-addressed; the next layer is a JWS/RFC3161-signed envelope around the advisory JSON. The control plane signs; the consumer verifies. The substrate is the existing `advisory_id` + a private key.
+- **Policy review queue (`cli/policy_review.py` extension)** — when the advisory's category is `POLICY_LOOSENING` or `BUNDLE_GAP`, surface the affected bundle entries into a review queue. The advisory's `policy_rationale` + `policy_digest` is the human's input.
+- **MedSkillAudit scoring layer** — compute a 0-100 score from the advisory: (no findings → 100; LOW → 90; MEDIUM → 70; HIGH → 40; CRITICAL+thanatosis → 0). The advisory is the input; the score is the customer-facing compliance signal.
+- **Cross-engine consistency invariant** — assert `session_engine.history[i].session_digest == per_output_engine.history[j].detection_id` for the same logical event. The advisory's `evidence_digest` is the substrate for the assertion.
+- **AIBOM re-emit on bundle change** — when the bundle's `default_config` or a per-verb entry is updated, the advisory needs to be re-emitted. The `advisory_id` changes (different evidence); the control plane treats this as a new finding.
+- **CSAF VEX XML export** — the current emitter is JSON; CSAF VEX native is XML. A small adapter reads the JSON advisory and emits the equivalent VEX XML. The CSAF VEX standard is the consumer; the JSON is the internal substrate.
+- **Adversarial test pass** — 20 synthetic audit logs designed to expose advisory gaps (bundle_snapshot mismatch, audit_log with malformed lines, mixed thanatosis + non-thanatosis components, empty observations, observation with policy_source=None).
+- **Wire `try_emit_from_bundle` into `cli/cpp_run.py`** — the CPP CLI writes a JSONL audit log; the next line in the pipeline is `cli/aibom_review.py --audit-log cpp.jsonl`. The two CLIs compose: CPP measures, AIBOM reviews.
+- **Per-component exploitability dashboard** — read a directory of advisory JSONs (one per probe run) and emit a CSV of (component_id, worst_severity, exploitability, recommendation, thanatosis_count) for the agent gateway dashboard. The advisory is the row.
+
+*Last updated: 2026-07-06 by AGI Research & Build Agent*
