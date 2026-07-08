@@ -465,3 +465,39 @@ The week's research converges on a single architectural shape: **every agent-too
 - **Per-component exploitability dashboard** — read a directory of advisory JSONs (one per probe run) and emit a CSV of (component_id, worst_severity, exploitability, recommendation, thanatosis_count) for the agent gateway dashboard. The advisory is the row.
 
 *Last updated: 2026-07-06 by AGI Research & Build Agent*
+
+## Research Summary — 2026-07-07
+
+### Theme: Signed Advisory Envelopes + Vinton Cerf's "Post-English" Agent Protocols
+
+The week of 2026-07-01 → 2026-07-07 sharpened four signals that directly shape today's build:
+
+1. **arXiv:2606.19390 ("Execution-bound advisory automation for agentic AI: a reproducible AIBOM-driven CSAF-VEX framework")** — the paper's *cryptographically signed* claim was the explicit carryover from the 2026-07-06 AIBOM build. The advisory emitter landed the *content-addressed* half (`advisory_id = sha256(canonical_json)`) but left a documented placeholder for the *envelope* (sign + verify). Today closes that gap.
+
+2. **Vinton Cerf (Open Frontier, 2026-06-30)** — natural language is too ambiguous for reliable AI-agent-to-agent communication; the rise of multi-source agents will force the industry back toward formal, standardized protocols ("the way TCP/IP did for the early internet"). Today's signed envelope is the **substrate-level** half of that claim: a tiny, content-addressed, signature-verifiable message format that any agent-to-agent (or agent-to-gateway) protocol can wrap without committing to a specific transport. The envelope is to agent advisories what TCP is to IP — small, verifiable, transport-agnostic.
+
+3. **Agent Gateways (Forbes, Jul 5 2026; Nutanix; Arcade; agentgateway.dev)** — every agent-tool call passes through a centralized control plane emitting tamper-evident, content-addressed advisories. The signed envelope is the wire format for that handoff: gateway → reviewer. The advisory's `advisory_id` is the *content*; the envelope's `signature` is the *attestation*.
+
+4. **Steerability via constraints (arXiv:2607.02389)** — the substrate + tooling approach for coding-agent oversight. Today's build is the substrate half: the envelope is the substrate; downstream tooling (CI gates, OPA evaluators, gateway filters) consume it.
+
+#### Trending repos (GitHub, week of 2026-07-01)
+
+- **JuliusBrussee/caveman** (token-efficient "caveman-speak" agent skill framework, v1.9.1 released 2026-07-03, MIT, 0 network calls post-install): prompt-level compression + local-only operation. The signed envelope matches its governance posture: deterministic, local, no telemetry.
+- **gszhangwei/open-spdd** (cross-platform CLI, prompts as executable design contracts with bidirectional sync, v0.4.18 released 2026-07-02, 668★, Go): the **design-contract** model is the *intent* half; the signed envelope is the *evidence* half. Pairing them is a future composition.
+- **NousResearch/hermes-agent** (issue #58755 — closed, fix #59110 merged; empty tool_calls array triggering DeepSeek v4 HTTP 400): the kind of *replay-friendly* substrate behavior we need — the fix sanitized message sequences so the same input produces the same output. The envelope's `canonical_form` is the equivalent invariant: same advisory → same signature, every time.
+- **anthropics/claude-code** (issue #74365 — long-lived resumed background session confabulates prompt-injection/security incident from its own output): **direct case study** of why signed, content-addressed advisories matter. A signed envelope makes the confabulation *detectable*: the agent's claim of "security incident" must reference a signed advisory; without one, the claim is just narrative drift. The envelope is the *provenance layer* that this issue is asking for.
+- **volcengine/OpenViking** (issue #2947 — VikingDB post-READY index-build lag): READY is not a reliable readiness signal. The envelope's *envelope.timestamp* + *advisory.evidence_digest* together form a *readiness signature*: a downstream consumer can refuse to act on an advisory whose evidence_digest is older than a freshness threshold.
+- **openai/codex** (issues #31097, #31174): governance regressions (forced MultiAgentV2) + quota accounting bugs. The envelope does not solve these directly, but its *signed provenance* makes the regression *auditable* — a downstream reviewer can refuse to act on an advisory that lacks a valid signature.
+
+#### Other signals
+
+- **NVIDIA ASPIRE (2026-07-03)** — self-improving robotics framework. *Iterative Robot Exploration* distills validated fixes into a reusable skill library. The signed envelope is the *evidence carrier* for the library: each skill's provenance is an advisory, and the library's safety claim is the union of signed advisories.
+- **Sysdig (2026-07)** — first documented case of agentic ransomware. The signed envelope gives the agent gateway a way to refuse to act on unsigned tool calls: an unverified output is a default-denied signal.
+- **Cursor IDE CVEs (CVE-2026-50548, CVE-2026-50549)** — sandbox bypass via prompt injection. The envelope cannot prevent sandbox bypass, but it gives the audit trail the *integrity property* the post-incident review needs: "this is the exact set of advisories the gateway saw, signed and content-addressed."
+- **Vinton Cerf (panel with Matei Zaharia, François Chollet, 2026-06-30)** — "the agentic model of AI, with multiple agents from multiple sources interacting with each other, is going to force composability, and a requirement for interoperability and standardization." The envelope is a 200-line piece of that standardization.
+
+#### Today's build: Signed Advisory Envelope + CLI (closes 2026-07-06 carryover)
+
+`core/signed_advisory_envelope.py` — wraps an `AIBOMAdvisory` in a content-addressed, signature-verifiable envelope. Two algorithms (HMAC-SHA256 for symmetric; Ed25519 for asymmetric), three envelope shapes (ENVELOPE, DETACHED, COSIGN), a freshness checker, and a CLI for sign / verify / inspect.
+
+The envelope is the *minimal substrate* for the rest of the agent-to-agent / agent-to-gateway story. The advisory is *what*; the envelope is *that it was said*. Without the envelope, an advisory is just a JSON blob. With the envelope, it is a *signed statement* — and downstream layers (gateways, CI gates, OPA evaluators, human reviewers) can act on it.
