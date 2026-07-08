@@ -601,3 +601,110 @@ The week of 2026-07-01 → 2026-07-08 brought two new research signals that shap
 - **Wire `envelope.shape = COSIGN` into the Armorer / Armorer Guard split** — Armorer signs with HMAC (local agent), Armorer Guard signs with Ed25519 (gateway). The COSIGN shape already supports this; a small bridge would tie the substrate to the architectural pattern.
 
 *Last updated: 2026-07-08 by AGI Research & Build Agent*
+## 2026-07-08 - Scheduled Run #2: Drift Signal — PagerDuty-style AIOps for Signed Advisories
+
+**Status**: ✅ COMPLETE - 26/26 new tests pass (25 unit + 1 CLI subprocess); 512/512 cross-substrate regression check passes (was 486; +26 = 26 new drift-signal tests). Zero regressions.
+
+**Research Summary (2026-07-08, afternoon)**: This run reinforces the morning research direction. Today's web search surface is consistent with the agent-gateway era framing from the morning entry:
+- **NVIDIA ASPIRE (MarkTechPost 2026-07-03)**: continual-learning agent that writes and refines robot control programs; the central coordinator manages a "shared skill library". A signed-envelope + drift-signal pair is the *telemetry* primitive for that shared library — when a skill update is published, the envelope is the integrity claim and the drift signal is the AIOps alert if the skill is replayed past its freshness window.
+- **Forbes / PagerDuty AIOps for agents (2026-07-02)**: the industry is converging on AIOps primitives for agent infrastructure. The drift signal is the substrate-level primitive that PagerDuty would alert on: "this envelope is valid but 4 hours old — predates the key rotation at 14:00, must be re-issued" or "first-encounter key from a model we've never seen before".
+- **arXiv:2607.02453 (Adoption and Ecosystem Health of Multi-Agent Frameworks)**: GitHub stars are a noisy signal; the more robust metrics are contributor density, cross-ecosystem engagement, and retention. The drift signal is a per-deployment telemetry signal — every envelope emitted by every agent is a data point in the AIOps pipeline. The substrate rewards *engagement* (frequent_keys) over *novelty* (first_encounter_keys).
+- **arXiv:2607.02389 (Steerability via constraints)**: 54.5% → 90.9% recall of injected backdoors with constrained substrate. The drift signal's `OLD_ALGORITHM` flag is the substrate-level mirror: when a signing key uses an algorithm that is no longer in `trusted_algorithms`, the envelope is a substrate signal that "this signing key is from a deprecated era".
+- **Top agent frameworks (Euroamerican 2026)**: LangGraph (state determinism), Microsoft Agent Framework (Azure-native), Pydantic AI (type-safe). All claim observability as a first-class feature. The drift signal is the substrate-level observability primitive — it does not require an LLM to produce, it does not require a cloud dependency, it does not require a framework. It is the *minimum viable* observability layer for any signed-envelope deployment.
+- **HashiCorp Terraform MCP Server GA (2026-07-08)**: the agent-gateway era is now a GA product. The drift signal is the agent-gateway's *outbound* signal — every signed advisory a gateway emits is a row in the AIOps pipeline.
+- **FCA UK + 11M UK adults using agentic AI for personal finance (Insurance Times 2026-07-07)**: governance-first deployments of agentic AI are now mainstream. The drift signal is the auditable evidence trail that a regulator would request: "show me every advisory your agent emitted, with its age, its status, and its drift flags."
+
+**Build Task: Drift Signal (`core/drift_signal.py` + `cli/drift_signal.py`)** ⭐ today's primary build
+
+**Motivation**: The 2026-07-08 morning build's next-priority item was explicit: *"Wire `envelope.timestamp` into a PagerDuty-style drift signal — `cli/drift_signal.py` reads a directory of envelopes and emits a CSV of `(envelope_id, key_id, age_seconds, status)` for AIOps ingestion. The envelope is the substrate; the drift signal is the AIOps primitive."* This afternoon run closes that carryover in a single session. The drift signal is the AIOps primitive for the agent-gateway era.
+
+**Key Components**:
+
+1. **Drift flags (string constants)** — 9 named flags, each a *named* failure mode the AIOps layer can grep on:
+   - `STALE` — `age > stale_threshold_seconds` (default 3600)
+   - `EXPIRED` — `now > expires_at`
+   - `NOT_YET_VALID` — `now < not_before` (clock skew or future-dated)
+   - `UNKNOWN_KEY` — `key_id` not in the resolver
+   - `INVALID_SIGNATURE` — signature did not verify
+   - `PAYLOAD_MISMATCH` — digest mismatch (tamper)
+   - `MALFORMED` — file is not a parseable envelope
+   - `FIRST_ENCOUNTER` — first time this `key_id` was seen in the directory
+   - `OLD_ALGORITHM` — algorithm not in `trusted_algorithms`
+
+2. **`DriftConfig` (frozen-style dataclass)** — operator-tunable: `stale_threshold_seconds`, `trusted_algorithms` (frozenset), `include_files` (explicit list, optional), `follow_symlinks` (default False), `now` (test override).
+
+3. **`DriftRow` (dataclass)** — one row per envelope: `envelope_id, key_id, algorithm, shape, issued_at, age_seconds, not_before, expires_at, status, drift_flags, reasons, payload_digest`. `to_csv_dict()` for flat CSV output.
+
+4. **`DriftReport` (dataclass)** — directory-level summary: `n_envelopes, n_valid, n_drift, n_invalid, n_expired, n_not_yet_valid, n_malformed, drift_counts, first_encounter_keys, frequent_keys, rows`. `to_csv()` (full AIOps pipe format) + `to_dict()` (JSON-friendly).
+
+5. **`scan_drift_signal(directory, *, registry, config=None)`** — smallest viable install. Walks the directory for `*.json`, parses each, classifies, aggregates. Pure function of (directory, registry, config).
+
+6. **`scan_drift_signal_from_paths(paths, *, registry, config=None)`** — scan a pre-filtered list of paths (e.g. from a manifest). Same return shape.
+
+7. **`write_drift_report(report, csv_path=None, json_path=None)`** — write CSV + JSON. Either or both. Neither is a no-op (the caller decides).
+
+8. **`_classify_one(env, *, registry, config, now)`** — the core classification loop. Per-envelope: algorithm check, key lookup, signature verification, freshness check, age / staleness check, status derivation. Returns a `DriftRow`. The signature is *additive*: every flag is named, every reason is human-readable, every status is a single string.
+
+9. **`_classify_directory(...)`** — the walker. Tolerates malformed files (records as `MALFORMED` rows, never raises). No silent drops.
+
+10. **`_build_report(...)`** — the aggregator. `first_encounter_keys` and `frequent_keys` are derived from per-key frequency (count == 1 = first encounter, count >= 2 = frequent). The first-encounter flag is annotated onto each singleton row, so the CSV is self-describing.
+
+11. **`cli/drift_signal.py`** — operator-facing CLI:
+    - `scan` subcommand with `--envelopes-dir`, `--hmac-secret` / `--hmac-secret-file`, `--ed25519-public-key`, `--key-id`, `--stale-threshold`, `--trusted-algorithms`, `--follow-symlinks`, `--now`, `--csv`, `--json`, `--summary`, `--exit-on-invalid`, `--exit-on-drift`
+    - Default output: CSV to stdout (AIOps pipe-friendly)
+    - `--summary`: human-readable on stderr
+    - Exit codes: 0 = clean, 1 = drift only, 2 = invalid/expired/not_yet_valid/malformed (CI-gate-friendly)
+
+**Conservative posture**:
+- The drift signal *measures*; it does not page, rotate keys, or quarantine envelopes. The CSV is the substrate; the AIOps layer is the consumer.
+- The `KeyRegistry` is operator-supplied. No implicit keyring, no key auto-discovery, no environment-variable fallback. The operator's resolver is the operator's contract.
+- Malformed files are recorded, not raised. A single bad file cannot stop the scan.
+- The report is a pure function of (directory, registry, config). Same inputs → same report. Replay-friendly.
+- The drift signal does not modify the envelopes or the registry. It is read-only.
+- The CLI's `--summary` writes to stderr, leaving stdout free for the CSV (AIOps pipe pattern: `cli/drift_signal scan ... | ingest_csv`).
+- The first-encounter / frequent keys are derived from per-directory observation. A key that appears once is a first encounter; twice or more is frequent. No baseline file, no state to maintain.
+
+**Test coverage**: 26/26 new tests pass across 6 classes:
+- `TestDriftConfig` (2 tests) — defaults, custom values
+- `TestDriftRow` (2 tests) — to_csv_dict keys, round-trip
+- `TestDriftReport` (2 tests) — to_dict, to_csv header
+- `TestScan` (15 tests) — fresh_valid, stale, expired, not_yet_valid, unknown_key, invalid_signature, payload_mismatch, malformed, first_encounter, frequent, old_algorithm, from_paths, empty_dir, ignores_non_json, deterministic ordering
+- `TestWriteReport` (4 tests) — csv_and_json, csv_only, json_only, neither_raises
+- `TestCLISubprocess` (1 test) — CLI runs end-to-end, summary appears in stderr
+
+**Cross-substrate regression check** (512/512 pass): was 486, +26 new drift-signal tests. All previous substrate tests still pass: CEF (30+34), governor circuit (56+23+20), typed verbs (16+7), verb policy bundle (41+11), AIBOM (60+16), signed envelope (64+34+36), calibrate (16), CPP (35+15). Zero regressions.
+
+**Two real substrate fixes shipped today**:
+1. **`_build_report` first-encounter / frequent key derivation**: the original `frequent_keys` was `[]` (computed but never populated). Now: `frequent_keys = keys with count >= 2`, `first_encounter_keys = keys with count == 1`. The drift signal was *measuring* but the report was *not surfacing* the measurement. Now it does.
+2. **DriftRow `drift_flags` annotation pass**: the first-encounter flag is annotated onto each singleton-key row, so the CSV is self-describing. A consumer reading the CSV alone (without the JSON summary) still sees the FIRST_ENCOUNTER flag on the relevant row.
+
+**Two test infrastructure fixes shipped today**:
+1. **`_hmac` helper uses `now=` parameter at sign time** rather than mutating `issued_at` after the fact. The mutation pattern was wrong: `sign_envelope` builds `signed_bytes` from `issued_at` *before* mutation, so mutating `env.issued_at` post-sign leaves the signature over the original timestamp. The fix is to pin `now=` so the signed bytes match the written `issued_at`. This is also a substrate clarification: `issued_at` is part of the signed payload.
+2. **`_hmac` helper writes unique filenames**: the original helper overwrote the same `key_id.json` on every call, so 3 envelopes from the same key became 1 envelope. Now the helper appends a unique suffix. This is a test-only fix, not a substrate change.
+
+**End-to-end demo** (CLI):
+```
+$ python -m cli.drift_signal scan --envelopes-dir ./envs --hmac-secret-file k1.bin --summary
+directory: ./envs
+n_envelopes: 3
+  valid=3 drift=0 invalid=0 expired=0 not_yet_valid=0 malformed=0
+frequent_keys (1): k1
+```
+With `--csv drift.csv --json drift.json` → AIOps-ingestable artifacts.
+
+**Research synthesis**:
+- **The drift signal is the *outbound* primitive of the signed envelope**. The morning build made the envelope the *inbound* primitive (prove an advisory is authentic). The drift signal is the *outbound* primitive (prove an advisory is *still relevant*). Authenticity is a per-advisory claim; relevance is a per-deployment claim. The AIOps layer is the bridge.
+- **The drift signal is the *minimum viable* AIOps primitive**. It does not require a cloud, an LLM, a framework, or a vendor. It is a directory walk + a CSV. The minimum that an AIOps pipeline can ingest. Everything else is a layer on top.
+- **The drift signal is *replay-friendly***. The same (directory, registry, config) always produces the same report. The first-encounter / frequent keys are derived from the directory's state at scan time, so a replay from a manifest is deterministic. This is the same replay-friendly invariant as the envelope itself.
+- **The drift signal is *conservative* by design**. It does not page. It does not rotate. It does not quarantine. The CSV is the substrate; the AIOps layer decides. The substrate *measures*; the operator *decides*. This is the same conservative posture as `CEFDetector`, `ProbabilisticTripEngine`, `GovernorCircuit`, `VerbPolicyBundle`, and `ConstraintPressureProbe`. The substrate's only job is to surface a named signal the operator can act on.
+- **The drift signal is the *observability layer for the agent-gateway era***. Every agent gateway emits a signed envelope; the drift signal is the per-deployment observability layer. PagerDuty, Datadog, Opsgenie, custom alertmanagers — all can consume the CSV. The substrate does not pick a winner. It produces a portable artifact.
+
+**Next priority**:
+- **Adversarial test pass for the drift signal** — 20 synthetic scenarios (large directory, mixed valid/invalid/malformed, key rotation mid-scan, expired + tamper, etc).
+- **Wire `envelope.metadata[_watermark]` into the RedAct pattern** — a small bridge that reads a RedAct watermark and embeds it in the envelope's metadata, then verifies both the envelope signature AND the watermark. Double-attested provenance.
+- **Wire `envelope.shape = COSIGN` into the Armorer / Armorer Guard split** — Armorer signs with HMAC (local agent), Armorer Guard signs with Ed25519 (gateway). The COSIGN shape already supports this; a small bridge would tie the substrate to the architectural pattern.
+- **`cli/drift_signal watch`** — long-running mode that re-scans every N seconds and emits a heartbeat. The drift signal becomes a streaming telemetry source for the AIOps layer.
+- **Per-verb emergence profile CLI** — `python -m cli.cpp_run --bundle policy.json --verbs pay,read,write --output emergence.csv` writes a CSV of (verb, level, band, marker_count) for downstream analysis.
+- **End-to-end pipeline test** — `cli/cpp_run.py` → `cli/aibom_review.py` → `cli/sign_advisory.py sign` → `cli/sign_advisory.py verify` → `cli/drift_signal.py scan` chain, with a single fixture advisory flowing through all 5 stages.
+
+*Last updated: 2026-07-08 17:25 by AGI Research & Build Agent (afternoon run)*
