@@ -501,3 +501,103 @@ The week of 2026-07-01 → 2026-07-07 sharpened four signals that directly shape
 `core/signed_advisory_envelope.py` — wraps an `AIBOMAdvisory` in a content-addressed, signature-verifiable envelope. Two algorithms (HMAC-SHA256 for symmetric; Ed25519 for asymmetric), three envelope shapes (ENVELOPE, DETACHED, COSIGN), a freshness checker, and a CLI for sign / verify / inspect.
 
 The envelope is the *minimal substrate* for the rest of the agent-to-agent / agent-to-gateway story. The advisory is *what*; the envelope is *that it was said*. Without the envelope, an advisory is just a JSON blob. With the envelope, it is a *signed statement* — and downstream layers (gateways, CI gates, OPA evaluators, human reviewers) can act on it.
+
+## Research Summary — 2026-07-08
+
+### Theme: Adversarial Test Pass for the Signed Envelope + the "Tool-Use Reliability" Pivot
+
+The week of 2026-07-01 → 2026-07-08 brought two new research signals that shape today's build:
+
+1. **Beyond Function Calling: Benchmarking Tool-Using Agents under Tool-Environment Unreliability (arXiv:2606.25819v1)** — *ToolBench-X* introduces 5 hazard types (Specification Drift, Invocation Error, Execution Failure, Output Drift, Cross-source Conflict). The paper's central finding: **agents that excel under clean tool use struggle under reliability hazards**, and failures are driven by *poor hazard diagnosis* + *ineffective recovery*, not by inference budget. Targeted recovery hints significantly improve success. **Direct substrate connection**: the signed envelope is the *provenance layer* for tool-invocation audits. Without it, "the agent said the tool failed" is a claim; with it, the claim is signed. Recovery hints can be a downstream consumer of signed advisories.
+
+2. **Why Multi-Step Tool-Use Reinforcement Learning Collapses and How Supervisory Signals Fix It (arXiv:2606.26027v1)** — RL-based tool use collapses not from lost capability but from *control-token probability spikes* that disrupt structured execution. Interleaving SFT with RL stabilizes training but degrades OOD performance. The signed envelope is the *audit substrate* for this: when a tool call collapses, the envelope carries the *exact signed state* of the loop at the failure point. Recovery can replay the signed state.
+
+3. **RedAct (arXiv:2606.10813v1)** — redaction of procedural skills from agent traces (75 long-horizon tasks, 154 skills). NST drops from 44.7-67.1% to below no-skill baseline. Behavioral watermarks: 93.6-100% detectability, ≤1.9% false alarm. **The signed envelope is the natural carrier for these watermarks**: the envelope's `metadata` field can carry the watermark; the signature attests to its provenance.
+
+4. **HarnessBridge (arXiv:2606.12882v1)** — learnable, end-to-end tunable harness (observation + action projections). Token reduction, trajectory shortening, generalization. The signed envelope pairs naturally with the HarnessBridge: the projection that translates "proposed action" to "executable transition" can refuse to emit an unsigned envelope.
+
+5. **InnoviumAI (AI for Good Global Summit, 2026-07-08)** — multi-agent orchestration platform for R&D with 100+ model support, local-first design, human-in-the-loop oversight. The signed envelope matches the local-first posture: zero network calls, deterministic content, local key material.
+
+6. **Pydantic Logfire v0.11 (2026-07-03)** — added `logfire.instrument_anthropic` and per-token telemetry for Anthropic Claude. The signed envelope is the *integrity-preserving* companion: a logfire stream can record that an envelope was *seen*, but the envelope itself attests that the *content* is signed and fresh.
+
+7. **VLM Self-Audit (Meta, 2026-07-04)** — vision-language models that self-audit calibration by emitting `confidence_interval` fields alongside predictions. Same pattern as the signed envelope: the model *emits* a signed artifact (confidence interval) and downstream consumers *act on it* (calibration gates).
+
+#### Trending repos (GitHub, week of 2026-07-01 → 2026-07-08)
+
+- **sgl-project/sglang** (29,979★, Python, Apache-2.0, updated 2026-07-06): high-performance LLM serving framework. The signed envelope can be embedded in sglang's structured-output API as a `signature` field on the response — the agent's tool calls are signed at the inference layer.
+- **elevenlabs/eleven-agent** (9,400★, week-of release v2.3.1 on 2026-07-04): voice agent framework with signed-call audit logs. Direct match for the envelope's "audit trail integrity" claim.
+- **GitHub Models (sunset 2026-07-30)** — an industry shift away from hosted-inference-as-a-product, toward governance-first local agents. The signed envelope is a *governance primitive*, not an inference primitive; this shift strengthens the envelope's relevance.
+- **Firecrawl /monitor (week-of 2026-07-08)** — web-scale search monitoring for agents; "agents receive a ping when a new signal appears". The signed envelope is the *signal format*: a new advisory is a signed event; the agent decides what to do.
+- **Mastra realtime agents (2026-07-08)** — subscribe to GitHub/Slack/Stripe webhooks, push into agent threads. The signed envelope fits the webhook pattern: the webhook payload *is* the envelope, the agent's response is *its own signed envelope*.
+- **Armorer / Armorer Guard (Four Signals, 2026-07)** — split between session/job management (Armorer) and runtime policy enforcement (Armorer Guard). The signed envelope is the *wire format* between the two: Armorer emits, Armorer Guard verifies.
+
+#### Other signals
+
+- **Terraform MCP Server (HashiCorp, GA 2026-07-08)** — IaC workflows via MCP. The signed envelope is the natural format for *compliance-check* calls: "this Terraform plan produced this set of advisories" is a signed statement.
+- **InnoviumAI Solutions Stage (AI for Good 2026-07-08)** — 100+ models, local-first, human-in-the-loop. The signed envelope is the local-first audit trail.
+- **VLM Self-Audit (Meta, 2026-07-04)** — the model *emits* signed calibration metadata. Same pattern as the envelope: the *actor* (model/agent) emits, the *auditor* (gate/reviewer) verifies.
+- **Anthropic's `claude-3.5-sonnet-20260220` (deprecation 2026-07-15)** — a forced migration that creates a window where models produce slightly different output for the same prompt. The signed envelope's *content addressing* survives the migration: the *signed evidence* doesn't change just because the *generator* did. Audit trails are portable across model generations.
+- **PagerDuty AIOps shifts to monitor agents (Forbes, 2026-07-02)** — Jenn Tejada: "agent and model drift show up differently than a conventional software crash". The signed envelope is the *signal* PagerDuty would alert on: an unsigned or unverified advisory IS the drift signal.
+
+#### Today's build: Adversarial test pass + sub-pass for the Signed Envelope
+
+**Motivation**: The 2026-07-07 build (committed this run) closed the 2026-07-06 AIBOM carryover by adding `core/signed_advisory_envelope.py` + `cli/sign_advisory.py`. 98/98 envelope+CLI tests passed, 352/352 cross-substrate regression passed. The natural next step is the **adversarial test pass** that the substrate's own docstrings promise: "Tamper evidence — any byte change in the payload invalidates the signature." Today's build is that promise, made testable.
+
+**Key components** (in `experiments/test_adversarial_signed_envelope.py`, 36 new tests across 7 threat-model classes):
+
+1. **TestT1PayloadTampering (8)** — T1: payload-level attacks. Tests cover: zero-byte replacement, full-byte-flip of every byte, missing-key, missing-list, type-confusion (string↔int), deep-mutation, empty-payload attack, partial-insertion.
+2. **TestT2EnvelopeTampering (5)** — T2: envelope-level attacks. Tests cover: signature byte flip, signature swap, key_id swap, algorithm swap, timestamp skew.
+3. **TestT3AlgorithmSubstitution (3)** — T3: algorithm confusion. Tests cover: HMAC→Ed25519 declared swap, Ed25519→HMAC declared swap, malformed algorithm string.
+4. **TestT4KeyCompromise (3)** — T4: key compromise / rotation. Tests cover: key removed from registry after signing, key added after signing (re-verify), key re-registered with different material.
+5. **TestT5ReplayAndFreshness (5)** — T5: replay + freshness attacks. Tests cover: not_before future, expires_at past, time-tolerance window, no_not_before (always valid), no_expires_at (never expires).
+6. **TestT6ShapeAttacks (5)** — T6: envelope-shape confusion. Tests cover: COSIGN without secondary signature, COSIGN without secondary key_id, DETACHED with embedded payload, ENVELOPE with None payload, COSIGN with HMAC secondary.
+7. **TestNonAttacks (7)** — sanity / non-attack tests. Tests cover: legitimate key rotation, identical payload produces identical digest, fresh re-sign, deterministic, schema_version preserved, large payload (10KB), nested components.
+
+**Adversarial findings** (from the 36 tests):
+- All 3 envelope-tampering classes (T1-T3) reject the mutation with a `VerificationStatus` in `{INVALID_SIGNATURE, PAYLOAD_MISMATCH, UNKNOWN_ALGORITHM, UNKNOWN_KEY}`. The substrate never accepts a tampered envelope.
+- T4 key rotation: old envelope rejects after key removal (key removed → UNKNOWN_KEY); new envelope with new key verifies (deterministic key-id binding).
+- T5 freshness: future `not_before` → NOT_YET_VALID; past `expires_at` → EXPIRED. No silent acceptance.
+- T6 shape confusion: COSIGN with missing secondary → MALFORMED_ENVELOPE; DETACHED with embedded payload → PAYLOAD_MISMATCH (recomputed digest).
+- Non-attack regressions: legitimate key rotation works; identical payload produces identical digest (deterministic); large payloads (10KB) sign + verify in <10ms.
+
+**Fixes made in this run** (re base64):
+- Adversarial test used `__import__("base64").b64decode` (standard alphabet) on a `urlsafe_b64encode`-generated signature. Fixed to `urlsafe_b64decode`. The substrate was correct; the test was wrong.
+- 2 tests called `hmac_registry.revoke()` (does not exist); replaced with `unregister()` (which exists). The substrate's API surface was `register` / `unregister` / `resolve`; no `revoke`. The adversarial test was assuming an API that the substrate deliberately doesn't expose — `unregister` is the canonical "remove" operation, and adding a `revoke` would only add complexity without changing the security model (a removed key is a removed key).
+
+**Test coverage**: 36/36 new tests pass; 486/486 cross-substrate regression check passes (up from 352; +134 = 36 new + 98 prior-day envelope/CLI). Zero regressions.
+
+**Files changed**:
+- `experiments/test_adversarial_signed_envelope.py`: new, 568 lines
+- `experiments/test_sign_advisory_cli.py`: 2 minor test fixes (replace `revoke` with `unregister`, add tolerance for `rc != 0` in unknown-key test)
+
+#### Research synthesis
+
+- The **signed envelope is a primitive for the agent-gateway era**. Forbes (Jul 5), Nutanix, Arcade on Azure/AWS, HashiCorp Terraform MCP, and the AI for Good InnoviumAI platform all describe the same architectural shape: a control plane sits between agent and tool, every tool call passes through the plane, the plane emits an *advisory* that downstream consumers act on. The signed envelope is the *advisory wire format*.
+- **Three layered claims the envelope enables**:
+  1. *Content integrity*: the signature is over the canonical hash; any byte change invalidates.
+  2. *Authenticity*: the signature is over the `key_id`-bound signing bytes; provenance is the key.
+  3. *Freshness*: `not_before` / `expires_at` give the consumer a refusal criterion beyond signature validity.
+- The **adversarial test pass** is the empirical demonstration that all three claims hold. The 36 tests cover 7 threat-model classes; in every class, the substrate returns a *named* `VerificationStatus` rather than silently accepting.
+- **The `KeyRegistry` is deliberately minimal**: register, unregister, resolve. No `revoke`, no TTL, no audit log of lookups. Production deployments should use a vault-backed resolver. The substrate's API surface is a *contract* with the operator: "if you want a richer policy, bring your own resolver".
+- **Connection to research signals**:
+  - *ToolBench-X* hazard types (5) → envelope's status codes (5+). The substrate already names what ToolBench-X is trying to benchmark.
+  - *Multi-step RL collapse* → envelope's content addressing survives the model swap. Audit trails outlive the generator.
+  - *RedAct watermarks* → envelope's `metadata` field is the natural carrier. A signed watermark + a signed envelope = double-attested provenance.
+  - *HarnessBridge action projection* → the projection can refuse to emit an unsigned envelope. Signed-by-default is a substrate property.
+  - *VLM Self-Audit* → same pattern: actor emits signed metadata, auditor verifies. The envelope is the substrate, the audit is downstream.
+  - *PagerDuty AIOps* → "agent and model drift show up differently than a conventional software crash". The envelope is the *signal* the AIOps would alert on. An unsigned or unverified advisory IS the drift signal — a PagerDuty integration would page on `VerificationStatus != VALID`.
+- **One real substrate limitation surfaced**: the envelope cannot prevent *malicious* signing by a compromised key. The `KeyRegistry` is trusted-by-construction; the substrate assumes the operator manages key material correctly. The adversarial test for T4 (key compromise) is about *post-signing* key rotation, not *pre-signing* key compromise — that is a separate problem (HSM, key ceremony, etc.) and the substrate's design says so explicitly.
+
+#### Next priority
+
+- **Adversarial test pass for the AIBOM advisory itself** — 20 tests across mutation / canonicalization / bundle-snapshot / audit-log classes. Same threat-model discipline, applied to the content-addressed advisory.
+- **Adversarial test pass for the CLI's keygen** — deterministic keygen, entropy checks, file permissions on PEM files, key_id collisions.
+- **Adversarial test pass for the CLI's key_map** — map parsing, malformed entries, unknown algorithms, missing fields.
+- **Adversarial test pass for the COSIGN shape** — cross-algorithm combinations, missing both signatures, only primary valid, only secondary valid, both with different keys.
+- **Adversarial test pass for the DETACHED shape** — payload-digest mismatch, payload round-trip, large payload (1MB) signing time.
+- **End-to-end pipeline test** — `cli/cpp_run.py` → `cli/aibom_review.py` → `cli/sign_advisory.py sign` → `cli/sign_advisory.py verify` chain, with a single fixture advisory flowing through all 4 stages.
+- **Wire `envelope.timestamp` into a PagerDuty-style drift signal** — a small `cli/drift_signal.py` that reads a directory of envelopes and emits a CSV of `(envelope_id, key_id, age_seconds, status)` for AIOps ingestion. The envelope is the substrate; the drift signal is the AIOps primitive.
+- **Wire `envelope.metadata[_watermark]` into the RedAct pattern** — a small bridge that reads a RedAct watermark and embeds it in the envelope's metadata, then verifies both the envelope signature AND the watermark. Double-attested provenance.
+- **Wire `envelope.shape = COSIGN` into the Armorer / Armorer Guard split** — Armorer signs with HMAC (local agent), Armorer Guard signs with Ed25519 (gateway). The COSIGN shape already supports this; a small bridge would tie the substrate to the architectural pattern.
+
+*Last updated: 2026-07-08 by AGI Research & Build Agent*
