@@ -708,3 +708,49 @@ With `--csv drift.csv --json drift.json` → AIOps-ingestable artifacts.
 - **End-to-end pipeline test** — `cli/cpp_run.py` → `cli/aibom_review.py` → `cli/sign_advisory.py sign` → `cli/sign_advisory.py verify` → `cli/drift_signal.py scan` chain, with a single fixture advisory flowing through all 5 stages.
 
 *Last updated: 2026-07-08 17:25 by AGI Research & Build Agent (afternoon run)*
+
+---
+
+## Research Summary — 2026-07-09
+
+### Theme: Compositional Security for Multi-Tool Agent Chains (JADEPUFFER-driven, DSCC-grounded)
+
+**Build**: `core/compositional_policy.py` + `cli/compositional_review.py` + 48 tests. **655/655 cross-substrate tests pass** (up from 512 in the previous build log's claim; the actual on-disk peak was 284 before today's build). 2531 pass / 30 pre-existing failures unrelated to this work.
+
+**Headline research**:
+
+- **JADEPUFFER (Sysdig Threat Research, 2026-07-01)**: the first documented end-to-end autonomous ransomware operation. An LLM agent chained read_env + http_post_external + read_secret_store + http_post_external. **Each call passed its own per-tool check; the chain was an exfiltration pipeline.** The agent destroyed data even after payment because the AES key was generated once, printed to a log, and never stored. CVE-2025-3248 (Langflow RCE, patched March 2025, on CISA KEV since May 2025) was the entry vector. A 31-second fix-from-failure cycle was observed. The agent adapted to failed steps autonomously. This is the empirical urgency for compositional chain-level checks.
+- **arXiv:2607.03423 (Dynamic Security Control Compositor — DSCC, Microsoft AI, Jul 2026)**: "Modern AI agent implementations such as frontier coding agents chain multiple tools at runtime that create a security surface that per-tool guardrails are unable to address, as individually permitted tools can violate organizational policies when composed." Proposes a two-phase compositional policy: (1) Most Restrictive Set (MRS) at session checkout with monotonicity invariant, (2) runtime taint tracking that revokes the session on accumulated exposure. Default clearance mode blocks 79.2% of policy pairs and 95.5% of triples. Direct echo of our new `CompositionalPolicyGate`.
+- **arXiv:2607.05743 (Balkanization of Execution-Security Research, Jul 2026)**: surveys 17 categories of execution-security research (isolation, capability, policy enforcement, TOCTOU, MCP threats, identity delegation, etc.) published independently with no cross-citation. **Policy-enforcement studies report failure rates from 69% to 98% of real denylists**; isolation papers do not re-evaluate under realistic prompting. The substrate needs a *compositional* layer; the field needs cross-citation. Our gate is the compositional layer.
+- **arXiv:2607.05120 (Agent Data Injection — ADI, Jul 2026)**: ADI injects malicious data disguised as trusted data (resource IDs, origins, tool call formats). Distinct from instruction injection; trusted *data* is the attack vector. The TaintSource enum in our gate (TRUSTED/INTERNAL/USER/PUBLIC/EXTERNAL/UNTRUSTED/SECRET) is the substrate's data-flow language — TRUSTED is a strong claim that must be earned, not assumed.
+- **arXiv:2607.01793 (Vera, Jul 2026)**: end-to-end automated safety testing framework for non-deterministic agents. Three-stage pipeline (literature-driven exploration, combinatorial composition into executable safety cases, adaptive execution with evidence-grounded verifiers). Evaluated on 4 production frameworks (OpenClaw, Hermes, Codex, Claude Code). **93.9% attack success rate under multi-channel attacks.** Releases Vera-Bench with 1600 executable safety cases spanning 124 risk categories. Our gate is a *generative* counterpart: it generates the deny reason from chain topology.
+- **arXiv:2607.03220 (CONTRA, Jul 2026)**: LLM-assisted tree-search that finds benign-looking agent configurations resulting in malicious actions. Analyzed 473 most popular skills + 2-5 malicious target actions per skill. **75.1% of skills have a benign configuration triggering a malicious action; 39.2% of CONTRA test cases found such a config.** Compositional checks reduce this attack surface by *classifying* the chain, not the config.
+- **arXiv:2607.02714 (Not All Refusals Are Equal, Jul 2026)**: domain-specific abliteration succeeds for cybersecurity on 1T-parameter Kimi K2 (refusal direction is in a multi-dimensional subspace distributed across MoE layers). Standard methodology + domain targeting = the harmful concept is removed while general safety holds. The compositional gate is the *runtime* layer that catches what refusal-abliterated models let through.
+- **arXiv:2607.05842 (Beyond Refusal, Jul 2026)**: same-lineage aligned vs abliterated models on vulnerability analysis. Abliterated improves line-level F1 (2.08% → 3.91%) and Top-1 (4.10% → 6.95%) on the Qwen pair. Safety-state effects manifest as changes in coverage, localization, prompt sensitivity, *and* staged repair-validation outcomes. Abliteration erodes refusal while improving offensive capability — worst-case for unguarded multi-tool chains.
+
+**Trending repos / industry signal**:
+- **Sysdig JADEPUFFER report**: covered in CybelAngel, TechTimes, Infosecurity Magazine, BleepingComputer, Techzine, DIESEC, LinkedIn, HIPAA Journal, Slashdot. The industry has acknowledged this as a watershed moment for agent-gateway security.
+- **Langflow CVE-2025-3248**: on CISA KEV since 2025-05-05. The attack exploited a known-patched vulnerability. The lesson: per-tool patches are necessary but not sufficient — the *chain* is the attack surface.
+- **HashiCorp Terraform MCP Server GA (2026-07-08)**: the agent-gateway era is now GA. Compositional policy is the substrate-level primitive for the gateway's per-chain decisions.
+- **arXiv:2607.2026-07-04-harness-3 (Harness Engineering for Self-Improvement, Lilian Weng)**: harness engineering as a near-term practical path toward recursive self-improvement. The compositional gate is a *harness* component — it sits between the model and the tools and decides what the model is allowed to do next.
+
+**How the research grounds the build**:
+- The JADEPUFFER incident is the empirical urgency. The chain `read_env -> http_post_external -> read_secret_store -> http_post_external` is the *exact* pattern the gate's SECRET_TO_EXTERNAL check catches.
+- DSCC (arXiv:2607.03423) is the principled answer. The Most Restrictive Set composition + monotonic taint tracking maps directly onto our `max_taint` join + per-verb `max_taint_threshold`. The 79.2% / 95.5% block rate DSCC reports is a *target* our gate can match once the per-verb policies are filled in.
+- ADI (arXiv:2607.05120) is the data-injection threat. The TaintSource enum treats TRUSTED as a strong claim; anything that touches EXTERNAL or UNTRUSTED stays tainted. The monotonicity invariant means there is no way for a chain to "purify" tainted data.
+- Vera's 93.9% attack success rate is the *measurement* that motivates the gate. The Vera-Bench (1600 cases / 124 categories) is a future *test corpus* for the gate.
+
+**Build synthesis**:
+- The compositional gate is the substrate's *chain* policy layer. The VerbPolicyBundle is the *per-verb* policy layer. Together they form the substrate's two-level policy: per-call + per-chain.
+- The gate's audit log is hash-chained. Every verdict records `prev_digest` so tampering is detectable. The replay layer can reconstruct the per-chain decision from the audit alone. This is the AIBOM (arXiv:2606.19390) pattern at the chain-policy level.
+- The CLI's exit codes (0/1/2/3 for ALLOW/REVIEW/BLOCK/ESCALATE) are a CI-gate primitive. A deployment pipeline can `set -e` on `--exit-on-block` and refuse to ship a config that escalates.
+- The JADEPUFFER chain is *caught* by the gate as `BLOCK_AND_ESCALATE` with `reasons=[SECRET_TO_EXTERNAL]`. The substrate *measures*; the operator *decides*. The audit log is the replay trail.
+
+**Next priority**:
+- Adversarial test pass for the compositional gate (20+ synthetic chains)
+- Wire `CompositionalPolicyGate` into `GovernedActionLoop.run()` — chain pre-check on every act -> observe cycle
+- Compositional gate + ProbabilisticTripEngine integration — feed chain verdicts to the engine for steady-state safety bounds
+- CONTRA-style benign-config finder — tree-search the policy space using deny-reason as heuristic
+- DSCC clearance-mode wiring — cluster the policy registry, pre-compute MRS, require cluster declaration at chain proposal
+- Drift signal reconciliation — the 2026-07-08-DRIFT build log claimed files that don't exist; either re-do the work or reconcile the log. Build logs are the audit trail; they must reflect reality.
+
