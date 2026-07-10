@@ -84,6 +84,15 @@ from core.three_ring_architecture import (
     make_ring2_agent,
     make_ring3_agent,
 )
+from core.compositional_policy import (
+    ChainAction,
+    ChainStep,
+    CompositionalPolicyGate,
+    TaintSource,
+    VerbPolicy,
+    create_gate,
+    create_jadepuffer_demo_gate,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +195,14 @@ class TestCrossCheckOutcome(unittest.TestCase):
         self.assertEqual(CrossCheckOutcome.REJECT.value, "reject")
 
     def test_count(self):
-        self.assertEqual(len(list(CrossCheckOutcome)), 6)
+        self.assertEqual(len(list(CrossCheckOutcome)), 7)
+
+    def test_hold_pending_chain(self):
+        # HOLD_PENDING_CHAIN is the new outcome from the compositional gate
+        # substrate. It mirrors the gate's ALLOW_ONLY_REVIEW action.
+        self.assertEqual(
+            CrossCheckOutcome.HOLD_PENDING_CHAIN.value, "hold_pending_chain",
+        )
 
     def test_str_mixin(self):
         # CrossCheckOutcome is a str-enum
@@ -884,6 +900,320 @@ class TestCEFIntegration(unittest.TestCase):
         last_report = loop.reports[-1]
         self.assertTrue(last_report.cef_recovery_horizon)
         self.assertEqual(last_report.cef_session_state, CEFSessionState.POINT_OF_NO_RETURN)
+
+
+class TestCompositionalGateIntegration(unittest.TestCase):
+    """Integration tests for CompositionalPolicyGate as Step 6 of the cross-check.
+
+    The gate is a *chain-level* policy substrate: it inspects a multi-verb
+    planned chain for compositional attack patterns (JADEPUFFER, secret
+    exfiltration, sink fanout). The cross-check consults the gate when the
+    request supplies a `planned_chain`.
+
+    Conservative posture: BLOCK_AND_ESCALATE -> REJECT (full deny).
+    ALLOW_ONLY_REVIEW -> HOLD_PENDING_CHAIN (operator-visible hold).
+    ALLOW -> cross-check continues to final accept block.
+    """
+
+    @staticmethod
+    def _make_blocking_gate() -> CompositionalPolicyGate:
+        """Build a gate whose policies actually trigger SECRET_TO_EXTERNAL
+        on the 4-step JADEPUFFER chain.
+
+        The default `create_jadepuffer_demo_gate()` uses INTERNAL taint
+        on `read_env`, which never escalates to SECRET data taint in the
+        chain's running state. To exercise the deny-reason code path,
+        we register `read_env` with is_secret_emitting=True (its *output*
+        is SECRET) so the running data taint escalates to SECRET after
+        the first step.
+        """
+        g = create_gate()
+        g.register(VerbPolicy(
+            "read_env", TaintSource.INTERNAL,
+            sinks=("read",), is_secret_emitting=True,
+        ))
+        g.register(VerbPolicy(
+            "read_secret_store", TaintSource.SECRET,
+            sinks=("read",), is_secret_emitting=True,
+        ))
+        g.register(VerbPolicy(
+            "http_post_external", TaintSource.EXTERNAL,
+            sinks=("egress", "write"),
+        ))
+        g.register(VerbPolicy(
+            "read_file", TaintSource.UNTRUSTED,
+            sinks=("read",),
+        ))
+        g.register(VerbPolicy(
+            "shell_exec", TaintSource.INTERNAL,
+            sinks=("exec", "write", "egress"),
+            requires_review=True,
+        ))
+        g.register(VerbPolicy(
+            "write_file", TaintSource.INTERNAL,
+            sinks=("write",),
+        ))
+        g.register(VerbPolicy(
+            "http_get", TaintSource.EXTERNAL,
+            sinks=("egress",),
+        ))
+        return g
+
+    @staticmethod
+    def _jadepuffer_chain():
+        """The canonical 4-step JADEPUFFER chain."""
+        return [
+            ChainStep(verb_name="read_env", taint_in=TaintSource.SECRET),
+            ChainStep(verb_name="http_post_external", taint_in=TaintSource.EXTERNAL),
+            ChainStep(verb_name="read_secret_store", taint_in=TaintSource.SECRET),
+            ChainStep(verb_name="http_post_external", taint_in=TaintSource.EXTERNAL),
+        ]
+
+    def test_no_chain_no_gate_skipped(self):
+        # No planned_chain -> no chain check, no chain fields.
+        loop = create_governed_loop()
+        req = _make_request(action_type="read")
+        _, _, report = loop.propose(req)
+        self.assertEqual(report.chain_verdict, None)
+        self.assertEqual(report.chain_reasons, ())
+        self.assertEqual(report.chain_digest, "")
+
+    def test_no_gate_attached_skips_chain_check(self):
+        # Even with planned_chain, no gate -> check is silent.
+        loop = create_governed_loop()
+        req = _make_request(action_type="read")
+        req.planned_chain = [
+            ChainStep(verb_name="read_file"),
+            ChainStep(verb_name="write_file"),
+        ]
+        _, _, report = loop.propose(req)
+        self.assertEqual(report.chain_verdict, None)
+        self.assertEqual(report.chain_reasons, ())
+
+    def test_clean_chain_records_verdict_on_report(self):
+        # read_file -> write_file is benign under default jadepuffer policies.
+        gate = create_jadepuffer_demo_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [
+            ChainStep(verb_name="read_file"),
+            ChainStep(verb_name="write_file"),
+        ]
+        _, _, report = loop.propose(req)
+        self.assertIsNotNone(report.chain_verdict)
+        self.assertEqual(report.chain_verdict["action"], ChainAction.ALLOW.value)
+        self.assertEqual(report.chain_reasons, ())
+        self.assertNotEqual(report.chain_digest, "")
+
+    def test_secret_to_external_holds_for_chain_review(self):
+        # The classic JADEPUFFER chain -> BLOCK_AND_ESCALATE -> REJECT.
+        gate = self._make_blocking_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = self._jadepuffer_chain()
+        cert, _, report = loop.propose(req)
+        # BLOCK_AND_ESCALATE -> REJECT.
+        self.assertEqual(report.outcome, CrossCheckOutcome.REJECT)
+        self.assertIn("secret_to_external", report.chain_reasons)
+        self.assertEqual(report.enforceability, EnforceabilityClass.REQUIRE_HUMAN)
+        # Certificate is REJECTED.
+        self.assertEqual(cert.state, CertificateState.REJECTED)
+
+    def test_jadepuffer_full_chain_rejects(self):
+        # The full 4-step JADEPUFFER chain -> BLOCK_AND_ESCALATE -> REJECT.
+        gate = self._make_blocking_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = self._jadepuffer_chain()
+        cert, _, report = loop.propose(req)
+        self.assertEqual(report.outcome, CrossCheckOutcome.REJECT)
+        self.assertIn("secret_to_external", report.chain_reasons)
+        # The chain verdict is preserved on the report.
+        self.assertIsNotNone(report.chain_verdict)
+        self.assertEqual(report.chain_verdict["action"], "block_and_escalate")
+        # The certificate is REJECTED.
+        self.assertEqual(cert.state, CertificateState.REJECTED)
+
+    def test_chain_rejection_does_not_short_circuit_bridge(self):
+        # Chain check is Step 6 (last). Bridge structural gate short-
+        # circuits at Step 1 with a strict externality policy, so the
+        # compositional gate is never consulted.
+        from core.proof_carrying_action import (
+            ExternalityContext,
+            ExternalityPolicy,
+        )
+        strict = ExternalityPolicy(required=["destination_visibility"])
+        bridge = create_pca_bridge(externality_policy=strict)
+        gate = create_jadepuffer_demo_gate()
+        loop = GovernedActionLoop(bridge=bridge, compositional_gate=gate)
+        req = _make_request(action_type="read")
+        # Force incomplete externality so the bridge REJECTS.
+        req.externality = ExternalityContext(destination_visibility="")
+        req.planned_chain = [ChainStep(verb_name="read_file")]
+        _, _, report = loop.propose(req)
+        # Bridge rejected; cross-check stops at Step 1.
+        self.assertEqual(report.outcome, CrossCheckOutcome.REJECT)
+        # No chain fields populated because gate was not consulted.
+        self.assertIsNone(report.chain_verdict)
+
+    def test_chain_reasons_preserved_on_to_dict(self):
+        gate = self._make_blocking_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = self._jadepuffer_chain()
+        _, _, report = loop.propose(req)
+        d = report.to_dict()
+        self.assertIn("chain_reasons", d)
+        self.assertIn("chain_digest", d)
+        self.assertIn("secret_to_external", d["chain_reasons"])
+        self.assertNotEqual(d["chain_digest"], "")
+
+    def test_chain_digest_changes_per_chain(self):
+        # Different chains should produce different digests on the report.
+        gate = create_jadepuffer_demo_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req1 = _make_request(action_type="read")
+        req1.planned_chain = [ChainStep(verb_name="read_file")]
+        _, _, r1 = loop.propose(req1)
+        req2 = _make_request(action_type="read")
+        req2.planned_chain = [
+            ChainStep(verb_name="read_env"),
+            ChainStep(verb_name="http_post_external"),
+        ]
+        _, _, r2 = loop.propose(req2)
+        self.assertNotEqual(r1.chain_digest, r2.chain_digest)
+        # r1 had no hold so its chain_digest is from the gate (the
+        # check_chain call still runs and produces a digest).
+        self.assertNotEqual(r1.chain_digest, "")
+
+    def test_chain_with_unknown_verb(self):
+        # An unknown verb under jadepuffer demo (no default_unknown_policy)
+        # -> BLOCK_AND_ESCALATE with reason UNKNOWN_VERB -> REJECT.
+        gate = create_jadepuffer_demo_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [ChainStep(verb_name="quantum_entangle")]
+        _, _, report = loop.propose(req)
+        self.assertEqual(report.outcome, CrossCheckOutcome.REJECT)
+        self.assertIn("unknown_verb", report.chain_reasons)
+
+    def test_chain_with_too_many_sinks_holds(self):
+        # A chain with >3 distinct sinks -> ALLOW_ONLY_REVIEW -> HOLD.
+        gate = create_jadepuffer_demo_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [
+            ChainStep(verb_name="read_file"),    # sink: read
+            ChainStep(verb_name="http_post_external"),  # sink: egress,write
+            ChainStep(verb_name="shell_exec"),   # sink: exec,write,egress
+            ChainStep(verb_name="write_file"),   # sink: write
+        ]
+        _, _, report = loop.propose(req)
+        self.assertEqual(report.outcome, CrossCheckOutcome.HOLD_PENDING_CHAIN)
+        self.assertIn("too_many_distinct_sinks", report.chain_reasons)
+
+    def test_chain_check_runs_after_cef(self):
+        # Step 6 (chain) runs AFTER CEF (Step 5). CEF CRITICAL
+        # (CET) -> HOLD_PENDING_HUMAN short-circuits at Step 5,
+        # so the chain gate is NOT consulted.
+        gate = create_jadepuffer_demo_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        cet_output = (
+            "Traceback (most recent call last):\n"
+            "  File x.py line 1\n"
+            "ValueError: catastrophic failure\n"
+            "0xDEADBEEF\n"
+            "FATAL ERROR: system halted"
+        )
+        req.agent_output = cet_output
+        req.planned_chain = [ChainStep(verb_name="read_env")]
+        _, _, report = loop.propose(req)
+        # CEF caught the crash-fabrication at Step 5.
+        self.assertEqual(report.outcome, CrossCheckOutcome.HOLD_PENDING_HUMAN)
+        # Chain gate not consulted because CEF short-circuited.
+        self.assertIsNone(report.chain_verdict)
+
+    def test_chain_check_runs_after_breaker_critical(self):
+        # Step 2 (breaker) runs before Step 6 (chain). CRITICAL
+        # breaker risk short-circuits to HOLD_PENDING_HUMAN *before*
+        # the chain gate is consulted. Target='production' +
+        # delete action makes assess_risk rate CRITICAL.
+        gate = create_jadepuffer_demo_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="delete", target="production_db")
+        req.planned_chain = [ChainStep(verb_name="read_env")]
+        _, _, report = loop.propose(req)
+        # Bridge is REQUIRES_HUMAN (HUMAN_GATED for delete) and
+        # breaker also promotes to REQUIRE_HUMAN. The bridge
+        # admitted (delete is HUMAN_GATED, not REJECTED), so the
+        # breaker ran. CRITICAL breaker risk short-circuits.
+        self.assertEqual(report.outcome, CrossCheckOutcome.HOLD_PENDING_HUMAN)
+        # Chain gate was NOT consulted because the breaker
+        # short-circuited at Step 2 with CRITICAL risk. This is
+        # the correct fail-fast posture: once the breaker says
+        # CRITICAL, no further substrate inspection is needed.
+        self.assertIsNone(report.chain_verdict)
+        # The gate's audit log was also not extended.
+        self.assertEqual(len(gate.audit_log), 0)
+
+    def test_audit_index_assigned(self):
+        # Each chain check should record its audit log index.
+        gate = create_jadepuffer_demo_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [ChainStep(verb_name="read_file")]
+        _, _, report = loop.propose(req)
+        self.assertGreaterEqual(report.chain_audit_index, 0)
+
+    def test_default_unknown_verb_policy(self):
+        # With default_unknown_policy, unknown verbs are POLICY-routed.
+        # An ALLOW default_unknown_policy -> chain passes.
+        policies = {
+            "read_file": VerbPolicy(
+                verb_name="read_file",
+                taint_in=TaintSource.UNTRUSTED,
+                sinks=("read",),
+            ),
+        }
+        default_unknown = VerbPolicy(
+            verb_name="<unknown>",
+            taint_in=TaintSource.INTERNAL,
+            sinks=(),
+        )
+        gate = CompositionalPolicyGate(
+            policies=policies,
+            default_unknown_policy=default_unknown,
+        )
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [ChainStep(verb_name="quantum_entangle")]
+        _, _, report = loop.propose(req)
+        # Default unknown is ALLOW; chain passes.
+        self.assertEqual(report.outcome, CrossCheckOutcome.ALLOW)
+        self.assertEqual(report.chain_verdict["action"], ChainAction.ALLOW.value)
+
+    def test_requires_review_verb_holds_chain(self):
+        # shell_exec has requires_review=True; chain containing it -> ALLOW_ONLY_REVIEW.
+        gate = create_jadepuffer_demo_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [ChainStep(verb_name="shell_exec")]
+        _, _, report = loop.propose(req)
+        # shell_exec has requires_review; single-verb chain still
+        # triggers ALLOW_ONLY_REVIEW.
+        self.assertEqual(report.outcome, CrossCheckOutcome.HOLD_PENDING_CHAIN)
+
+    def test_empty_chain_is_vacuously_safe(self):
+        # Empty chain -> ALLOW (vacuous).
+        gate = create_jadepuffer_demo_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = []
+        _, _, report = loop.propose(req)
+        # Empty chain is vacuously safe -> chain check returns ALLOW.
+        self.assertEqual(report.outcome, CrossCheckOutcome.ALLOW)
+        self.assertEqual(report.chain_verdict["action"], ChainAction.ALLOW.value)
 
 
 if __name__ == "__main__":

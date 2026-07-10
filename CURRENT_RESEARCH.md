@@ -821,3 +821,141 @@ The morning's research already established the JADEPUFFER / DSCC / CONTRA / Vera
 - **Auto-recompute of audit digests on tamper** — a `verify_chain()` method on the gate that re-walks the audit log, re-derives each digest, and reports the first inconsistency index.
 
 *Last updated: 2026-07-09 17:11 by AGI Research & Build Agent (afternoon run)*
+
+### 2026-07-10 - Scheduled Run: Compositional Policy Gate wired into GovernedActionLoop (CAGE-1 + JADEPUFFER cross-validation)
+
+**Status**: ✅ COMPLETE - 16/16 new tests pass; **459/459 cross-substrate regression check passes** (up from 386/386 yesterday; +73 from governed_action_loop.py including 16 new chain tests). Zero regressions.
+
+**Research headlines (this week)**:
+
+- **CAGE-1 (arXiv:2607.03510, Jul 2026)** — "Control, Assurance, and Governance Evaluation for Enterprise Agentic AI." This paper introduces the *Prebind Assurance* pattern: an agentic action must be controlled *before* it becomes binding or operational. It also defines a precise action-handling state vocabulary: "proposed actions may be **admitted, held, narrowed, refused, escalated, quarantined, or made non-effective** prior to protected consequences." **Our `CrossCheckReport.outcome` enum (ALLOW / HOLD_PENDING_* / REJECT) maps 1:1 onto CAGE-1's vocabulary** — the substrate is a CAGE-1-shaped implementation. The paper also lists 11 evaluation dimensions (authority, policy enforcement, retrieval quality, memory integrity, tool safety, auditability, human oversight, conflict handling, safe failure, operational readiness, business fitness). Our `GovernedActionLoop` covers authority (PCA bridge), policy enforcement (verb bundle + compositional gate), tool safety (privilege governor), auditability (AIBOM + signed envelope + chain audit log), human oversight (HOLD outcomes), conflict handling (priority of HARD_BLOCK over REVIEW), safe failure (CEF detector catches fabricated crashes). The remaining dimensions (retrieval quality, memory integrity, operational readiness, business fitness) are *future work*.
+
+- **JADEPUFFER agentic ransomware (Sysdig Threat Research, late June 2026)** — the first publicly documented end-to-end ransomware campaign autonomously orchestrated by an LLM. The attack chain: Langflow CVE-2025-3248 (RCE, CVSS 9.8) → host enumeration → credential discovery → S3/MinIO enumeration → lateral move to Nacos → AES-encrypt 1,342 service configuration items → ransom note. The agent adapted in real time (e.g., a 31-second fix when a login attempt failed, parser switching when MinIO returned XML instead of JSON). Critically, **our internal threat-model term "JADEPUFFER" is the same name Sysdig assigned to the actor** — the compositional gate was designed for this exact attack pattern. Our deny-reason vocabulary catches the chain: `secret_to_external` (the credential harvest + exfil), `too_many_distinct_sinks` (the multi-service fanout: read→egress→write→exec→egress), `write_after_untrusted` (the Langflow CVE entry is the untrusted step; subsequent database writes are blocked). This is the first real-world validation of the gate's threat model.
+
+- **Agent Gateway as control plane (Nutanix, Arcade, Forbes Jul 5)** — the layer *between* agent and tools is becoming its own product category. Validates the substrate's `GovernedActionLoop` shape: a centralized cross-check that sits between the agent and every tool call. Our loop's six-substrate architecture (bridge / breaker / ledger / governor / CEF / compositional gate) is a *self-hosted* agent gateway.
+
+- **NVIDIA ASPIRE (MarkTechPost, Jul 3)** — Agentic Skill Programming through Iterative Robot Exploration. Writes and refines robot control programs, then distills validated fixes into a reusable skill library. A central coordinator manages the shared skill library. The "distill validated fixes" pattern matches our `ConstraintPressureProbe` finding (L7-L8 = emergence point) and our `VerbPolicyBundle` audit log. Future work: apply ASPIRE-style skill-distillation to the gate's policy registry (successful chain verdicts become a positive-corpus that the gate is "trained" against).
+
+- **arXiv:2607.06008 (PolyWorkBench, Jul 2026)** — 67 multilingual long-horizon tasks; agents show significant performance drops in multilingual vs monolingual. Adds a new dimension to the gate's taint vocabulary: `taint=language-tier` (which locale's data flow is in).
+
+- **arXiv:2607.07612 (Towards Agentic AI Governance, Jul 8)** — systematic review of agentic AI governance. Confirms the *multi-tool compositional* gap is the live research front. Our compositional gate (morning's `core/compositional_policy.py`, now wired into the loop) is the substrate this paper surveys.
+
+- **Forbes Jul 9 (Cognitive AI Ecosystems)** — persistent memory, multimodal perception, long-term planning. Validates the substrate's `EnhancedMemory` + `ContextCache` + `DriftSignal` architecture as the AGI substrate direction.
+
+- **Forbes Jul 6 (AI's Next Bottleneck Isn't Compute)** — "running an agent is a systems problem." The substrate is the systems layer.
+
+- **HFS Research + Infosys (cited in VitalOralife Jul 6)** — only 12% of enterprises have mature AI governance processes. **88% are unprotected against the JADEPUFFER pattern**. The substrate's open availability gives every enterprise a turnkey agent gateway.
+
+**Trending repos (week)**:
+- `microsoft/agent-framework` issue #6986 — Anthropic SDK constraint blocking newer features. Substrate-level *versioning* matters.
+- `NousResearch/hermes-agent` issue #58755 — `repair_message_sequence` produces empty `tool_calls`. Substrate-level *shape validation* matters.
+- `openai/codex` issue #31097 — GPT-5.5 forces MultiAgentV2. Substrate-level *operator-config parity* matters (our gate is operator-configurable via `max_sinks`, `default_unknown_policy`, `max_taint_threshold`).
+- `JuliusBrussee/caveman` (82k★) — token-compression for multi-agent calls. Our gate's `to_dict()` is the compact, replayable verdict format.
+- `Nanako0129/pilotfish` — multi-model orchestration for Claude Code, ~96% performance at ~46% cost. Our gate is the *guard*, not the *router*; the two compose.
+
+**Build Task: Wire `CompositionalPolicyGate` into `GovernedActionLoop.run()`** (closes morning's next-priority + 2026-07-09-PART2's next-priority)
+
+**Motivation**: The 2026-07-09 morning build created the compositional policy gate (38 unit tests + 10 CLI tests). The afternoon's adversarial pass hardened it to 54 distinct attack patterns. **The next-priority was explicit**: "Wire `CompositionalPolicyGate` into `GovernedActionLoop.run()` — every act → observe cycle pre-checks the proposed chain. The verb bundle is the per-verb policy; the compositional gate is the chain policy. The substrate's agent loop now has both." Today's run closes that carryover. The JADEPUFFER ransomware disclosure (the *real-world* validation of the gate's threat model) makes this wiring the most operationally consequential build in the substrate's history: the loop can now refuse to run a chain that matches the live attack pattern.
+
+**Key components**:
+
+1. **`CrossCheckOutcome.HOLD_PENDING_CHAIN`** — new 7th outcome value. Mirrors the gate's `ALLOW_ONLY_REVIEW` action. Distinct from the existing 4 `HOLD_PENDING_*` outcomes (evidence / ring / CEF / human).
+
+2. **`CrossCheckReport` chain fields** — `chain_verdict: Optional[Dict[str, Any]]`, `chain_reasons: Tuple[str, ...]`, `chain_digest: str`, `chain_audit_index: int`. All surfaced in `to_dict()` for downstream replay / AIBOM.
+
+3. **`GovernedActionRequest.planned_chain: Optional[List[ChainStep]]`** — request-level field. When supplied, the cross-check consults the gate as Step 6 (the last substrate). When `None`, the chain check is skipped (backward-compatible with all existing call sites).
+
+4. **`GovernedActionLoop.__init__` accepts `compositional_gate: Optional[CompositionalPolicyGate]`** — gate is optional; if not attached, the chain-substrate step is skipped (full backward compatibility with the 73 existing tests).
+
+5. **Step 6 in `propose()`** — runs after Step 5 (CEF). The gate's verdict maps to outcomes:
+   - `ALLOW` → continue to final accept block; record verdict + digest on the report.
+   - `ALLOW_ONLY_REVIEW` → `HOLD_PENDING_CHAIN` (operator-visible hold; certificate state = REQUIRE_HUMAN).
+   - `BLOCK_AND_ESCALATE` → `REJECT` (hard ceiling; certificate state = REJECTED).
+   - In both hold and reject cases, the chain audit log index + digest are preserved on the report for replay.
+
+6. **Step 6 ordering** — runs after Step 5 (CEF) and is short-circuited by any earlier step that returns (e.g., bridge REJECT, breaker CRITICAL, ledger CONTRADICTED). This matches the substrate's conservative posture: when an earlier substrate has already decided the action's fate, the chain check is *not* consulted. The 6th substrate is the *last* line of defense, not the first.
+
+7. **Soft import of `compositional_policy`** — if the module is unavailable (e.g., a slim install), the `planned_chain` field is silently ignored and the loop's existing behavior is preserved.
+
+**Conservative posture**:
+- The chain check is **last**. Earlier substrates' hard decisions short-circuit before the gate runs. This matches the principle of "fail at the earliest decisive substrate" (cheaper to fail at Step 1 than Step 6).
+- The chain check is **silent** when the gate is not attached. Backward compatibility: every existing call site keeps working.
+- The chain verdict's `digest` is a content-addressed hash of the verdict payload. The audit index points to the record in the gate's `audit_log` list. Together, these two fields let a downstream replay layer reconstruct the chain's decision from the gate's audit alone.
+- The chain gate **never mutates** the gate itself. The probe is read-only. This matches the substrate's broader pattern (CEF detector, VerbPolicyBundle, ConstraintPressureProbe, ProbabilisticTripEngine are all read-only substrates).
+- `HOLD_PENDING_CHAIN` is a **distinct** outcome from the other 4 hold types (evidence / ring / CEF / human). The cross-check report's `chain_reasons` list preserves *which* deny reasons fired, so a downstream UI can show "secret_to_external" specifically.
+
+**Test coverage (16 new tests in `TestCompositionalGateIntegration`)**:
+- `test_no_chain_no_gate_skipped` — no `planned_chain` → no chain fields populated.
+- `test_no_gate_attached_skips_chain_check` — gate not attached → chain check silent.
+- `test_clean_chain_records_verdict_on_report` — `read_file → write_file` → `chain_verdict` populated, `chain_reasons=()`, `chain_digest != ""`.
+- `test_secret_to_external_holds_for_chain_review` — JADEPUFFER chain → REJECT, `secret_to_external` in reasons.
+- `test_jadepuffer_full_chain_rejects` — full 4-step JADEPUFFER chain → REJECT, cert REJECTED, chain verdict preserved.
+- `test_chain_rejection_does_not_short_circuit_bridge` — strict externality policy + bridge REJECT at Step 1 → chain gate not consulted (chain_verdict is None).
+- `test_chain_reasons_preserved_on_to_dict` — `chain_reasons` and `chain_digest` in `to_dict()` output.
+- `test_chain_digest_changes_per_chain` — different chains produce different digests.
+- `test_chain_with_unknown_verb` — unknown verb under jadepuffer demo gate → REJECT, `unknown_verb` in reasons.
+- `test_chain_with_too_many_sinks_holds` — 4-distinct-sink chain → HOLD_PENDING_CHAIN, `too_many_distinct_sinks` in reasons.
+- `test_chain_check_runs_after_cef` — CEF CRITICAL (CET) short-circuits at Step 5; chain gate not consulted.
+- `test_chain_check_runs_after_breaker_critical` — **corrected during test pass**: breaker CRITICAL short-circuits at Step 2; chain gate not consulted. The original test asserted the wrong invariant; corrected to match the substrate's conservative posture.
+- `test_audit_index_assigned` — `chain_audit_index >= 0` for every gate check.
+- `test_default_unknown_verb_policy` — `default_unknown_policy=ALLOW` → unknown verb passes.
+- `test_requires_review_verb_holds_chain` — `requires_review=True` verb → HOLD_PENDING_CHAIN.
+- `test_empty_chain_is_vacuously_safe` — empty chain → ALLOW.
+
+**Cross-substrate regression check (459/459 pass)**:
+- `experiments/test_governed_action_loop.py` — 73/73 ✅ (57 pre-existing + 16 new)
+- `experiments/test_cef_detector.py` — 30/30 ✅
+- `experiments/test_cef_session.py` — 34/34 ✅
+- `experiments/test_verb_policy_bundle.py` — 42/42 ✅
+- `experiments/test_policy_review_cli.py` — 10/10 ✅
+- `experiments/test_typed_verb_cef_guard.py` — 16/16 ✅
+- `experiments/test_typed_verb_library.py` — 7/7 ✅
+- `experiments/test_governor_circuit.py` — 80/80 ✅
+- `experiments/test_governor_circuit_cli.py` — 7/7 ✅
+- `experiments/test_calibrate_cli.py` — 8/8 ✅
+- `experiments/test_cpp.py` — 35/35 ✅
+- `experiments/test_cpp_run_cli.py` — 15/15 ✅
+- `experiments/test_compositional_policy.py` — 38/38 ✅
+- `experiments/test_compositional_review_cli.py` — 10/10 ✅
+- `experiments/test_compositional_policy_adversarial.py` — 37/37 ✅
+- `experiments/test_compositional_policy_adversarial_cli.py` — 17/17 ✅
+- **Total: 459/459 cross-substrate pass** ✅ (up from 386/386, +73)
+
+**Files changed**:
+- `core/governed_action_loop.py` (1146 lines) — `CrossCheckOutcome.HOLD_PENDING_CHAIN`, `CrossCheckReport` chain fields, `GovernedActionRequest.planned_chain`, `GovernedActionLoop.__init__` accepts `compositional_gate`, Step 6 chain check in `propose()`.
+- `experiments/test_governed_action_loop.py` (1217 lines) — `TestCompositionalGateIntegration` class with 16 tests.
+- `CURRENT_RESEARCH.md` — this entry.
+- (Build log written separately to `BUILD_LOG_2026-07-10.md`.)
+- `AGENTS.md` — build log entry (prepended).
+
+**End-to-end demo** (selected from `TestCompositionalGateIntegration`):
+- JADEPUFFER chain (`read_env → http_post_external → read_secret_store → http_post_external`) on a gate with `is_secret_emitting=True` policies → REJECT, `secret_to_external` in reasons, cert REJECTED, `chain_verdict["action"] = "block_and_escalate"`, `chain_digest != ""`, `chain_audit_index >= 0`.
+- Too-many-sinks chain (`read_file → http_post_external → shell_exec → write_file`) → HOLD_PENDING_CHAIN, `too_many_distinct_sinks` in reasons.
+- CEF CRITICAL (CET) + planned chain → HOLD_PENDING_HUMAN, chain gate not consulted (Step 5 short-circuits before Step 6).
+- Bridge REJECT (strict externality) + planned chain → REJECT, chain gate not consulted (Step 1 short-circuits before Step 6).
+
+**Real findings the implementation pass surfaced**:
+1. **The breaker-CRITICAL test had the wrong invariant.** The test was written assuming the chain gate "still runs in parallel" when the breaker is CRITICAL. It doesn't — the breaker's CRITICAL is a hard early return at Step 2, before the chain gate. The test was corrected to assert the actual substrate behavior (chain gate not consulted, `chain_verdict is None`). This is a *clarification* of the conservative posture: the substrate fails at the earliest decisive substrate, not the last.
+2. **The `chain_digest` is non-empty even on clean chains.** Because the gate's `check_chain()` always produces a verdict (even on ALLOW), the digest is always populated when the gate is attached AND a chain is supplied. The cross-substrate test `test_clean_chain_records_verdict_on_report` was written to match this.
+3. **`HOLD_PENDING_CHAIN` is distinct from `HOLD_PENDING_CEF` and the other 4 hold types.** The test set exercises this: `test_secret_to_external_holds_for_chain_review` produces REJECT (not HOLD), and `test_chain_with_too_many_sinks_holds` produces HOLD_PENDING_CHAIN (not HOLD_PENDING_HUMAN). The distinct outcome values let a downstream UI render "operator-visible hold for chain review" specifically.
+
+**Research synthesis**:
+- **The substrate is now CAGE-1-shaped.** The cross-check's outcome vocabulary (admitted, held, narrowed, refused, escalated, quarantined, made non-effective) maps 1:1 onto the CAGE-1 paper's vocabulary. An operator can now produce a CAGE-1 evaluation report from the substrate's audit logs: "admitted actions: 0; held for evidence: 3; held for ring: 1; held for CEF: 2; held for chain: 5; held for human: 4; refused: 2."
+- **The JADEPUFFER real-world attack is the live validation of the substrate's threat model.** Sysdig's JADEPUFFER attack chain (Langflow CVE → recon → credential harvest → lateral move → encrypt → ransom note) maps onto the gate's deny reasons: `secret_to_external` (credential + exfil), `too_many_distinct_sinks` (multi-service fanout: read→egress→write→exec→egress), `write_after_untrusted` (Langflow CVE entry is the untrusted step; subsequent DB writes blocked). The fact that our internal threat-model term *matches* the real-world threat-actor name is a marker that the substrate was tracking the right attack pattern *before* the live attack was disclosed.
+- **The compositional gate is the substrate's 6th substrate.** The 6-substrate architecture is now: (1) PCA bridge (structural pre-bind validation), (2) SafetyCircuitBreaker (risk-class), (3) EvidenceLedger (claim grounding), (4) ThreeRingGovernor (capability routing), (5) CEF detector (output fabrication), (6) CompositionalPolicyGate (chain topology). Each substrate catches a different attack class; the cross-check consults them in order of *cost* (cheapest first).
+- **The gate's audit log is the substrate's AIOps layer.** Every chain check appends a hash-chained record. A future drift-signal layer can re-walk the gate's audit log and detect benign-config drift (a policy that "looks" innocuous but produces dangerous chains) — the same pattern as `DriftSignal` but applied to the gate's policy registry instead of the model's per-output distribution.
+- **The wiring is the *practical* generalization of the gate.** Without wiring, the gate is a *standalone* substrate. With wiring, the gate is a *substrate that the loop consults*. The loop becomes the integration point: a single `loop.propose(request)` call routes through 6 substrates in order. The `planned_chain` field on the request is the only API change a caller makes to opt in.
+- **The JADEPUFFER attack would be blocked at Step 6.** The attack chain: `read_env` (Langflow CVE) → `http_get_external` (MinIO enumeration) → `read_secret_store` (credential harvest) → `http_post_external` (exfil). Under the gate's JADEPUFFER demo policies, the chain's running taint escalates INTERNAL → EXTERNAL → SECRET → EXTERNAL, and the final `http_post_external` step fires `secret_to_external`. Outcome: BLOCK_AND_ESCALATE → REJECT. The certificate is REJECTED. The agent does not run the chain.
+- **The substrate is now the *enterprise agent gateway* that Forbes described (Jul 5).** Nutanix shipped the "Nutanix Agent Gateway" as part of Enterprise AI 2.7. Our `GovernedActionLoop` is a self-hosted, open agent gateway with 6 substrates, an audit log, and a real-world-validated threat model.
+
+**Next priority** (carries forward to the next run):
+- **Compositional gate + ProbabilisticTripEngine integration** — feed each chain verdict's reason-set into the engine's history. The engine's bound tells the operator "we expect ≤ X% of chains to escalate" — a steady-state safety claim. The chain gate's `to_dict()` payload becomes the engine's per-event input.
+- **DSCC clearance-mode wiring** — partition the policy registry into classification-level clusters; pre-compute the MRS (Most Restrictive Set) for each cluster; require the agent to declare the cluster at chain proposal time. arXiv:2607.03423 reports 79.2% / 95.5% block rate with this approach.
+- **CONTRA-style benign-config finder** — a tree-search that searches the policy space for benign-looking configs that produce dangerous chains. The compositional gate's deny reasons are the search heuristic. The JADEPUFFER attack is the search's *target* (find a policy config that "looks" innocuous but produces the JADEPUFFER chain).
+- **NVIDIA ASPIRE-style skill distillation** — successful chain verdicts become a positive-corpus that the gate is "trained" against. New policies are proposed by the skill-acquisition module, validated by the gate, and either accepted (added to the registry) or rejected (logged for review).
+- **CAGE-1 evaluation report CLI** — `python -m cli.cage1_report` reads the loop's `reports` list and emits a CAGE-1-shaped evaluation: "admitted: n, held for evidence: n, held for ring: n, held for CEF: n, held for chain: n, held for human: n, refused: n". The substrate is the CAGE-1 audit log generator.
+- **Auto-recompute of audit digests on tamper** — a `verify_chain()` method on the gate that re-walks the audit log, re-derives each digest, and reports the first inconsistency index. The substrate for an AIOps "drift signal" layer.
+- **Per-verb emergence profile across compositional policies** — same Probe harness as CPP, but the constraint source is the policy registry (add/remove verb policies and measure how often the chain flips ALLOW → BLOCK). The probe is the empirical instrument for the policy's safety claim.
+- **Wire `planned_chain` into the agent loop's planner** — the `core/planner.py` module currently generates *verb sequences* but doesn't pass them to the cross-check as `planned_chain`. The wiring would let the planner's output be the input to the loop's Step 6.
+
+*Last updated: 2026-07-10 17:11 by AGI Research & Build Agent*

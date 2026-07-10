@@ -101,6 +101,14 @@ from .cef_session import (
     CEFSessionVerdict,
     create_cef_session_detector,
 )
+from .compositional_policy import (
+    ChainAction,
+    ChainStep,
+    ChainVerdict,
+    CompositionalPolicyGate,
+    DenyReason,
+    create_gate,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +134,14 @@ class CrossCheckOutcome(str, Enum):
                             human review when a HIGH/CRITICAL fabrication is
                             detected on the agent's output (or when the
                             session has crossed the recovery horizon)
+    HOLD_PENDING_CHAIN  -- the sixth substrate (CompositionalPolicyGate)
+                            holding for human review when the proposed
+                            multi-verb chain is ALLOW_ONLY_REVIEW (e.g. a
+                            requires_review verb is present, or the chain
+                            has too many distinct sinks, or taint escalates
+                            but does not yet hit a hard block reason). The
+                            chain audit log entry is preserved on the
+                            report's `chain_verdict` field for replay.
     REJECT              -- one of the four substrates hard-rejected; the
                             certificate is REJECTED
     """
@@ -135,6 +151,7 @@ class CrossCheckOutcome(str, Enum):
     HOLD_PENDING_EVIDENCE = "hold_pending_evidence"
     HOLD_PENDING_RING = "hold_pending_ring"
     HOLD_PENDING_CEF = "hold_pending_cef"
+    HOLD_PENDING_CHAIN = "hold_pending_chain"
     REJECT = "reject"
 
 
@@ -201,6 +218,10 @@ class CrossCheckReport:
     cef_recovery_horizon: bool = False
     cef_session_state: Optional[CEFSessionState] = None
     cef_session_action: Optional[CEFSessionAction] = None
+    chain_verdict: Optional[Dict[str, Any]] = None
+    chain_reasons: Tuple[str, ...] = ()
+    chain_digest: str = ""
+    chain_audit_index: int = -1
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -224,6 +245,9 @@ class CrossCheckReport:
             "cef_recovery_horizon": self.cef_recovery_horizon,
             "cef_session_state": self.cef_session_state,
             "cef_session_action": self.cef_session_action,
+            "chain_reasons": list(self.chain_reasons),
+            "chain_digest": self.chain_digest,
+            "chain_audit_index": self.chain_audit_index,
         }
 
 
@@ -248,6 +272,7 @@ class GovernedActionRequest:
     required_capability: Optional[str] = None
     permission: Optional[PermissionScope] = None
     agent_output: Optional[str] = None  # when provided, the CEF detector runs on it as a fifth substrate
+    planned_chain: Optional[List[ChainStep]] = None  # when provided, the compositional gate runs on it as the sixth substrate
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +327,7 @@ class GovernedActionLoop:
         cef_detector: Optional[CEFDetector] = None,
         cef_session_detectors: Optional[Dict[str, CEFSessionDetector]] = None,
         cef_session_config: Optional[CEFSessionConfig] = None,
+        compositional_gate: Optional[CompositionalPolicyGate] = None,
     ) -> None:
         self.bridge = bridge or create_pca_bridge()
         self.breaker = breaker or SafetyCircuitBreaker()
@@ -327,6 +353,15 @@ class GovernedActionLoop:
         self.cef_session_detectors: Dict[str, CEFSessionDetector] = dict(
             cef_session_detectors or {}
         )
+
+        # Compositional policy gate (6th substrate). When a request
+        # supplies a `planned_chain`, the gate evaluates the chain and
+        # BLOCK_AND_ESCALATE promotes the cross-check to REJECT while
+        # ALLOW_ONLY_REVIEW promotes to HOLD_PENDING_CHAIN. The
+        # gate's audit log index + digest are recorded on the report
+        # for replay. A gate is optional; if not attached, the
+        # chain-substrate step is skipped (backward-compatible).
+        self.compositional_gate = compositional_gate
 
     # -- propose ---------------------------------------------------------
 
@@ -833,7 +868,94 @@ class GovernedActionLoop:
                     cef_session_state=cef_session_verdict.state,
                     cef_session_action=cef_session_verdict.action,
                 )
-        
+
+        # Step 6: CompositionalPolicyGate.check_chain() (if attached).
+        # The gate evaluates the proposed multi-verb chain. The
+        # chain may include read_env, http_get, shell_exec, etc.; the
+        # gate's per-verb policy declares taint_in, sinks, secret
+        # emission, review requirements, and max_taint_threshold. The
+        # chain-level check catches combinations where each individual
+        # verb would pass its own per-tool gate but the chain as a
+        # whole is an exfiltration / escalation / fanout pipeline
+        # (JADEPUFFER pattern). The conservative posture:
+        #   - ALLOW: pass through, record verdict on the report.
+        #   - ALLOW_ONLY_REVIEW: HOLD_PENDING_CHAIN (operator-visible).
+        #   - BLOCK_AND_ESCALATE: REJECT (hard ceiling; the chain is
+        #     an active attack pattern).
+        #   - The chain verdict's digest + audit index are preserved
+        #     on the report for replay. A future drift-signal layer
+        #     can re-walk the gate's audit log and detect benign-
+        #     config / chain-topology drift.
+        chain_report_data: Optional[Dict[str, Any]] = None
+        chain_reasons_list: Tuple[str, ...] = ()
+        chain_digest_str: str = ""
+        chain_audit_idx: int = -1
+        if (
+            self.compositional_gate is not None
+            and request.planned_chain is not None
+        ):
+            chain_verdict_obj: ChainVerdict = (
+                self.compositional_gate.check_chain(
+                    request.planned_chain
+                )
+            )
+            chain_report_data = chain_verdict_obj.to_dict()
+            chain_reasons_list = tuple(
+                r.value for r in chain_verdict_obj.reasons
+            )
+            chain_digest_str = chain_verdict_obj.digest
+            chain_audit_idx = (
+                len(self.compositional_gate.audit_log) - 1
+            )
+            if chain_verdict_obj.action == ChainAction.BLOCK_AND_ESCALATE:
+                return CrossCheckReport(
+                    outcome=CrossCheckOutcome.REJECT,
+                    bridge_decision=bridge_decision,
+                    breaker_risk=breaker_risk,
+                    ledger_claim_count=ledger_report["total"],
+                    ledger_supported=ledger_report["supported"],
+                    routing_ring=routing_ring,
+                    routing_agent=routing_agent,
+                    enforceability=EnforceabilityClass.REQUIRE_HUMAN,
+                    rationale=(
+                        f"compositional gate BLOCK_AND_ESCALATE on "
+                        f"chain of {len(request.planned_chain)} step(s); "
+                        f"reasons={list(chain_reasons_list)}"
+                    ),
+                    detail={
+                        "ledger": ledger_report,
+                        "compositional_chain": chain_report_data,
+                    },
+                    chain_verdict=chain_report_data,
+                    chain_reasons=chain_reasons_list,
+                    chain_digest=chain_digest_str,
+                    chain_audit_index=chain_audit_idx,
+                )
+            if chain_verdict_obj.action == ChainAction.ALLOW_ONLY_REVIEW:
+                return CrossCheckReport(
+                    outcome=CrossCheckOutcome.HOLD_PENDING_CHAIN,
+                    bridge_decision=bridge_decision,
+                    breaker_risk=breaker_risk,
+                    ledger_claim_count=ledger_report["total"],
+                    ledger_supported=ledger_report["supported"],
+                    routing_ring=routing_ring,
+                    routing_agent=routing_agent,
+                    enforceability=EnforceabilityClass.REQUIRE_HUMAN,
+                    rationale=(
+                        f"compositional gate ALLOW_ONLY_REVIEW on "
+                        f"chain of {len(request.planned_chain)} step(s); "
+                        f"reasons={list(chain_reasons_list)}; "
+                        f"operator must approve"
+                    ),
+                    detail={
+                        "ledger": ledger_report,
+                        "compositional_chain": chain_report_data,
+                    },
+                    chain_verdict=chain_report_data,
+                    chain_reasons=chain_reasons_list,
+                    chain_digest=chain_digest_str,
+                    chain_audit_index=chain_audit_idx,
+                )
 
         # All four substrates agree.  If the bridge originally said
         # REQUIRE_HUMAN, the cross-check confirms it; if the bridge
@@ -874,6 +996,15 @@ class GovernedActionLoop:
             detail["cef_recovery_horizon"] = (
                 cef_session_verdict.is_compromised()
             )
+        chain_kwargs: Dict[str, Any] = {}
+        if chain_report_data is not None:
+            chain_kwargs = {
+                "chain_verdict": chain_report_data,
+                "chain_reasons": chain_reasons_list,
+                "chain_digest": chain_digest_str,
+                "chain_audit_index": chain_audit_idx,
+            }
+            detail["compositional_chain"] = chain_report_data
         return CrossCheckReport(
             outcome=outcome,
             bridge_decision=bridge_decision,
@@ -887,6 +1018,7 @@ class GovernedActionLoop:
             rationale=rationale,
             detail=detail,
             **cef_kwargs,
+            **chain_kwargs,
         )
 
     def _check_ledger(self, claim_ids: List[str]) -> Dict[str, Any]:
