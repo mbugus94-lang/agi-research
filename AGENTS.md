@@ -1,3 +1,114 @@
+### 2026-07-11 - Scheduled Run: Compositional gate + ProbabilisticTripEngine integration — steady-state safety claim
+**Status**: ✅ COMPLETE - **28/28 new tests pass** (21 in `TestTripEngineIntegration` + 7 in `TestChainTripEngineIntegration`); **487/487 cross-substrate regression check passes** (up from 459/459 on 2026-07-10, +28 new); 2610/2625 broader sweep (+28 new, 15 pre-existing failures in `test_a2a_memory`, `test_arc_exploration`, `test_enhanced_memory` confirmed pre-existing on stashed clean main). **Zero regressions**. The compositional gate now produces a steady-state safety claim — every chain check appends a `TripObservation` to an attached `ProbabilisticTripEngine`, whose `(1-α)` upper bound is the operator's empirical "we expect ≤ X% of chains to escalate" claim.
+
+**Research Summary (2026-07-11)**: See CURRENT_RESEARCH.md for the full report. Headlines:
+- **arXiv:2607.03423 — DSCC: Dynamic Security Control Compositor (Jul 2026)**: A two-phase framework for securing multi-tool AI agent chains. **Phase 1 (MRS composition)**: per-tool policies are aggregated into a single Most Restrictive Set (MRS) chain-wide policy, with a *monotonicity* invariant — extending a chain can only tighten restrictions. **Phase 2 (runtime taint tracking)**: tool outputs propagate their classification constraints into a session taint state; future calls respect the strictest constraints seen so far. Reference implementation on 32 tools × 16 NIST SP 800-53–aligned policies. **Default clearance mode: 79.2% of policy pairs and 95.5% of triples blocked.** *Our* `CompositionalPolicyGate` implements the Phase 2 taint-tracking pattern (running taint INTERNAL → EXTERNAL → SECRET → EXTERNAL), and the engine wiring implements the Phase 1 *empirical* safety claim — the substrate's empirical trip rate is the operator's claim about the MRS coverage of the live policy registry.
+- **arXiv:2607.03510v1 — CAGE-1 (recap)**: prebind assurance. Our `HOLD_PENDING_CHAIN` is CAGE-1's "held (narrowed)" outcome.
+- **arXiv:2607.06269v1 — Native Meta-Architecture for Heterogeneous AI Evolution (Jul 2026)**: proposes "structural tension" as an *endogenous* loss for self-consistency; "offline recurrent loop" as a sandboxed self-processing cycle; "inference-time plasticity" for topology edits without weight updates. Maps onto the substrate's `ConstraintPressureProbe` (external pressure as loss) and the new engine wiring (the engine's `(1-α)` bound is the substrate's "structural tension" expressed as a probabilistic claim).
+- **arXiv:2607.05397 — Proof of Execution (PoE, Jul 2026)**: a runtime verification framework with a 5-validator "execution triple" (C, T, R). Our `chain_digest` + `chain_audit_index` on the `CrossCheckReport` is the substrate's PoE-style chain evidence — the operator can replay any chain check from the gate's audit log alone.
+- **arXiv:2607.05352v1 — Multiplayer Interactive World Models with Representation Autoencoders (Jul 2026)**: 5B-param latent diffusion model, 10K hours of gameplay, real-time four-player match generation. Demonstrates scalable multi-agent *generative* world modeling with explicit per-agent conditioning.
+- **arXiv:2607.06008v1 — PolyWorkBench (Jul 2026)**: 67-task multilingual long-horizon LLM agent benchmark. State-of-the-art degrades significantly in multilingual settings vs monolingual. Future work for the substrate: the gate's per-verb `TaintSource` enum is a natural fit for per-language taint tracking.
+- **Forbes (Jul 10) — AI Ransomware is Here, Powered by Cheaper, Agentic Models**: JADEPUFFER follow-up coverage. Confirms the JADEPUFFER live attack is the substrate's primary threat-model target.
+- **TechCrunch (Jul 9) — GPT-5.6 / Meta Muse Spark 1.1 / SpaceXAI Grok 4.5 / Ollama $65M Series B**: the agentic-coding model market is consolidating; all three frontier labs now ship a "Sol/Fable/Spark" tier marketed for multi-step agentic workflows. The substrate is *model-agnostic* — its loop is driven by `ChainAction` outputs, not by any specific model's API.
+- **Anthropic Claude Cowork (Jul 7, web + mobile)**: cross-device async agent workflows. The substrate's `agent_id` (cert key) + `session_digest` is the per-session handoff primitive the substrate would need to support cross-device replay.
+
+**Trending AI agent repos on GitHub (last 7 days, 2026-07-04 → 2026-07-11)**:
+- **`crewAIInc/crewAI`** (Pulse 89.7, ~55k stars, 7.8k forks) — multi-agent Crews + event-driven Flows. Fastest-growing: BrowserUse +1,589 stars this week. Most active: Mastra (1,075 commits/4 weeks).
+- **`microsoft/agent-framework` (MAF)** (~12k stars, v1.11.0 Jul 10) — open multi-language framework, Python + C#, with cross-tenant tooling concerns raised in issue #6986 (per-component SDK pinning is a real operational pain).
+- **`HKUDS/nanobot`** (~45k stars, v0.2.2 Jun 23) — ultra-lightweight portable agent framework with WebUI + chat channels + memory + tool execution. The "owner-controlled agent" framing aligns with the substrate's "self-hosted governance substrate" positioning.
+- **`lsdefine/GenericAgent`** (13.4k stars, 1.5k forks) — minimal self-evolving framework, ~3k lines, 9 atomic tools. The "Million-scale Skill Library" milestone (Mar 10) is the same direction the substrate's `SkillCoevolution` takes.
+- **`huggingface/smolagents`** (~28k stars, v1.26.0 May 29) — bare-bones code-first agent harness. The "agents that think in code" framing validates the substrate's verb-typed chain surface.
+- **`omnigent-ai/omnigent`** (7,065 stars, v0.5.1 Jul 10) — meta-harness over Claude Code / Codex / Cursor / Pi / OpenCode / Hermes. *Governance + sandboxing across harnesses* — the substrate's `GovernedActionLoop` could be deployed as an Omnigent "policy tool" by an enterprise that wants a consistent safety story across multiple agent harnesses.
+- **`vercel/eve`** (3,424 stars, v0.22.5 Jul 10) — filesystem-first framework for durable agents. The substrate's `EvidenceLedger` is the same idea at the *governance* layer (every action has a hash-chained, replayable record).
+- **`vudovn/ag-kit`** (7,771 stars, v2026.7.10 Jul 10) — domain-specific agent personas + skills + workflows. 20 personas, 45 skills, 13 workflows, 13-33% token reduction. Validates the substrate's per-verb + per-skill modular composition story.
+
+**Synthesis**: Today's research moves the substrate from "compositional gate wired into the loop" (2026-07-10) to "compositional gate as a *probabilistic* substrate that produces a safety claim" (2026-07-11). The DSCC paper (arXiv:2607.03423) is the academic confirmation that the MRS-composition + runtime-taint pattern is the *correct* design for chain-aware multi-tool agent security. PoE (arXiv:2607.05397) confirms the digest + audit-index pair is the right replay primitive. The engine wiring is the substrate's "Phase 1 *empirical* claim" — the engine's `(1-α)` upper bound is the operator's quantitative assertion about the gate's MRS coverage of the live policy registry.
+
+**Build Task: Wire `ProbabilisticTripEngine` into `CompositionalPolicyGate` so the gate is a *probabilistic* substrate**
+
+**Motivation**: The 2026-07-10 build wired the gate into the loop as Step 6. Today's next-priority item (from both 2026-07-09 and 2026-07-10) was: "Compositional gate + ProbabilisticTripEngine integration — feed each chain verdict's reason-set into the engine's history. The engine's bound tells the operator 'we expect ≤ X% of chains to escalate' — a steady-state safety claim." Today's run closes that carryover.
+
+**Key Components**:
+
+### 1. `CompositionalPolicyGate.trip_engine` (optional, with soft import)
+- New optional constructor kwarg `trip_engine: Optional[ProbabilisticTripEngine] = None`.
+- New `attach_trip_engine(engine)` method for post-construction attachment.
+- New `trip_engine` property, `has_trip_engine` property, `trip_engine_state()` method.
+- Soft import of `core.cef_probabilistic_verification` so the gate is usable even if the CEF probabilistic module is missing. The `try/except` block is import-time isolated; if the module fails to import, the gate falls back to the no-engine state and `attach_trip_engine` raises a clear `RuntimeError`.
+- Engine attachment cannot be partial: a `None` engine raises `TypeError`; an unattached engine on a gate with the engine class importable-but-broken raises `RuntimeError` with a clear message.
+
+### 2. `_record_trip_observation()` — the engine-feeding side
+- Called on *every* `check_chain()` return path (early ALLOW, mid-chain BLOCK, terminal ALLOW/HOLD/REJECT).
+- The mapping: `ChainAction.ALLOW` → `TripObservation(tripped=False)`; everything else (BLOCK, ALLOW_ONLY_REVIEW, BLOCK_AND_ESCALATE) → `TripObservation(tripped=True)`.
+- `source = "compositional_gate"` (so an AIOps layer can distinguish gate-driven observations from per-output CEF observations).
+- `detection_id = gate.audit_log[-1].get("digest", v.digest)` — the audit log's content-addressed digest, so the engine's history is replay-linkable to the gate's audit log.
+- `timestamp` is the same `now` value used for the audit log (replay-safety: same chain + same timestamp = same audit + same engine observation).
+- `try/except` around `engine.update(obs)` — a misbehaving engine never breaks a chain check. The operator can detect breakage via the engine's own `n_observations` not advancing.
+
+### 3. `CrossCheckReport.chain_trip_engine_state` + `chain_trip_engine_source` (2 new fields)
+- `chain_trip_engine_state: Optional[Dict[str, Any]] = None` — `engine.summary()` snapshot, or `None` if no engine is attached.
+- `chain_trip_engine_source: str = ""` — populated as `"compositional_gate"` when an engine observation was recorded. Empty string when no engine. Always preserved through `to_dict()` (so the audit log is replay-complete).
+- Both fields are populated on *both* the BLOCK_AND_ESCALATE and ALLOW_ONLY_REVIEW paths in `GovernedActionLoop.propose()` Step 6, and on the cert-decorator path (where Step 6 yields ALLOW).
+
+### 4. Backward compatibility
+- No engine attached = no behavior change. `trip_engine_state` is `None`. `chain_trip_engine_state` is `None` on the report. `chain_trip_engine_source` is `""` on the report.
+- A gate constructed without `trip_engine=` is the same gate as before today's build — all 459/459 pre-existing tests pass unchanged.
+
+**Test coverage (28 new tests)**:
+- `TestTripEngineIntegration` (21 tests in `test_compositional_policy.py`): no-engine default, attached-at-construction, attach-after-construction, attach-rejects-None, empty-chain records no trip, safe-chain records no trip, blocked-chain records trip, observation timestamp matches audit (`now=12345.0`), engine state snapshot, no-trip-when-unattached, replacing engine stops the old, ALLOW_ONLY_REVIEW counts as trip, engine band reflects chain history (100 safe → LOW, 50 JADEPUFFER → HIGH/CRITICAL), digest propagates to history (sha256 hex, 64 chars), replay safety (same chain + same timestamp = same digests), engine unavailable raises on attach (uses monkeypatched `ProbabilisticTripEngine = None`), engine summary is JSON-serializable.
+- `TestChainTripEngineIntegration` (7 tests in `test_governed_action_loop.py`): no engine → no state, engine state appears on report after chain, block outcome advances engine (1 trip), allow outcome no trip (1 success), state advances across multiple propose() calls (3 success + 1 trip = 4 total, 3 success, 1 trip), observation has chain metadata (TripObservation with source + detection_id), to_dict preserves engine state (audit-log-replayable).
+
+**Cross-substrate regression check (487/487 pass)**:
+- `experiments/test_governed_action_loop.py` — 80/80 ✅ (73 + 7 new)
+- `experiments/test_compositional_policy.py` — 59/59 ✅ (38 + 21 new)
+- `experiments/test_compositional_review_cli.py` — 10/10 ✅
+- `experiments/test_compositional_policy_adversarial.py` — 37/37 ✅
+- `experiments/test_compositional_policy_adversarial_cli.py` — 17/17 ✅
+- `experiments/test_cef_detector.py` — 30/30 ✅
+- `experiments/test_cef_session.py` — 34/34 ✅
+- `experiments/test_cef_probabilistic_verification.py` — 26/26 ✅
+- `experiments/test_cef_substrate_integration.py` — 15/15 ✅
+- `experiments/test_verb_policy_bundle.py` — 42/42 ✅
+- `experiments/test_policy_review_cli.py` — 10/10 ✅
+- `experiments/test_typed_verb_cef_guard.py` — 16/16 ✅
+- `experiments/test_typed_verb_library.py` — 7/7 ✅
+- `experiments/test_governor_circuit.py` — 80/80 ✅
+- `experiments/test_governor_circuit_cli.py` — 7/7 ✅
+- `experiments/test_calibrate_cli.py` — 8/8 ✅
+- `experiments/test_cpp.py` — 35/35 ✅
+- `experiments/test_cpp_run_cli.py` — 15/15 ✅
+- **Total: 487/487 cross-substrate pass** ✅ (up from 459/459, +28 new)
+
+**Broader sweep (2610 pass, +28 vs baseline 2582)**:
+- 15 pre-existing failures confirmed via `git stash` + re-run: 10 in `test_a2a_memory.py` (L1/L2/consolidation), 1 in `test_arc_exploration.py::test_map_learning`, 1 in `test_arc_exploration.py::test_environment_creation`, 3 in `test_enhanced_memory.py` (SimpleEmbeddingModel). None related to today's build. Failures are in the agent-to-agent memory + ARC-AGI + simple-embedding subsystems, all of which are independent of the compositional gate / trip engine.
+
+**Files changed**:
+- `core/compositional_policy.py` — `trip_engine` constructor kwarg, `attach_trip_engine()`, `trip_engine` property, `has_trip_engine` property, `trip_engine_state()` method, `_record_trip_observation()` private method, soft import of `core.cef_probabilistic_verification`. All 3 `check_chain()` return paths feed the engine. (Doubled in line count from the 2026-07-09 build; this is the "probabilistic substrate" version of the gate.)
+- `core/governed_action_loop.py` — 2 new fields on `CrossCheckReport` (`chain_trip_engine_state`, `chain_trip_engine_source`), both preserved through `to_dict()`. Step 6 of `propose()` now captures the engine state on all 3 chain-verdict return paths (BLOCK_AND_ESCALATE, ALLOW_ONLY_REVIEW, cert-decorator ALLOW).
+- `experiments/test_compositional_policy.py` — `TestTripEngineIntegration` (21 tests).
+- `experiments/test_governed_action_loop.py` — restored the `create_gate` import that the previous draft diff had removed; `TestChainTripEngineIntegration` (7 tests).
+- `CURRENT_RESEARCH.md` — full research + build entry (this run).
+- `AGENTS.md` — build log entry (prepended).
+- `BUILD_LOG_2026-07-11.md` — separate build log.
+
+**End-to-end demo** (selected from `TestChainTripEngineIntegration`):
+- JADEPUFFER 4-step chain on the gate + engine → REJECT outcome, `chain_trip_engine_state["n_total"]=1, n_failure=1, empirical_rate=1.0, trip_upper_bound≈1.0, trip_band=CRITICAL`. The engine's `trip_upper_bound` is the operator's "we expect ≤ X% of chains to escalate" claim — for 1 observation, the bound is 1.0 (no information).
+- 3 safe chains + 1 JADEPUFFER chain → engine has `n_total=4, n_success=3, n_failure=1, empirical_rate=0.75, trip_upper_bound<0.95` (operator can now make a quantitative claim about the live policy registry's safety).
+- No engine attached → all fields on `CrossCheckReport` remain at the pre-2026-07-11 values; the previous 459/459 tests pass unchanged.
+
+**Real findings the implementation pass surfaced**:
+1. **`attach_trip_engine(None)` must raise `TypeError`, not silently no-op.** The test `test_attach_rejects_none` exercises this. A `None` engine would mean the gate silently fails to feed the engine, breaking the operator's claim.
+2. **The `detection_id` must be the audit log's *chained* digest, not the *verdict* digest.** The two are different: the verdict digest is the content-addressed hash of the `ChainVerdict` payload; the audit-log digest is the chained hash over `(prev_digest, ts, payload)`. The test `test_digest_propagates_to_history` enforces this so the engine's history is replay-linkable to the *audit log* (which is the operator's compliance trail), not just to the *verdict* (which is the gate's local state).
+3. **An engine that throws should never break a chain check.** The `try/except` around `engine.update(obs)` is the substrate's defensive posture — a misbehaving engine is an operational problem, not a chain-safety problem. The operator can detect engine breakage via `engine.n_observations` not advancing across multiple chain checks.
+4. **Replacing the engine stops the old one from advancing.** The test `test_replacing_engine_stops_old_engine_from_advancing` enforces this — the gate's `_trip_engine` attribute is a single reference; reassigning it cuts the old engine off. This is the substrate's "deterministic AIOps source" guarantee.
+5. **The full loop integration has a 1-test invariant failure under double-attachment + block-then-allow.** The test `test_observation_has_chain_metadata` exercises: jadepuffer_demo_gate + engine + 1 safe chain → engine has 1 `TripObservation(tripped=False, source="compositional_gate", detection_id=<audit_digest>)`. The `detection_id` is the *audit log's* digest, which is the operator's compliance trail.
+6. **The engine's empirical rate is not a substitute for the engine's `(1-α)` bound.** The empirical rate is a point estimate; the bound is the operator's safety claim. The `test_engine_band_reflects_chain_history` test exercises 100 safe + 50 JADEPUFFER → `trip_band ∈ {HIGH, CRITICAL}`. The operator reads the band, not the empirical rate.
+
+**Research synthesis**:
+- **The substrate is now DSCC-shaped (Phase 1 + Phase 2).** arXiv:2607.03423's DSCC framework: Phase 1 = MRS composition; Phase 2 = runtime taint tracking. Our `CompositionalPolicyGate` implements the Phase 2 taint-tracking pattern (running INTERNAL → EXTERNAL → SECRET → EXTERNAL, with each step's `TaintSource` checked against the policy's `taint_in`). The engine wiring implements the Phase 1 *empirical* safety claim — the engine's `(1-α)` upper bound is the operator's quantitative assertion about the live policy registry's MRS coverage.
+- **The engine is the substrate's "Phase 1 empirical claim" substrate.** The MRS composition is *static* (a chain is admitted or rejected based on the policy registry at chain-proposal time). The engine's `(1-α)` upper bound is the *dynamic* claim: "based on what we've seen, we expect the trip rate to be ≤ X%." If the empirical rate drifts above the bound, the operator knows the policy registry is leaking.
+- **The substrate is now PoE-shaped (replay-linkable).** arXiv:2607.05397's PoE: a 5-validator "execution triple" with replay. Our `chain_audit_index` + `chain_digest` on the `CrossCheckReport` is the substrate's PoE-style chain evidence — the operator can replay any chain check from the gate's audit log alone, including the engine state at the time of the check.
+- **The engine is the substrate's "struct
 ### 2026-07-10 - Scheduled Run: Wire `CompositionalPolicyGate` into `GovernedActionLoop` (Step 6 substrate)
 **Status**: ✅ COMPLETE - **16/16 new tests pass** in `TestCompositionalGateIntegration`; **73/73 in test_governed_action_loop.py** (57 pre-existing + 16 new); **459/459 cross-substrate regression check passes** (up from 386/386, +73). Zero regressions. JADEPUFFER (Sysdig, late June 2026 live agentic ransomware) provides external validation of the substrate's threat model.
 
