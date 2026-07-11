@@ -31,8 +31,15 @@ from core.compositional_policy import (
     TaintSource,
     VerbPolicy,
     create_gate,
+    create_jadepuffer_demo_gate,
     max_taint,
     taint_rank,
+)
+from core.cef_probabilistic_verification import (
+    ProbabilisticTripEngine,
+    TripBand,
+    TripObservation,
+    create_probabilistic_trip_engine,
 )
 
 
@@ -452,6 +459,267 @@ class TestCreateGate(unittest.TestCase):
         )
         v = g.check_chain([ChainStep("read")])
         self.assertEqual(v.action, ChainAction.ALLOW)
+
+
+# ===========================================================================
+# Trip-engine integration (2026-07-11)
+# ===========================================================================
+
+class TestTripEngineIntegration(unittest.TestCase):
+    """Tests for CompositionalPolicyGate x ProbabilisticTripEngine wiring.
+
+    Each check_chain() call must append a TripObservation to the
+    attached engine, so the operator gets a steady-state safety claim
+    ("we expect <= X% of chains to escalate") directly from the
+    substrate's audit log.
+    """
+
+    def test_no_engine_by_default(self) -> None:
+        g = create_gate()
+        self.assertFalse(g.has_trip_engine)
+        self.assertIsNone(g.trip_engine)
+        self.assertIsNone(g.trip_engine_state())
+
+    def test_engine_attached_at_construction(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = CompositionalPolicyGate(trip_engine=e)
+        self.assertTrue(g.has_trip_engine)
+        self.assertIs(g.trip_engine, e)
+
+    def test_attach_after_construction(self) -> None:
+        g = create_gate()
+        self.assertFalse(g.has_trip_engine)
+        e = create_probabilistic_trip_engine()
+        g.attach_trip_engine(e)
+        self.assertTrue(g.has_trip_engine)
+        self.assertIs(g.trip_engine, e)
+
+    def test_attach_rejects_none(self) -> None:
+        g = create_gate()
+        with self.assertRaises(TypeError):
+            g.attach_trip_engine(None)  # type: ignore[arg-type]
+
+    def test_empty_chain_records_no_trip(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = CompositionalPolicyGate(trip_engine=e)
+        v = g.check_chain([])
+        self.assertEqual(v.action, ChainAction.ALLOW)
+        # One observation appended; empty chain = no trip.
+        self.assertEqual(e.n_observations, 1)
+        self.assertEqual(e.n_failure, 1)
+        self.assertEqual(e.n_success, 0)
+
+    def test_safe_chain_records_no_trip(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = CompositionalPolicyGate(
+            policies={"read": VerbPolicy("read", TaintSource.INTERNAL, sinks=("read",))},
+            trip_engine=e,
+        )
+        g.check_chain([ChainStep("read")])
+        self.assertEqual(e.n_observations, 1)
+        self.assertEqual(e.n_failure, 1)
+        self.assertEqual(e.n_success, 0)
+
+    def test_jadepuffer_chain_records_trip(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = create_jadepuffer_demo_gate()
+        g.attach_trip_engine(e)
+        chain = [
+            ChainStep("read_env", TaintSource.INTERNAL),
+            ChainStep("http_post_external", TaintSource.EXTERNAL),
+            ChainStep("read_secret_store", TaintSource.SECRET),
+            ChainStep("http_post_external", TaintSource.EXTERNAL),
+        ]
+        v = g.check_chain(chain)
+        self.assertEqual(v.action, ChainAction.BLOCK_AND_ESCALATE)
+        self.assertEqual(e.n_observations, 1)
+        self.assertEqual(e.n_success, 1)
+        self.assertEqual(e.n_failure, 0)
+
+    def test_unknown_verb_records_trip(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = CompositionalPolicyGate(trip_engine=e)
+        g.check_chain([ChainStep("totally_unknown")])
+        self.assertEqual(e.n_observations, 1)
+        self.assertEqual(e.n_success, 1)
+        self.assertEqual(e.n_failure, 0)
+
+    def test_mixed_observations_update_engine(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = create_jadepuffer_demo_gate()
+        g.attach_trip_engine(e)
+        # 5 safe chains, 2 jadepuffer chains
+        safe = [ChainStep("read_env")]
+        bad = [
+            ChainStep("read_env", TaintSource.INTERNAL),
+            ChainStep("http_post_external", TaintSource.EXTERNAL),
+            ChainStep("read_secret_store", TaintSource.SECRET),
+            ChainStep("http_post_external", TaintSource.EXTERNAL),
+        ]
+        for _ in range(5):
+            g.check_chain(safe)
+        for _ in range(2):
+            g.check_chain(bad)
+        self.assertEqual(e.n_observations, 7)
+        self.assertEqual(e.n_success, 2)
+        self.assertEqual(e.n_failure, 5)
+
+    def test_observation_source_is_compositional_gate(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = create_jadepuffer_demo_gate()
+        g.attach_trip_engine(e)
+        g.check_chain([ChainStep("read_env")])
+        last_obs = e.history[-1]
+        self.assertEqual(last_obs.source, "compositional_gate")
+
+    def test_observation_has_digest_detection_id(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = create_jadepuffer_demo_gate()
+        g.attach_trip_engine(e)
+        g.check_chain([ChainStep("read_env")])
+        last_obs = e.history[-1]
+        # digest is the verdict digest, used as a per-event id
+        self.assertEqual(last_obs.detection_id, g.audit_log[-1]["digest"])
+        self.assertTrue(len(last_obs.detection_id) > 0)
+
+    def test_observation_timestamp_matches_audit(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = CompositionalPolicyGate(trip_engine=e)
+        g.check_chain([ChainStep("x")], now=12345.0)
+        self.assertEqual(e.history[-1].timestamp, 12345.0)
+        self.assertEqual(g.audit_log[-1]["ts"], 12345.0)
+
+    def test_trip_engine_state_snapshot(self) -> None:
+        # Without an engine, state is None.
+        g0 = create_gate()
+        self.assertIsNone(g0.trip_engine_state())
+        # With an engine, state is a non-empty dict.
+        e = create_probabilistic_trip_engine()
+        g = CompositionalPolicyGate(trip_engine=e)
+        state = g.trip_engine_state()
+        self.assertIsNotNone(state)
+        # Engine summary includes these keys
+        for k in ("n_total", "empirical_rate", "trip_upper_bound",
+                  "trip_band", "confidence"):
+            self.assertIn(k, state)
+
+    def test_no_trip_observation_when_engine_unattached(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = create_gate()
+        g.check_chain([ChainStep("x")])
+        # Engine was never attached; remains empty.
+        self.assertEqual(e.n_observations, 0)
+
+    def test_replacing_engine_stops_old_engine_from_advancing(self) -> None:
+        # Re-attaching a fresh engine should stop the old engine from being
+        # fed. The new engine starts at zero observations.
+        e_old = create_probabilistic_trip_engine()
+        g = CompositionalPolicyGate(trip_engine=e_old)
+        g.check_chain([ChainStep("x")])
+        self.assertEqual(e_old.n_observations, 1)
+        e_new = create_probabilistic_trip_engine()
+        g.attach_trip_engine(e_new)
+        g.check_chain([ChainStep("x")])
+        # Old engine stays at 1; new engine advances to 1.
+        self.assertEqual(e_old.n_observations, 1)
+        self.assertEqual(e_new.n_observations, 1)
+
+    def test_allow_only_review_counts_as_trip(self) -> None:
+        """A chain held for chain review (ALLOW_ONLY_REVIEW) is a 'trip':
+        the gate says ALLOW but the loop should hold for operator review.
+        From the engine's perspective, anything != ALLOW is a trip.
+        """
+        e = create_probabilistic_trip_engine()
+        g = CompositionalPolicyGate(
+            max_sinks=2,
+            trip_engine=e,
+        )
+        g.register(VerbPolicy("a", TaintSource.TRUSTED, sinks=("a",)))
+        g.register(VerbPolicy("b", TaintSource.TRUSTED, sinks=("b",)))
+        g.register(VerbPolicy("c", TaintSource.TRUSTED, sinks=("c",)))
+        chain = [ChainStep("a"), ChainStep("b"), ChainStep("c")]
+        v = g.check_chain(chain)
+        self.assertEqual(v.action, ChainAction.ALLOW_ONLY_REVIEW)
+        self.assertEqual(e.n_observations, 1)
+        self.assertEqual(e.n_failure, 0)
+        self.assertEqual(e.n_success, 1)
+
+    def test_engine_band_reflects_chain_history(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = create_jadepuffer_demo_gate()
+        g.attach_trip_engine(e)
+        # 100 safe observations -> LOW band
+        for _ in range(100):
+            g.check_chain([ChainStep("read_env")])
+        # 50 jadepuffer chains -> MEDIUM or worse band
+        bad = [
+            ChainStep("read_env", TaintSource.INTERNAL),
+            ChainStep("http_post_external", TaintSource.EXTERNAL),
+            ChainStep("read_secret_store", TaintSource.SECRET),
+            ChainStep("http_post_external", TaintSource.EXTERNAL),
+        ]
+        for _ in range(50):
+            g.check_chain(bad)
+        # 50/150 = 33% trip rate, well above 20% -> CRITICAL band
+        self.assertIn(e.trip_band, {TripBand.HIGH, TripBand.CRITICAL})
+
+    def test_digest_propagates_to_history(self) -> None:
+        e = create_probabilistic_trip_engine()
+        g = create_jadepuffer_demo_gate()
+        g.attach_trip_engine(e)
+        g.check_chain([ChainStep("read_env")])
+        # Same chain -> same verdict digest
+        v1 = g.check_chain([ChainStep("read_env")])
+        self.assertEqual(v1.digest, g.last_chain_digest)
+        # The engine records the audit log's chained digest (the same one
+        # visible in g.audit_log[-1]["digest"]), so the engine's history
+        # is replay-linkable to the gate's audit log.
+        v2_digest = e.history[-1].detection_id
+        self.assertEqual(v2_digest, g.audit_log[-1]["digest"])
+        self.assertNotEqual(v2_digest, v1.digest)  # audit digest != verdict digest
+        self.assertTrue(len(v2_digest) == 64)  # sha256 hex
+
+    def test_replay_safety_with_engine(self) -> None:
+        """Replaying the same chain through the same gate should produce
+        identical digests and consistent engine state.
+        """
+        e = create_probabilistic_trip_engine()
+        g = create_jadepuffer_demo_gate()
+        g.attach_trip_engine(e)
+        chain = [ChainStep("read_env"), ChainStep("http_post_external")]
+        v1 = g.check_chain(chain, now=9999.0)
+        v2 = g.check_chain(chain, now=9999.0)
+        self.assertEqual(v1.digest, v2.digest)
+        # Two observations appended.
+        self.assertEqual(e.n_observations, 2)
+
+    def test_engine_unavailable_raises_on_attach(self) -> None:
+        """If the engine class is None (e.g., import was soft-failed),
+        attaching one should raise a clear error.
+        """
+        from core import compositional_policy as cp_mod
+        saved = cp_mod.ProbabilisticTripEngine
+        cp_mod.ProbabilisticTripEngine = None  # type: ignore[assignment]
+        try:
+            g = create_gate()
+            with self.assertRaises(RuntimeError):
+                g.attach_trip_engine(object())  # type: ignore[arg-type]
+        finally:
+            cp_mod.ProbabilisticTripEngine = saved  # type: ignore[assignment]
+
+    def test_engine_summary_is_jsonable(self) -> None:
+        import json
+        e = create_probabilistic_trip_engine()
+        g = create_jadepuffer_demo_gate()
+        g.attach_trip_engine(e)
+        for _ in range(10):
+            g.check_chain([ChainStep("read_env")])
+        state = g.trip_engine_state()
+        self.assertIsNotNone(state)
+        # Engine summary must be JSON-serializable for audit export.
+        blob = json.dumps(state)
+        self.assertIsInstance(blob, str)
+        self.assertGreater(len(blob), 0)
 
 
 # ===========================================================================

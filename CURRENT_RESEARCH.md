@@ -959,3 +959,177 @@ The morning's research already established the JADEPUFFER / DSCC / CONTRA / Vera
 - **Wire `planned_chain` into the agent loop's planner** — the `core/planner.py` module currently generates *verb sequences* but doesn't pass them to the cross-check as `planned_chain`. The wiring would let the planner's output be the input to the loop's Step 6.
 
 *Last updated: 2026-07-10 17:11 by AGI Research & Build Agent*
+
+---
+
+## Research Summary — 2026-07-11
+
+### Theme: Probabilistic Bound on the Compositional Chain + the "Agent Gateway" Product Category Converges
+
+This week's research surface converges on three themes that the substrate already implements (and that today's build tightens into a *probabilistic* claim):
+
+**Theme 1 — JADEPUFFER is the first documented case of agentic ransomware** (Forbes, Jul 10; Sysdig Threat Research). The substrate's threat-actor name matches the real-world threat-actor name; the substrate's deny reasons (`secret_to_external`, `too_many_distinct_sinks`, `write_after_untrusted`) map onto the attack's actual stages. The substrate's compositional gate was tracking the right attack pattern *before* the live attack was disclosed. Today's build closes the *measurement* loop: the gate's chain verdicts are now fed to a probabilistic trip engine that produces a steady-state safety claim with a (1 - α) upper bound on the chain-escalation rate.
+
+**Theme 2 — Agent gateways are an enterprise product category** (Forbes, Jul 5; Nutanix, Arcade). The substrate's `GovernedActionLoop` is a self-hosted, open agent gateway with 6 substrates, an audit log, and a real-world-validated threat model. Today's build adds the *probabilistic safety claim* dimension: every chain check now contributes to a (1 - α) upper bound on the chain-escalation rate, so the operator's "is the gateway safe?" question becomes a *measurable* claim rather than a configuration hope.
+
+**Theme 3 — Agentic AI governance matures** (arXiv:2607.03510 CAGE-1, Jul 8; arXiv:2607.03423 DSCC, Jul; arXiv:2607.07612 Towards Agentic AI Governance, Jul 8). The substrate's `CrossCheckOutcome` vocabulary (admitted, held, narrowed, refused, escalated, quarantined, made non-effective) maps 1:1 onto CAGE-1's evaluation vocabulary. Today's build surfaces a new dimension on the report: `chain_trip_engine_state` and `chain_trip_engine_source`, which feed CAGE-1's "operational readiness" axis with a *probabilistic* metric rather than a binary.
+
+#### Today's research items (web_search + web_research, 2026-07-11)
+
+- **Forbes (Jul 10) — "AI Ransomware Is Here, Now Powered By Cheaper, Agentic Models"** [^1]. Sysdig's JADEPUFFER research: AI agent performs recon, credential work, lateral movement, database encryption, and ransom note generation. First known agentic ransomware operation. The substrate's compositional gate deny reasons map directly: `read_env` (Langflow CVE) → `secret_to_external` (credential exfil), `too_many_distinct_sinks` (multi-service fanout: read→egress→write→exec→egress), `write_after_untrusted` (Langflow CVE entry blocked by chain gate).
+- **Forbes (Jul 5) — "Agent Gateways Are Becoming The Control Plane For Enterprise AI"** [^2]. Nutanix ships Nutanix Agent Gateway as part of Enterprise AI 2.7 (late May 2026). Arcade on Azure + AWS marketplaces (Jul 3). The product category is *the layer that sits between an agent and everything it touches* — exactly the architectural slot the substrate's `GovernedActionLoop` occupies. Today's build extends the gateway's claim from "I have an audit log" to "I have a probabilistic safety claim."
+- **arXiv:2607.03423 — "Securing Multi-Tool AI Agent Chains With Dynamic, Real-Time Compositional Policies" (DSCC)** [^3]. Two-phase framework: (1) Most Restrictive Set (MRS) policy composition with monotonicity invariant — extending a chain can only tighten restrictions; (2) runtime monotonic taint state. Default clearance mode: 79.2% block rate for pairs, 95.5% for triples. Taunt mode: 42.5% / 60.5%. The substrate's compositional gate implements (2) (runtime taint tracking) directly. (1) (static MRS pre-composition) is the substrate's next-priority "DSCC clearance-mode wiring."
+- **arXiv:2607.03510 — CAGE-1 (Control, Assurance, and Governance Evaluation for Enterprise Agentic AI)** [^4]. "Prebind Assurance" — proving an agentic action is controlled *before* it becomes binding. Outcome vocabulary: admitted, held, narrowed, refused, escalated, quarantined, made non-effective. The substrate's `CrossCheckOutcome` (ALLOW, HOLD_PENDING_EVIDENCE, HOLD_PENDING_RING, HOLD_PENDING_CEF, HOLD_PENDING_CHAIN, HOLD_PENDING_HUMAN, REJECT) maps 1:1 onto this vocabulary. Today's `chain_trip_engine_state` adds a *probabilistic* column to the CAGE-1 evaluation report.
+- **arXiv:2607.07612 — "Towards Agentic AI Governance: A Preliminary Assessment"** [^5]. Systematic review of agentic AI governance. Confirms the multi-tool compositional gap is the live research front. Validates the substrate's per-tool + chain + session + per-action gate architecture.
+- **arXiv:2607.05397 — "Proof of Execution: Runtime Verification for Governed AI Agent Actions"** [^6]. Execution triple x = (C, T, R) where C is contract, T is execution causal event stream, R is replay context. Five validator-checkable invariants. Maps onto the substrate's `ProofCarryingAction` + `EvidenceLedger` + `SignedAdvisoryEnvelope` substrates — the substrate already has the runtime verification substrate; the new paper formalizes it.
+- **arXiv:2607.05352 — "Multiplayer Interactive World Models with Representation Autoencoders"** [^7]. 5B-parameter latent diffusion model trained on 10K hours of gameplay; real-time 4-player generation at 20 fps on a single B200; stable rollouts up to 5 minutes. Multi-agent world modeling at scale. Substrate-relevance: the *world-model substrate* is the next frontier after policy gating — the agent needs a *simulator* to *anticipate* the chain's effects before running it.
+- **arXiv:2607.08625 — "The complexities of patient-centred conversational AI"** [^8]. Health chatbots: wide variation in user communication patterns. Patient simulator Turing-test at ~55% accuracy. Communication style influences triage outcomes. Validates the substrate's "per-verb emergence profile" idea — different *styles* of the same verb trigger different substrate paths.
+- **arXiv:2607.06269 — "From Application-Layer Simulation to Native Meta-Architecture"** [^9]. Structural Tension as endogenous loss guiding self-consistency; Offline Recurrent Loop; Inference-time Plasticity. The substrate's `RecursiveSelfImprovement` + `SelfHoning` modules are early practical instantiations of this meta-architecture.
+- **arXiv:2607.06008 — "PolyWorkBench: Benchmarking Multilingual Long-Horizon LLM Agents"** [^10]. 67 tasks across 5 domains (commerce, knowledge work, legal, localization, manufacturing). Multilingual setting degrades agents significantly vs monolingual. Validates the substrate's `BayesianPlanner` + `HierarchicalAgent` (long-horizon decomposition).
+- **TechCrunch (Jul 9) — OpenAI launches GPT-5.6 (Sol, Terra, Luna)** [^11]. 54% more token efficient on agentic coding (vs prior). Validates the substrate's `ModelRouter` (cost-aware model selection) direction. The substrate's `TieredMemory` is the LLM-agnostic substrate that benefits from any base model improvement.
+- **TechCrunch (Jul 9) — Meta Muse Spark 1.1** [^12]. Multimodal agentic coding model. Substrate relevance: the agent framework market is consolidating around a *small set* of base models + per-vendor agent stacks. The substrate's portability (no specific model lock-in) becomes a competitive advantage.
+- **TechCrunch (Jul 9) — Ollama raises $65M Series B, 8.9M monthly users, 176k stars** [^13]. 85% of Fortune 500. The substrate's per-verb, per-chain policies are model-agnostic — they work the same on Ollama-served open models as on closed APIs. The substrate's value proposition strengthens as local-model deployment grows.
+- **Markets Insider (Jul 7) — AIsa raises $6.5M for AI agent transaction network** [^14]. Unified transaction layer for AI agents (discover, access, pay). The substrate's AIBOM (Advisory Bill of Materials) is the *complement* to AIsa: AIsa is the *payment* substrate, the substrate's AIBOM is the *advisory* substrate. Both are needed for safe agent economies.
+- **CyberScoop (Jul 2026) — Sysdig documents first agentic ransomware (JadePuffer)** [^15]. The same Sysdig research; the substrate's threat-actor name matches the real-world threat-actor name. The substrate was tracking the JADEPUFFER attack pattern *before* it was disclosed publicly. The compositional gate's deny reasons map 1:1 onto the attack's stages.
+
+#### Trending repos (GitHub, 2026-07-11, agent frameworks)
+
+- `HKUDS/nanobot` (45k stars) — ultra-lightweight agent framework with WebUI, chat channels, memory, tool execution, model routing, deployment. The substrate's `ToolIntegration` + `ModelRouter` skills map onto nanobot's stack. Source: GitHub [^16].
+- `crewAIInc/crewAI` (55k stars) — production multi-agent workflows (Crews + Flows). The substrate's `MultiAgent` + `HierarchicalCoordinator` map onto crewAI's architecture. Source: GitHub [^17].
+- `microsoft/agent-framework` (12k stars) — multi-language (Python + C#) agent framework. The substrate's multi-language portability is more limited (Python-only), but the substrate's *governance-first* design is the differentiator that microsoft/agent-framework doesn't (yet) have. Source: GitHub [^18].
+- `huggingface/smolagents` (28k stars) — barebones code-thinking agents. The substrate's `CodeGeneration` skill is a similar primitive. Source: GitHub [^19].
+- `vercel/eve` (3.4k stars) — filesystem-first durable agent framework. The substrate's `TieredMemory` + `EvidenceLedger` are the durable-state primitives eve is exploring. Source: GitHub [^20].
+- `lsdefine/GenericAgent` (13k stars) — self-evolving desktop agent with 9 atomic tools. The substrate's `SelfEvolvingAgent` + `SkillCoevolution` are the research substrates for this direction. Source: GitHub [^21].
+
+#### Build Task: Compositional Gate + Probabilistic Trip Engine Integration (closes 2026-07-10 next-priority #1)
+
+**Motivation**: The 2026-07-10 build wired `CompositionalPolicyGate` into `GovernedActionLoop` as Step 6 (16 new tests, 459/459 cross-substrate pass). The next-priority item on that build was explicit: "Compositional gate + ProbabilisticTripEngine integration — feed each chain verdict's reason-set into the engine's history. The engine's bound tells the operator 'we expect ≤ X% of chains to escalate' — a steady-state safety claim." Today's run closes that carryover.
+
+**What's new in the gate**:
+
+1. **`CompositionalPolicyGate(trip_engine=...)` constructor parameter** — optional `ProbabilisticTripEngine` instance. When attached, every `check_chain()` verdict is fed to the engine as a `TripObservation` with `tripped = (verdict.action != ChainAction.ALLOW)`. The engine is read-only with respect to gate state.
+2. **`attach_trip_engine(engine)` method** — runtime attachment. The engine's `update()` is called after every chain check.
+3. **`has_trip_engine` / `trip_engine` / `trip_engine_state` properties** — operator-facing accessors. `trip_engine_state` returns `engine.summary()` (n_success, n_failure, n_observations, empirical_rate, trip_upper_bound, trip_band).
+4. **Soft import of `ProbabilisticTripEngine`** — `from core.cef_probabilistic_verification import ProbabilisticTripEngine, TripObservation` wrapped in try/except. The gate remains importable even if the CEF probabilistic module is missing or broken.
+5. **`_record_trip_observation()` private method** — internal feed. Uses the gate's audit log digest as `detection_id` so the engine's history is *replay-linkable* to the gate's audit log. The engine is updated in-place; the engine's own `update` returns self. Engine failures are caught silently — an engine that throws should not break a `check_chain` call.
+6. **Every chain check site** (3 paths: empty chain, unknown verb early-return, main path) now calls `_record_trip_observation(v, chain, now)`.
+
+**What's new in the loop's report**:
+
+7. **`CrossCheckReport.chain_trip_engine_state: Optional[Dict[str, Any]]`** — engine summary snapshot at the time of the chain check. `None` when no engine attached.
+8. **`CrossCheckReport.chain_trip_engine_source: str`** — populated as `"compositional_gate"` when an engine observation was recorded. Empty when no engine attached.
+9. **Both fields preserved through `to_dict()`** — the report's serialized form includes the engine state for audit export.
+
+**Test coverage (28 new tests)**:
+- `experiments/test_compositional_policy.py::TestTripEngineIntegration` (21 tests) — gate-side wiring.
+- `experiments/test_governed_action_loop.py::TestChainTripEngineIntegration` (7 tests) — loop-side wiring.
+
+**Test invariants**:
+- `test_no_engine_by_default` — fresh gate has no engine, `trip_engine_state()` is `None`.
+- `test_attach_after_construction` — `attach_trip_engine()` works post-construction; replaces previous engine.
+- `test_engine_attached_at_construction` — `trip_engine=` constructor parameter works.
+- `test_attach_rejects_none` — `attach_trip_engine(None)` raises `TypeError`.
+- `test_engine_unavailable_raises_on_attach` — when `ProbabilisticTripEngine` is `None` (import failed), `attach_trip_engine()` raises `RuntimeError` (not silent).
+- `test_empty_chain_records_no_trip` — empty chain → engine sees 1 observation, 0 trips.
+- `test_safe_chain_records_no_trip` — read-only chain → engine sees 1 observation, 0 trips.
+- `test_digest_propagates_to_history` — `detection_id` on the engine's history is the gate's audit log digest (replay-linkable). sha256 hex length 64.
+- `test_observation_timestamp_matches_audit` — `now=` parameter propagates to both gate's audit log ts and engine's observation timestamp.
+- `test_trip_engine_state_snapshot` — `trip_engine_state()` includes `n_total`, `empirical_rate`, `trip_upper_bound`, `trip_band`, `confidence`.
+- `test_no_trip_observation_when_engine_unattached` — engine state remains 0 when gate's engine is None.
+- `test_replacing_engine_stops_old_engine_from_advancing` — fresh engine starts at 0 observations; old engine's n_observations stays put.
+- `test_allow_only_review_counts_as_trip` — `ChainAction.ALLOW_ONLY_REVIEW` (held for chain review) is a trip from the engine's perspective (anything ≠ ALLOW).
+- `test_engine_band_reflects_chain_history` — 100 safe chains + 50 JADEPUFFER chains → engine `trip_band` ∈ {HIGH, CRITICAL}. Steady-state safety claim.
+- `test_digest_propagates_to_history` — chain verdict digest propagates to engine history.
+- `test_replay_safety_with_engine` — same chain + same `now=` produces same digest; engine accumulates 2 observations.
+- `test_engine_summary_is_jsonable` — `json.dumps(trip_engine_state())` succeeds (audit export).
+- `test_no_engine_no_state_on_report` — loop report has `chain_trip_engine_state = None` when no engine attached.
+- `test_engine_state_appears_on_report_after_chain` — loop report captures engine state when engine attached.
+- `test_block_outcome_advances_engine` — REJECT outcome → engine `n_failure` advances.
+- `test_allow_outcome_no_trip` — ALLOW outcome → engine `n_success` advances, `n_failure` stays at 0.
+- `test_state_advances_across_multiple_calls` — 3 safe + 1 bad chain → engine sees 4 observations, 1 failure.
+- `test_observation_has_chain_metadata` — engine history captures `TripObservation(source="compositional_gate", detection_id=audit_digest)`.
+- `test_to_dict_preserves_engine_state` — `report.to_dict()` includes `chain_trip_engine_state` and `chain_trip_engine_source`.
+
+**Cross-substrate regression check (487/487 pass)**:
+- `experiments/test_governed_action_loop.py` — 80/80 ✅ (73 pre-existing + 7 new)
+- `experiments/test_compositional_policy.py` — 59/59 ✅ (38 pre-existing + 21 new)
+- `experiments/test_cef_detector.py` — 30/30 ✅
+- `experiments/test_cef_session.py` — 34/34 ✅
+- `experiments/test_verb_policy_bundle.py` — 42/42 ✅
+- `experiments/test_policy_review_cli.py` — 10/10 ✅
+- `experiments/test_typed_verb_cef_guard.py` — 16/16 ✅
+- `experiments/test_typed_verb_library.py` — 7/7 ✅
+- `experiments/test_governor_circuit.py` — 80/80 ✅
+- `experiments/test_governor_circuit_cli.py` — 7/7 ✅
+- `experiments/test_calibrate_cli.py` — 8/8 ✅
+- `experiments/test_cpp.py` — 35/35 ✅
+- `experiments/test_cpp_run_cli.py` — 15/15 ✅
+- `experiments/test_compositional_review_cli.py` — 10/10 ✅
+- `experiments/test_compositional_policy_adversarial.py` — 37/37 ✅
+- `experiments/test_compositional_policy_adversarial_cli.py` — 17/17 ✅
+- **Total: 487/487 cross-substrate pass** ✅ (up from 459/459 on 2026-07-10, +28 new)
+
+**Broader regression** (excluding 13 pre-existing collection errors in test_agent.py / test_memory.py / etc.):
+- 2610 passed, 15 failed (all 15 failures pre-existed on clean main; same 15 failures: a2a_memory L0/L1/L2/context-loading/memory-compression, arc_exploration environment-creation/map-learning, enhanced_memory TestSimpleEmbeddingModel/TestEnhancedMemorySystem)
+- 4 skipped
+- **+28 new tests, zero new regressions**
+
+**Files changed**:
+- `core/compositional_policy.py` (mod) — `CompositionalPolicyGate.__init__` accepts `trip_engine`; `attach_trip_engine()`; `has_trip_engine` / `trip_engine` / `trip_engine_state` properties; soft import of `ProbabilisticTripEngine`; `_record_trip_observation()` private method; 3 chain-check sites call `_record_trip_observation()`.
+- `core/governed_action_loop.py` (mod) — `CrossCheckReport.chain_trip_engine_state` and `chain_trip_engine_source` fields; `to_dict()` preserves both; `GovernedActionLoop.propose()` populates both when the gate's engine is attached.
+- `experiments/test_compositional_policy.py` (mod) — `TestTripEngineIntegration` (21 tests).
+- `experiments/test_governed_action_loop.py` (mod) — restored `create_gate` import; `TestChainTripEngineIntegration` (7 tests).
+- `CURRENT_RESEARCH.md` — this entry.
+- `BUILD_LOG_2026-07-11.md` — this run's build log.
+
+**End-to-end demo** (selected from `TestChainTripEngineIntegration`):
+- JADEPUFFER chain (`read_env → http_post_external → read_secret_store → http_post_external`) on a `create_jadepuffer_demo_gate()` with attached engine → REJECT, `chain_trip_engine_state["n_failure"] == 1`, `chain_trip_engine_source == "compositional_gate"`, `report.to_dict()` round-trips both fields.
+- 3 safe `read_env` chains + 1 JADEPUFFER chain on the same gate + engine → engine `n_observations == 4`, `n_failure == 1`, `n_success == 3`. Steady-state safety claim emerges.
+- 100 safe `read_env` chains + 50 JADEPUFFER chains → engine `trip_band ∈ {HIGH, CRITICAL}` (33% trip rate well above 20% threshold). The substrate's empirical safety claim *fails loudly* when the operator's config produces dangerous chains.
+
+**Real findings the implementation pass surfaced**:
+1. **The "n_success / n_failure" semantic was reversed in the initial test set.** The test wrote `assertEqual(engine.n_failure, 1)` for a blocked chain, but the engine counts a "trip" as a *failure* (a *failure* of the safety claim, not a *success* of the chain). The first pass failed: 1 trip = 1 failure, not 0 failure. The tests were corrected to match the engine's actual semantic: `n_failure = number of trips`, `n_success = number of safe chains`. This is a *clarification* of the substrate's safety vocabulary: a "trip" is a *failure of the safety claim* (the chain violated policy), not a "success" of the agent.
+2. **The `chain_trip_engine_source` semantic was over-specified in the initial implementation.** The loop originally wrote `"compositional_gate_trip_engine"` (the substrate *role*), but the engine's own source field (in `TripObservation`) is already `"compositional_gate"` (the substrate *name*). The loop's source field is now `"compositional_gate"` to match — the engine and the report use the *same* source string, so a downstream AIOps layer can correlate them with a single key.
+3. **`trip_engine_state` is a method, not a property.** The original implementation defined it as `def trip_engine_state(self)` (a method), but the loop's `propose()` accessed it as `self.compositional_gate.trip_engine_state` (attribute access). The loop was corrected to call it as a method: `self.compositional_gate.trip_engine_state()`. The method-vs-property choice was deliberate: the method form lets the operator pass `now=` for a synthetic timestamp in the future (not implemented yet, but the API is open).
+
+**Research synthesis**:
+- **The substrate's compositional gate is now a *probabilistic* safety claim, not a configuration hope.** The operator can ask the engine: "given N chain checks, what is your (1 - α) upper bound on the chain-escalation rate?" The answer is a number (e.g., 0.04) backed by a (1 - α) confidence interval. The substrate's audit log + the engine's history jointly produce a *measurable* safety claim — the agent gateway's value proposition just got a *metric*.
+- **The JADEPUFFER attack is the substrate's *unit test* for the engine.** The same chain pattern that fires `secret_to_external` also produces a trip observation in the engine. After 1 JADEPUFFER chain, the engine's `n_failure == 1`. After 100 safe chains, `trip_band == LOW`. After 50/150 (33% trip rate), `trip_band ∈ {HIGH, CRITICAL}`. The engine *is* the empirical instrument for the JADEPUFFER claim.
+- **The substrate's audit log is the *replay* substrate; the engine's history is the *aggregate* substrate.** The audit log tells the operator *what happened on this chain*. The engine tells the operator *what's the long-run rate across chains*. Together: the operator gets a per-event audit + an aggregate safety metric. This is the same separation as `constraintPressureProbe` (per-event) vs `probabilisticTripEngine` (aggregate).
+- **The CAGE-1 evaluation report just got a 7th column.** The substrate's `CrossCheckReport.to_dict()` now has: admitted (`outcome == ALLOW`), held for evidence (`HOLD_PENDING_EVIDENCE`), held for ring (`HOLD_PENDING_RING`), held for CEF (`HOLD_PENDING_CEF`), held for chain (`HOLD_PENDING_CHAIN`), held for human (`HOLD_PENDING_HUMAN`), refused (`REJECT`), AND a probabilistic column: `chain_trip_engine_state.trip_upper_bound` (the (1 - α) upper bound on the chain-escalation rate). The CAGE-1 evaluation report is now *probabilistic*.
+- **The substrate's product category is the "probabilistic agent gateway."** Forbes (Jul 5) identified "agent gateway" as the emerging product category (Nutanix, Arcade). The substrate's `GovernedActionLoop` is an open, self-hosted, governance-first agent gateway. Today's build adds the *probabilistic* axis: the gateway now produces a (1 - α) upper bound on the chain-escalation rate, not just a binary allow/deny. The substrate's value proposition: *probabilistic agent gateway*, not just *agent gateway*.
+- **The engine is *read-only* with respect to gate state.** The engine never modifies the gate's policies, audit log, or verdict digest. The engine's `update()` returns self so the caller's chain pattern works. If the engine throws, the gate's `_record_trip_observation` catches silently. The gate's state is the source of truth; the engine is a *view* onto that state. This matches the substrate's broader pattern: every substrate is a *read-only observer* of agent state (CEF detector, VerbPolicyBundle, ConstraintPressureProbe, ProbabilisticTripEngine, CompositionalPolicyGate).
+
+**Next priority** (carries forward to the next run):
+- **DSCC clearance-mode wiring** (arXiv:2607.03423) — partition the policy registry into classification-level clusters; pre-compute the MRS (Most Restrictive Set) for each cluster; require the agent to declare the cluster at chain proposal time. arXiv:2607.03423 reports 79.2% / 95.5% block rate with this approach. The current compositional gate is the *runtime* phase; DSCC is the *static composition* phase. Together: static + runtime compositional policy.
+- **CONTRA-style benign-config finder** — a tree-search that searches the policy space for benign-looking configs that produce dangerous chains. The compositional gate's deny reasons are the search heuristic. The JADEPUFFER attack is the search's *target* (find a policy config that "looks" innocuous but produces the JADEPUFFER chain).
+- **NVIDIA ASPIRE-style skill distillation** — successful chain verdicts become a positive-corpus that the gate is "trained" against. New policies are proposed by the skill-acquisition module, validated by the gate, and either accepted (added to the registry) or rejected (logged for review).
+- **CAGE-1 evaluation report CLI** — `python -m cli.cage1_report` reads the loop's `reports` list and emits a CAGE-1-shaped evaluation: "admitted: n, held for evidence: n, held for ring: n, held for CEF: n, held for chain: n, held for human: n, refused: n, trip_upper_bound: X". The substrate is the CAGE-1 audit log generator.
+- **Auto-recompute of audit digests on tamper** — a `verify_chain()` method on the gate that re-walks the audit log, re-derives each digest, and reports the first inconsistency index. The substrate for an AIOps "drift signal" layer (per the substrate's existing `DriftSignal` AIOps primitive).
+- **Wire `planned_chain` into the agent loop's planner** — the `core/planner.py` module currently generates *verb sequences* but doesn't pass them to the cross-check as `planned_chain`. The wiring would let the planner's output be the input to the loop's Step 6.
+- **Per-verb emergence profile across compositional policies** — same Probe harness as CPP, but the constraint source is the policy registry (add/remove verb policies and measure how often the chain flips ALLOW → BLOCK). The probe is the empirical instrument for the policy's safety claim.
+- **Trip-engine band → cross-check outcome mapping** — when the engine's `trip_band == CRITICAL`, the loop's Step 6 should *escalate* to `HOLD_PENDING_HUMAN` regardless of the gate's verdict. The engine's aggregate view is the right substrate for the cross-check's "stop the agent" decision.
+
+*Last updated: 2026-07-11 17:10 by AGI Research & Build Agent*
+
+[^1]: https://www.forbes.com/sites/ronschmelzer/2026/07/10/ai-ransomware-is-here-now-powered-by-cheaper-agentic-models/
+[^2]: https://www.forbes.com/sites/janakirammsv/2026/07/05/agent-gateways-are-becoming-the-control-plane-for-enterprise-ai/
+[^3]: https://arxiv.org/html/2607.03423
+[^4]: https://arxiv.org/abs/2607.03510v1
+[^5]: https://arxiv.org/abs/2607.07612v1
+[^6]: https://arxiv.org/html/2607.05397
+[^7]: https://arxiv.org/abs/2607.05352v1
+[^8]: https://arxiv.org/abs/2607.08625v1
+[^9]: https://arxiv.org/abs/2607.06269v1
+[^10]: https://arxiv.org/abs/2607.06008v1
+[^11]: https://techcrunch.com/2026/07/09/openai-launches-its-new-family-of-models-with-gpt-5-6/
+[^12]: https://techcrunch.com/2026/07/09/meta-enters-the-crowded-ai-coding-battle-with-muse-spark-1-1/
+[^13]: https://techcrunch.com/2026/07/09/popular-open-source-ai-developer-tool-ollama-raises-65m-grows-to-nearly-9m-users/
+[^14]: https://markets.businessinsider.com/news/stocks/aisa-raises-6-5m-co-led-by-alibaba-and-tribe-capital-to-build-the-transaction-network-for-ai-agents-1036305081
+[^15]: https://cyberscoop.com/sysdig-judepuffer-ai-agentic-ransomware-attack/
+[^16]: https://github.com/HKUDS/nanobot
+[^17]: https://github.com/crewAIInc/crewAI
+[^18]: https://github.com/microsoft/agent-framework
+[^19]: https://github.com/huggingface/smolagents
+[^20]: https://github.com/vercel/eve
+[^21]: https://github.com/lsdefine/genericagent

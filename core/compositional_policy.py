@@ -4,7 +4,11 @@ Compositional policy gate (arXiv:2607.03423 DSCC-style, security-driven).
 The 2026-07-09 build closes a different gap than the per-verb
 VerbPolicyBundle. Per-verb policy is "is this single tool call
 permitted?". The compositional gap is: "is this *sequence* of tool
-calls safe even when each individual call passes its own check?".
+calls safe even when each individual call is permitted?". The 2026-07-10
+build wires the gate into GovernedActionLoop as Step 6. The 2026-07-11
+build feeds every chain verdict into a ProbabilisticTripEngine so the
+operator gets a steady-state safety claim ("we expect <= X% of chains
+to escalate") backed by a (1 - alpha) upper bound.
 
 This is the gap exploited by the 2026-07-01 JADEPUFFER incident
 (Sysdig Threat Research): an LLM agent chained read_env +
@@ -45,6 +49,23 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+# Soft import of the probabilistic trip engine substrate (added 2026-07-11).
+# The compositional gate feeds every chain verdict into a trip engine so the
+# operator gets a steady-state safety claim ("we expect <= X% of chains to
+# escalate") backed by a (1 - alpha) upper bound. The soft import keeps
+# compositional_policy.py usable even if the CEF probabilistic module is
+# missing or in a broken state (CEFDetectorAvailability-style fallback).
+try:  # pragma: no cover - exercised by import path
+    from core.cef_probabilistic_verification import (
+        ProbabilisticTripEngine,
+        TripObservation,
+    )
+    _TRIP_ENGINE_AVAILABLE = True
+except Exception:  # noqa: BLE001 - import-time isolation
+    ProbabilisticTripEngine = None  # type: ignore[assignment]
+    TripObservation = None  # type: ignore[assignment]
+    _TRIP_ENGINE_AVAILABLE = False
 
 
 # ===========================================================================
@@ -243,12 +264,122 @@ class CompositionalPolicyGate:
         default_unknown_policy: Optional[VerbPolicy] = None,
         max_sinks: int = DEFAULT_MAX_SINKS,
         audit_log: Optional[List[Dict[str, Any]]] = None,
+        trip_engine: Optional["ProbabilisticTripEngine"] = None,
     ) -> None:
         self._policies: Dict[str, VerbPolicy] = dict(policies or {})
         self._default_unknown = default_unknown_policy
         self._max_sinks = max(1, int(max_sinks))
         self._audit: List[Dict[str, Any]] = list(audit_log) if audit_log is not None else []
         self._last_chain_digest: str = ""
+        # Trip engine (optional, added 2026-07-11). When attached, every
+        # check_chain() verdict is fed to the engine as a TripObservation
+        # with tripped = (verdict.action != ChainAction.ALLOW). The engine
+        # is read-only with respect to gate state: the gate's policies,
+        # audit log, and verdict digest are all unaffected. The engine's
+        # update() returns self, so a caller can snapshot the engine
+        # state without touching the gate. The engine can also be
+        # attached after construction via attach_trip_engine().
+        if trip_engine is not None and ProbabilisticTripEngine is None:
+            raise RuntimeError(
+                "trip_engine was supplied but core.cef_probabilistic_verification "
+                "is not importable in this environment"
+            )
+        self._trip_engine = trip_engine
+
+    def attach_trip_engine(self, engine: "ProbabilisticTripEngine") -> None:
+        """Attach a probabilistic trip engine to this gate.
+
+        After attachment, every subsequent :meth:`check_chain` call will
+        emit a :class:`TripObservation` to the engine. This is the
+        steady-state safety monitor: the engine's ``trip_upper_bound``
+        is the operator's claim about the chain-escalation rate.
+
+        Parameters
+        ----------
+        engine : ProbabilisticTripEngine
+            The engine to feed. Must not be ``None``. To detach the
+            engine, set ``gate._trip_engine = None`` directly (intended
+            for test teardown only).
+
+        Raises
+        ------
+        TypeError
+            If ``engine`` is ``None``.
+        RuntimeError
+            If the trip-engine module is not importable in this
+            environment.
+        """
+        if engine is None:
+            raise TypeError("engine must be a ProbabilisticTripEngine, not None")
+        if ProbabilisticTripEngine is None:
+            raise RuntimeError(
+                "engine was supplied but core.cef_probabilistic_verification "
+                "is not importable in this environment"
+            )
+        self._trip_engine = engine
+
+    @property
+    def trip_engine(self) -> Optional["ProbabilisticTripEngine"]:
+        """The attached trip engine, or ``None`` if not attached."""
+        return self._trip_engine
+
+    @property
+    def has_trip_engine(self) -> bool:
+        return self._trip_engine is not None
+
+    def trip_engine_state(self) -> Optional[Dict[str, Any]]:
+        """Snapshot of the attached engine's state, or ``None``.
+
+        Returns ``None`` if no engine is attached. Otherwise returns
+        ``engine.summary()`` (n_success, n_failure, n_observations,
+        empirical_rate, trip_upper_bound, trip_band). Read-only.
+        """
+        if self._trip_engine is None:
+            return None
+        return self._trip_engine.summary()
+
+    def _record_trip_observation(self, v: ChainVerdict, chain: Sequence[ChainStep], now: Optional[float]) -> None:
+        """Feed a single verdict into the attached trip engine.
+
+        No-op when no engine is attached or when the trip engine module
+        is not importable. The mapping is:
+
+        - ``ChainAction.ALLOW`` -> TripObservation(tripped=False)
+        - everything else (BLOCK, ALLOW_ONLY_REVIEW, BLOCK_AND_ESCALATE) -> TripObservation(tripped=True)
+
+        The source string is ``"compositional_gate"`` so an AIOps layer
+        can distinguish gate-driven observations from per-output CEF
+        observations. ``detection_id`` is set to the chain digest when
+        available, so the engine's history is replay-linkable to the
+        gate's audit log.
+
+        The engine is updated in-place; the engine's own ``update``
+        returns self so the caller's chain pattern works. The gate's
+        state is not mutated.
+        """
+        if self._trip_engine is None or TripObservation is None:
+            return
+        tripped = v.action != ChainAction.ALLOW
+        # Use the audit log's chained digest if available (recorded just
+        # before this call), falling back to the verdict digest.
+        if self._audit:
+            detection_id = self._audit[-1].get("digest") or v.digest or None
+        else:
+            detection_id = v.digest if v.digest else None
+        obs = TripObservation(
+            tripped=tripped,
+            source="compositional_gate",
+            detection_id=detection_id,
+            session_digest=None,
+            timestamp=float(now) if now is not None else time.time(),
+        )
+        try:
+            self._trip_engine.update(obs)
+        except Exception:  # noqa: BLE001 - never let the engine crash the gate
+            # An engine that throws should not break a check_chain call.
+            # The operator can detect the breakage via the engine's own
+            # state (n_observations not advancing).
+            return
 
     def register(self, policy: VerbPolicy) -> None:
         if not policy.verb_name:
@@ -281,6 +412,7 @@ class CompositionalPolicyGate:
             v = ChainVerdict(action=ChainAction.ALLOW)
             v.digest = self._digest_verdict(v, chain)
             self._record_audit(v, chain, now)
+            self._record_trip_observation(v, chain, now)
             return v
 
         reasons: List[DenyReason] = []
@@ -307,6 +439,7 @@ class CompositionalPolicyGate:
                     )
                     v.digest = self._digest_verdict(v, chain)
                     self._record_audit(v, chain, now)
+                    self._record_trip_observation(v, chain, now)
                     return v
                 policy = self._default_unknown
 
@@ -414,6 +547,7 @@ class CompositionalPolicyGate:
         v.digest = self._digest_verdict(v, chain)
         self._last_chain_digest = v.digest
         self._record_audit(v, chain, now)
+        self._record_trip_observation(v, chain, now)
         return v
 
     # -----------------------------------------------------------------

@@ -222,6 +222,8 @@ class CrossCheckReport:
     chain_reasons: Tuple[str, ...] = ()
     chain_digest: str = ""
     chain_audit_index: int = -1
+    chain_trip_engine_state: Optional[Dict[str, Any]] = None
+    chain_trip_engine_source: str = ""  # populated when an engine observation was recorded
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -248,6 +250,12 @@ class CrossCheckReport:
             "chain_reasons": list(self.chain_reasons),
             "chain_digest": self.chain_digest,
             "chain_audit_index": self.chain_audit_index,
+            "chain_trip_engine_state": (
+                dict(self.chain_trip_engine_state)
+                if self.chain_trip_engine_state is not None
+                else None
+            ),
+            "chain_trip_engine_source": self.chain_trip_engine_source,
         }
 
 
@@ -907,6 +915,13 @@ class GovernedActionLoop:
             chain_audit_idx = (
                 len(self.compositional_gate.audit_log) - 1
             )
+            chain_trip_engine_state = None
+            chain_trip_engine_source = ""
+            if self.compositional_gate.has_trip_engine:
+                chain_trip_engine_state = (
+                    self.compositional_gate.trip_engine_state()
+                )
+                chain_trip_engine_source = "compositional_gate"
             if chain_verdict_obj.action == ChainAction.BLOCK_AND_ESCALATE:
                 return CrossCheckReport(
                     outcome=CrossCheckOutcome.REJECT,
@@ -930,6 +945,8 @@ class GovernedActionLoop:
                     chain_reasons=chain_reasons_list,
                     chain_digest=chain_digest_str,
                     chain_audit_index=chain_audit_idx,
+                    chain_trip_engine_state=chain_trip_engine_state,
+                    chain_trip_engine_source=chain_trip_engine_source,
                 )
             if chain_verdict_obj.action == ChainAction.ALLOW_ONLY_REVIEW:
                 return CrossCheckReport(
@@ -955,6 +972,8 @@ class GovernedActionLoop:
                     chain_reasons=chain_reasons_list,
                     chain_digest=chain_digest_str,
                     chain_audit_index=chain_audit_idx,
+                    chain_trip_engine_state=chain_trip_engine_state,
+                    chain_trip_engine_source=chain_trip_engine_source,
                 )
 
         # All four substrates agree.  If the bridge originally said
@@ -1003,6 +1022,8 @@ class GovernedActionLoop:
                 "chain_reasons": chain_reasons_list,
                 "chain_digest": chain_digest_str,
                 "chain_audit_index": chain_audit_idx,
+                "chain_trip_engine_state": chain_trip_engine_state,
+                "chain_trip_engine_source": chain_trip_engine_source,
             }
             detail["compositional_chain"] = chain_report_data
         return CrossCheckReport(

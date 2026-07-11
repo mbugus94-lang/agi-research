@@ -93,6 +93,10 @@ from core.compositional_policy import (
     create_gate,
     create_jadepuffer_demo_gate,
 )
+from core.cef_probabilistic_verification import (
+    create_probabilistic_trip_engine,
+    TripObservation,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -1214,6 +1218,146 @@ class TestCompositionalGateIntegration(unittest.TestCase):
         # Empty chain is vacuously safe -> chain check returns ALLOW.
         self.assertEqual(report.outcome, CrossCheckOutcome.ALLOW)
         self.assertEqual(report.chain_verdict["action"], ChainAction.ALLOW.value)
+
+
+
+
+# ===========================================================================
+# Compositional gate + probabilistic trip engine integration
+# ===========================================================================
+
+class TestChainTripEngineIntegration(unittest.TestCase):
+    """Tests for the chain gate's probabilistic trip engine integration.
+
+    When a CompositionalPolicyGate is attached to a ProbabilisticTripEngine
+    (via attach_trip_engine or the constructor), every chain check appends
+    a TripObservation to the engine's history. The GovernedActionLoop
+    surfaces the engine's post-check state on the CrossCheckReport as
+    chain_trip_engine_state and chain_trip_engine_source.
+    """
+
+    def test_no_engine_no_state_on_report(self) -> None:
+        """If the gate has no engine, chain_trip_engine_state is None
+        and chain_trip_engine_source is None.
+        """
+        gate = create_jadepuffer_demo_gate()
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [ChainStep("read_env")]
+        _, _, report = loop.propose(req)
+        self.assertIsNone(report.chain_trip_engine_state)
+        self.assertEqual(report.chain_trip_engine_source, "")
+
+    def test_engine_state_appears_on_report_after_chain(self) -> None:
+        """If the gate has an engine, the report captures its state."""
+        engine = create_probabilistic_trip_engine()
+        gate = create_jadepuffer_demo_gate()
+        gate.attach_trip_engine(engine)
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [ChainStep("read_env")]
+        _, _, report = loop.propose(req)
+        # Engine has one observation from the chain check.
+        self.assertIsNotNone(report.chain_trip_engine_state)
+        self.assertEqual(report.chain_trip_engine_state["n_total"], 1)
+        self.assertEqual(report.chain_trip_engine_source, "compositional_gate")
+
+    def test_block_outcome_advances_engine(self) -> None:
+        """A blocked chain records a trip in the engine."""
+        engine = create_probabilistic_trip_engine()
+        gate = create_jadepuffer_demo_gate()
+        gate.attach_trip_engine(engine)
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [
+            ChainStep("read_env", TaintSource.INTERNAL),
+            ChainStep("http_post_external", TaintSource.EXTERNAL),
+            ChainStep("read_secret_store", TaintSource.SECRET),
+            ChainStep("http_post_external", TaintSource.EXTERNAL),
+        ]
+        _, _, report = loop.propose(req)
+        self.assertEqual(report.outcome, CrossCheckOutcome.REJECT)
+        # Engine has one trip observation.
+        self.assertEqual(report.chain_trip_engine_state["n_total"], 1)
+        # engine n_failure is the NON-trip count; n_success is the trip count.
+        self.assertEqual(report.chain_trip_engine_state["n_failure"], 0)
+        self.assertEqual(report.chain_trip_engine_state["n_success"], 1)
+
+    def test_allow_outcome_no_trip(self) -> None:
+        """An allowed chain records a non-trip."""
+        engine = create_probabilistic_trip_engine()
+        gate = create_gate(
+            policies={"read": VerbPolicy("read", TaintSource.INTERNAL, sinks=("read",))}
+        )
+        gate.attach_trip_engine(engine)
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [ChainStep("read")]
+        _, _, report = loop.propose(req)
+        self.assertEqual(report.outcome, CrossCheckOutcome.ALLOW)
+        self.assertEqual(report.chain_trip_engine_state["n_total"], 1)
+        # engine n_failure is the NON-trip count; n_success is the trip count.
+        self.assertEqual(report.chain_trip_engine_state["n_failure"], 1)
+        self.assertEqual(report.chain_trip_engine_state["n_success"], 0)
+
+    def test_state_advances_across_multiple_calls(self) -> None:
+        """The engine accumulates observations across multiple propose() calls."""
+        engine = create_probabilistic_trip_engine()
+        gate = create_jadepuffer_demo_gate()
+        gate.attach_trip_engine(engine)
+        loop = GovernedActionLoop(compositional_gate=gate)
+        # 3 safe chains + 1 bad chain
+        bad = [
+            ChainStep("read_env", TaintSource.INTERNAL),
+            ChainStep("http_post_external", TaintSource.EXTERNAL),
+            ChainStep("read_secret_store", TaintSource.SECRET),
+            ChainStep("http_post_external", TaintSource.EXTERNAL),
+        ]
+        for _ in range(3):
+            req = _make_request(action_type="read")
+            req.planned_chain = [ChainStep("read_env")]
+            loop.propose(req)
+        req = _make_request(action_type="read")
+        req.planned_chain = bad
+        loop.propose(req)
+        # Engine has 4 observations total. In the engine, n_success
+        # is the trip count (i.e. n of ChainAction != ALLOW) and
+        # n_failure is the non-trip count.
+        self.assertEqual(engine.n_observations, 4)
+        self.assertEqual(engine.n_success, 1)
+        self.assertEqual(engine.n_failure, 3)
+
+    def test_observation_has_chain_metadata(self) -> None:
+        """The engine's history captures a TripObservation with chain context."""
+        engine = create_probabilistic_trip_engine()
+        gate = create_jadepuffer_demo_gate()
+        gate.attach_trip_engine(engine)
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [ChainStep("read_env")]
+        loop.propose(req)
+        last = engine.history[-1]
+        self.assertIsInstance(last, TripObservation)
+        self.assertEqual(last.source, "compositional_gate")
+        self.assertFalse(last.tripped)
+        self.assertIsNotNone(last.detection_id)
+        # detection_id is the gate's audit log digest (content-addressed)
+        self.assertEqual(last.detection_id, gate.audit_log[-1]["digest"])
+
+    def test_to_dict_preserves_engine_state(self) -> None:
+        """to_dict on the report includes the engine state."""
+        engine = create_probabilistic_trip_engine()
+        gate = create_jadepuffer_demo_gate()
+        gate.attach_trip_engine(engine)
+        loop = GovernedActionLoop(compositional_gate=gate)
+        req = _make_request(action_type="read")
+        req.planned_chain = [ChainStep("read_env")]
+        _, _, report = loop.propose(req)
+        d = report.to_dict()
+        self.assertIn("chain_trip_engine_state", d)
+        self.assertIn("chain_trip_engine_source", d)
+        self.assertEqual(d["chain_trip_engine_source"], "compositional_gate")
+        self.assertEqual(d["chain_trip_engine_state"]["n_total"], 1)
 
 
 if __name__ == "__main__":
