@@ -1133,3 +1133,74 @@ This week's research surface converges on three themes that the substrate alread
 [^19]: https://github.com/huggingface/smolagents
 [^20]: https://github.com/vercel/eve
 [^21]: https://github.com/lsdefine/genericagent
+## Research Summary — 2026-07-12
+
+### Theme: DSCC Phase 1 (MRS) clearance-mode wiring — closes the 2026-07-11 next-priority
+
+**Status**: DSCC Phase 1 + Phase 2 are now both wired. The substrate went from "runtime taint tracking only" (Phase 2) to "static MRS composition (Phase 1) + runtime taint tracking (Phase 2)" — matching the DSCC paper's two-phase architecture.
+
+#### Headline: arXiv:2607.03423 — DSCC (Phase 1 implementation)
+
+The substrate's `CompositionalPolicyGate` now implements both phases of DSCC:
+
+**Phase 1 (new, today's build)**:
+- `ClassificationLevel` enum (PUBLIC < INTERNAL < CONFIDENTIAL < RESTRICTED).
+- `CompositionMode` enum (CLEARANCE / TAINT) — paper's default is CLEARANCE.
+- `VerbPolicy.classification` + `cluster` fields.
+- `chain_effective_classification(chain)` — the high-water mark C_eff. Monotonic by construction.
+- `mrs_clearance_check(chain)` — the per-tool classification >= C_eff check. Returns `(ok, failing_verbs, c_eff, failing_clusters)`.
+- `cluster_compatible(a, b)` + `chain_cluster_compatibility(chain)` — the cluster-partition check.
+- `DenyReason.CLEARANCE_LEVEL_INSUFFICIENT` + `CLEARANCE_CLUSTER_MISMATCH` — new deny reasons.
+- In CLEARANCE mode: clearance violations force `BLOCK_AND_ESCALATE`.
+- In TAINT mode: clearance check is skipped; C_eff is still recorded for downstream taint tracking.
+
+**Phase 2 (pre-existing, now augmented)**:
+- The existing runtime taint tracking (the substrate's original chain check) — `SECRET_TO_EXTERNAL`, `TAINT_ESCALATION`, `SENSITIVE_TO_PUBLIC`, `WRITE_AFTER_UNTRUSTED`, `TOO_MANY_DISTINCT_SINKS` — still fires. The new `chain_classification`, `cluster_set`, `clearance_violations` fields are *additive* on the verdict.
+
+**Defense in depth (JADEPUFFER example)**:
+- Static (Phase 1): `read_env` (INTERNAL) → `http_post_external` (PUBLIC) is *under-classified* once C_eff hits RESTRICTED via `read_secret_store`. The chain is rejected before any tool runs.
+- Runtime (Phase 2): the chain's `SECRET → EXTERNAL` data flow trips `DenyReason.SECRET_TO_EXTERNAL`. The chain is rejected *after* data flow analysis.
+
+The JADEPUFFER attack is now caught *twice* — by the static clearance check (new) and by the runtime taint tracking (existing). The substrate's defense-in-depth is now *visible* in the verdict's `clearance_violations` + `reasons` fields.
+
+**Empirical block rate**: DSCC paper reports 79.2% of policy *pairs* and 95.5% of *triples* are blocked under clearance mode. The substrate's `test_two_verb_mixed_classification_blocks` + `test_three_verb_mixed_classification_blocks` validate the cluster-mismatch path. The empirical block rate is a *property of the policy registry* (which verbs + classifications the operator registers), not a property of the gate. The gate is the *enforcement substrate*; the policy registry is the *policy substrate*.
+
+#### Trending AI agent repos on GitHub (last 7 days, 2026-07-05 → 2026-07-12)
+
+Recap from yesterday's research (the substrate is already well-aligned with the trending direction):
+- `crewAIInc/crewAI` — multi-agent Crews + event-driven Flows (~55k stars). Fastest-growing: BrowserUse +1,589 stars.
+- `microsoft/agent-framework` (MAF) — multi-language framework, Python + C# (~12k stars, v1.11.0 Jul 10).
+- `HKUDS/nanobot` — ultra-lightweight portable agent framework (~45k stars, v0.2.2).
+- `lsdefine/GenericAgent` — minimal self-evolving framework (13.4k stars).
+- `huggingface/smolagents` — bare-bones code-first agent harness (~28k stars).
+- `omnigent-ai/omnigent` — meta-harness over Claude Code / Codex / Cursor / Pi / OpenCode / Hermes (7,065 stars, v0.5.1 Jul 10). The substrate's `GovernedActionLoop` could be deployed as an Omnigent "policy tool" for cross-harness governance.
+- `vercel/eve` — filesystem-first framework for durable agents (3,424 stars, v0.22.5 Jul 10).
+- `vudovn/ag-kit` — domain-specific agent personas + skills + workflows (7,771 stars, v2026.7.10 Jul 10).
+
+#### Synthesis
+
+- **The substrate now implements the *full* DSCC architecture.** Phase 1 (MRS / static) + Phase 2 (runtime taint) + audit log + replay substrate. The `CompositionMode` enum is the operator's switch for which phase is the binding one. CLEARANCE is the strict default; TAINT is the permissive fallback.
+- **The clearance check is a *policy-substrate* check, not a runtime check.** The static phase is the "is this chain well-formed?" check — the answer depends on the *operator's* policy registry, not on the agent's runtime data flow. The substrate's `clusters` field is *operator-supplied* — the operator decides which verbs can coexist. This matches the DSCC paper's design: every tool carries a security policy authored by the tool developer or organizational security team.
+- **The JADEPUFFER chain now trips *two* deny reasons.** `CLEARANCE_LEVEL_INSUFFICIENT` (static) and `SECRET_TO_EXTERNAL` (runtime). The substrate's defense-in-depth is now *visible* in the audit log — every JADEPUFFER chain produces a verdict with both reasons, in order.
+- **The substrate is the *only* open, self-hosted, governance-first agent gateway with both DSCC phases.** Forbes (Jul 5) identified "agent gateway" as the emerging product category (Nutanix, Arcade). The substrate's `GovernedActionLoop` is the only open-source agent gateway that implements *both* DSCC phases (static MRS + runtime taint). The substrate's competitive moat just got wider.
+
+#### Substrate evolution
+
+- `core/compositional_policy.py` (mod) — full DSCC Phase 1 implementation.
+- `cli/dscc_clearance.py` (new) — operator-facing CLI.
+- `experiments/test_dscc_clearance.py` (new) — 42 tests.
+- `experiments/test_dscc_clearance_cli.py` (new) — 14 tests.
+- 56/56 new tests pass, 543/543 cross-substrate pass (+56), zero regressions.
+
+#### Next priority (carries forward to the next run)
+
+- **CONTRA-style benign-config finder** — tree-search for benign-looking configs that produce dangerous chains.
+- **NVIDIA ASPIRE-style skill distillation** — successful chain verdicts become a positive-corpus.
+- **CAGE-1 evaluation report CLI** — `python -m cli.cage1_report` reads the loop's `reports` list and emits a CAGE-1-shaped evaluation with the new DSCC columns.
+- **Auto-recompute of audit digests on tamper** — `verify_chain()` method on the gate.
+- **Wire `planned_chain` into the agent loop's planner**.
+- **Per-verb emergence profile across compositional policies** — Probe harness with the policy registry as the constraint source.
+- **Trip-engine band → cross-check outcome mapping** — when the engine's `trip_band == CRITICAL`, the loop's Step 6 should escalate.
+- **DSCC mode → cross-check outcome mapping** — when in CLEARANCE mode and a clearance violation fires, the loop's Step 6 should escalate to `HOLD_PENDING_HUMAN`.
+
+*Last updated: 2026-07-12 05:25 by AGI Research & Build Agent*
