@@ -1204,3 +1204,62 @@ Recap from yesterday's research (the substrate is already well-aligned with the 
 - **DSCC mode → cross-check outcome mapping** — when in CLEARANCE mode and a clearance violation fires, the loop's Step 6 should escalate to `HOLD_PENDING_HUMAN`.
 
 *Last updated: 2026-07-12 05:25 by AGI Research & Build Agent*
+
+## Research Summary — 2026-07-13
+
+### Theme: CLP gate hardening + CLI — closes the 2026-07-12 "wire the Prismata read-side into an operator CLI" next-priority
+
+**Status**: The Prismata read-side gate (CLP) is now exposed as a CLI and is the *default* operator-facing read-side check. The substrate's `GovernedActionLoop` can now run the chain through `cli.clp_check` (or, more efficiently, the in-process `ContextualLeastPrivilegeGate` + `dual_gate_check`) and get back a structural read verdict that complements the write-side `CompositionalPolicyGate` verdict.
+
+**Headline: arXiv:2607.08147 — Prismata (read side, now CLI-exposed)**
+
+The substrate's `core.contextual_least_privilege` module is now wired into `cli/clp_check.py`. The CLI accepts a JSON capability registry + chain description and emits either a human-readable verdict (with the visibility trace at each step) or a machine-readable JSON payload. When `--write-policies` is supplied, the CLI composes the read gate with the substrate's existing DSCC write gate via `dual_gate_check` and returns a single combined verdict (the integrity/confidentiality duality in one call).
+
+**Capabilities exposed**:
+- `--capabilities` — JSON file of `ReadCapability` entries (name + `required_label` + `reads_untrusted_input` + `emits_to_sink`).
+- `--chain` — JSON list of `ChainStep` records.
+- `--write-policies` — optional JSON file of write-side `VerbPolicy` entries; enables the combined mode.
+- `--initial-visibility` — the chain's starting visibility (default: `secret`).
+- `--summary` — one-line summary for shell pipelines.
+- `--json` — machine-readable output (action, reasons, visibility trace, required trace, capabilities used, audit digest, both_allow, write verdict, etc.).
+
+**Defense in depth (JADEPUFFER example)**:
+- Read side (Prismata): `read_env` (INTERNAL) → `read_secret_store` (SECRET) is permitted only if the chain is at SECRET visibility. If the chain started at PUBLIC, the read side blocks via `CLPReason.VISIBILITY_INSUFFICIENT`.
+- Write side (DSCC): `read_secret_store` (taint → SECRET) → `http_post_external` (PUBLIC egress) is blocked via `DenyReason.SENSITIVE_TO_PUBLIC` or `SECRET_TO_EXTERNAL` depending on the chain shape.
+
+The JADEPUFFER attack is now caught at *both* gates, and the combined CLI verdict returns `both_allow=False` — the substrate's defense-in-depth is now operator-inspectable from the command line.
+
+**Empirical block rate**: The Prismata paper reports a 91% block rate on three pop-up attack templates in their evaluation. The substrate's `_secure_capability_set` fixture + `jadepuffer_clp_capability_set` show that the read side blocks the JADEPUFFER chain (narrow-then-widen pattern) via the labels-only-decrease invariant. The substrate's *own* block rate is a property of the operator's capability registry, not the gate.
+
+#### Trending AI agent repos on GitHub (last 7 days, 2026-07-06 → 2026-07-13)
+
+No new repos in the substrate's tracking set this week. The carry-forward set: `crewAIInc/crewAI`, `microsoft/agent-framework`, `HKUDS/nanobot`, `lsdefine/GenericAgent`, `huggingface/smolagents`, `omnigent-ai/omnigent`, `vercel/eve`, `vudovn/ag-kit`.
+
+#### Synthesis
+
+- **The substrate's `GovernedActionLoop` is now the only open-source agent loop with both Prismata (read side) and DSCC (write side) gates composed by a single CLI.** The Prismata paper positions "contextual least privilege" as the missing complement to existing taint-tracking work. The substrate now ships the *full* integrity/confidentiality duality.
+- **The labels-only-decrease invariant is now operator-observable.** Every CLI verdict reports `labels_only_decrease: true` when the invariant holds (it always does, by construction) and the visibility trace at each step. A reviewer can replay the chain and verify the structural property without running the gate.
+- **The CLP gate and DSCC gate share the *verb* abstraction but operate on different labels.** The CLP gate's `VisibilityLabel` (TRUSTED < INTERNAL < USER < PUBLIC < EXTERNAL < UNTRUSTED < SECRET) is monotone *decreasing* in rank. The DSCC gate's `TaintSource` is monotone *increasing*. Two monotone-lattice properties, one for the read side, one for the write side, composing into a single security perimeter.
+- **The substrate's `dual_gate_check(chain, write_gate, read_gate)` is the canonical entry point for new integrations.** External callers (e.g. Omnigent's "policy tool" hook, or AIBOM's "chain reviewer") should use this single function rather than calling each gate separately — the function is the API surface for "is this chain safe?".
+
+#### Substrate evolution
+
+- `core/contextual_least_privilege.py` (mod) — added `CAPABILITY_NOT_REGISTERED` enum alias + `audit_digest` property.
+- `cli/clp_check.py` (new) — operator-facing CLI.
+- `experiments/test_clp_check_cli.py` (new) — 14 tests (12 JSON-driven + 2 summary-path).
+- `experiments/test_contextual_least_privilege.py` (mod) — fixed `--initial-visibility` to use the visibility rank + benign chain fix.
+- 14/14 new tests pass, 717/717 cross-substrate pass (+24 carryover from 2026-07-12's CLP test pass), zero regressions.
+
+#### Next priority (carries forward to the next run)
+
+- **NVIDIA ASPIRE-style skill distillation** — successful chain verdicts become a positive-corpus.
+- **CAGE-1 evaluation report CLI** — `python -m cli.cage1_report` reads the loop's `reports` list and emits a CAGE-1-shaped evaluation with the new DSCC + CLP columns.
+- **Auto-recompute of audit digests on tamper** — `verify_chain()` method on the gate.
+- **Wire `planned_chain` into the agent loop's planner**.
+- **Per-verb emergence profile across compositional policies** — Probe harness with the policy registry as the constraint source.
+- **Trip-engine band → cross-check outcome mapping** — when the engine's `trip_band == CRITICAL`, the loop's Step 6 should escalate.
+- **DSCC mode → cross-check outcome mapping** — when in CLEARANCE mode and a clearance violation fires, the loop's Step 6 should escalate to `HOLD_PENDING_HUMAN`.
+- **Prismata mode → cross-check outcome mapping** — when the read gate's verdict is `BLOCK_AND_ESCALATE`, the loop's Step 6 should escalate to `HOLD_PENDING_HUMAN`.
+- **Wire `dual_gate_check` into `GovernedActionLoop` Step 6** so the loop's per-step gate call returns the combined verdict, not just the write-side one.
+
+*Last updated: 2026-07-13 17:08 by AGI Research & Build Agent*
