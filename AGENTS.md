@@ -6391,3 +6391,67 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 - **Calibration tooling** (carried): `cli/calibrate.py` takes baseline trip rate and prints recommended `alpha_prior` / `beta_prior`.
 - **Adversarial gate test pass**: 20 synthetic histories — small-N all-trip, band-edge cases, recovery after horizon crossing, multi-session without reset, mid-warmup trip suppression verification.
 - **`detect_cef_session()` engine passthrough** (carried from 2026-06-25): add optional `probabilistic_engine` parameter to the end-to-end convenience.
+
+### 2026-07-14 - Scheduled Run: CAGE-1 Evaluation Module + CLI (arXiv:2607.03510)
+
+**Build summary**: `core/cage1_evaluation.py` (721 lines) + `cli/cage1_report.py` (181 lines) + `experiments/test_cage1_evaluation.py` (717 lines, 65 tests). 65/65 new tests pass. 980 cross-substrate tests pass. Zero regressions. Closes the 2026-07-10 next-priority ("CAGE-1 evaluation report CLI").
+
+**The CAGE-1 evaluation surface**:
+- `CAGE1Evaluation` dataclass with 7 dimensions (5 substrate-covered: authority/policy, tool_safety, auditability, conflict_handling, operational_readiness; 2 future-work: retrieval_quality, memory_integrity).
+- `OutcomeDistribution` covers CAGE-1's 8 outcome states (admitted, held_for_evidence, narrowed_for_ring, narrowed_for_chain, quarantined_for_cef, escalated, refused, made_non_effective) — mapped 1:1 from the substrate's `CrossCheckOutcome` enum.
+- `OperationalReadinessMetrics` carries the `chain_trip_engine_state.trip_upper_bound` mean/max + breaker-opens + CEF-quarantine counts.
+- `report_digest` is a stable SHA-256 of (label + sorted outcome counts + sorted dim keys) so two equivalent evaluations have the same digest.
+
+**The CLI** (`cli/cage1_report.py`):
+- `--demo [--demo-actions N --demo-seed S --include-breach]` — drives a real `GovernedActionLoop` through N synthetic actions, evaluates the reports.
+- `--audit-log PATH` — reads a JSONL audit log of report rows and evaluates. The substrate's `CrossCheckReport.to_dict()` rows are forward-compatible.
+- `--format {markdown,json,both}` — markdown on stdout, JSON on stderr; pipeable.
+- `--exit-on-escalation` / `--exit-on-refusal` — CI integration: non-zero exit when an escalation or refusal is observed.
+
+**Test coverage**: 65/65 in `experiments/test_cage1_evaluation.py`:
+- TestOutcomeMapping (3): every `CrossCheckOutcome` -> CAGE-1 state; bidirectional round-trip; reverse-lookup.
+- TestOutcomeDistribution (3): all-zero, total counter, to_dict ordering.
+- TestDimensionScore (5): future-work is "not_measured"; substrate-covered with no observations; mixed outcomes; round-trip; score computation.
+- TestOperationalReadiness (4): empty input, breaker-open count, mean/max trip bound, CEF-quarantine count.
+- TestEvaluateReports (5): empty list, single ALLOW, single REJECT, mixed outcomes, dict vs CrossCheckReport acceptance.
+- TestReportDigest (3): stability, sensitivity to label/counts/dimensions.
+- TestSubstrateAttribution (4): inferred substrates from row keys, explicit override, all-key shapes, future-work is empty.
+- TestSyntheticSession (5): N actions produces N reports (or fewer on propose errors), seed deterministic, include_breach flag, all rows have `outcome`, loop is real (no mocks).
+- TestLoadReportsFromJSONL (4): valid file, blank lines skipped, malformed lines skipped, non-dict lines skipped.
+- TestRowToCAGE1State (3): direct CAGE-1 state field wins, outcome string lookup, every state has a reverse outcome.
+- TestExports (1): `__all__` covers the public surface.
+- TestAdversarial (8): empty distribution; digest is order-stable; invalid outcome string -> REJECT fallback; JSONL malformed skip; round-trip through every CAGE-1 state; single-REJECT distribution; non-dict row raises TypeError; substrate attribution handles all 6 keys.
+- TestCLIDemo (5): --demo --label prints valid markdown header, --include-breach changes the count, --exit-on-escalation returns 1 on escalation, --exit-on-refusal returns 0 when no refusals, --format json puts JSON on stderr.
+- TestCLIJSONL (3): --audit-log reads + evaluates; missing path returns 2; empty file produces empty distribution.
+- TestCLIFormat (2): --format markdown vs json vs both work; markdown output is non-empty and starts with "# CAGE-1 Evaluation".
+- TestFutureWorkDimensions (3): both future-work dimensions report "not_measured"; substrate_coverage=5/7; notes explain the gap.
+
+**Cross-substrate regression check** (substrate tests adjacent to CAGE-1):
+- `experiments/test_governed_action_loop.py` — pass ✅
+- `experiments/test_positive_verdict_corpus.py` — pass ✅
+- `experiments/test_clp_check_cli.py` — pass ✅
+- `experiments/test_compositional_policy.py` — pass ✅
+- `experiments/test_governor_circuit.py` — pass ✅
+- `experiments/test_drift_signal.py` — pass ✅
+- `experiments/test_aibom_advisory.py` — pass ✅
+- `experiments/test_signed_advisory_envelope.py` — pass ✅
+- **980 cross-substrate tests pass with zero regressions.** The 15 pre-existing `test_self_evolving_agent.py` failures are unrelated to this build (verified by `git stash` baseline test before/after).
+
+**Files changed**:
+- `core/cage1_evaluation.py`: 721 lines (new) — module
+- `cli/cage1_report.py`: 181 lines (new) — CLI
+- `experiments/test_cage1_evaluation.py`: 717 lines (new) — 65 tests
+- `core/__init__.py`: +22 lines — exports (CAGE1Dimension, CAGE1Evaluation, build_synthetic_session, evaluate_reports, etc.)
+- `CURRENT_RESEARCH.md`: 2026-07-14 CAGE-1 research entry appended
+- `BUILD_LOG_2026-07-14-CAGE1.md`: build log (this file's sibling)
+- `AGENTS.md`: this build log entry
+
+**Next priority**:
+- **Retrieval-quality dimension** — substrate's `EvidenceLedger` knows about claim validation. A CAGE-1 dimension that maps `ledger_supported_count / ledger_total_count -> dimension score` is the natural extension. The ledger's existing `verify_chain()` is the substrate.
+- **Memory-integrity dimension** — `core/tiered_memory.py` + `core/enhanced_memory.py` already expose per-tier retention. A dimension that measures "did the agent's memory reflect this turn's evidence?" is the natural fit. CAGE-1's "memory integrity" criterion is the operator's question.
+- **PVC (Positive Verdict Corpus) integration** — wire `n_positive_verdict_skill_matches` into the synthetic driver: when an admitted action matches a known skill shape, increment the counter. The CAGE-1 evaluation becomes a *negative-AND-positive* report.
+- **Per-verb CAGE-1 distribution** — break the outcome distribution by verb namespace. A bundle with `pay` 80% admitted + `read` 95% admitted is a *better* CAGE-1 evaluation than one global number.
+- **Multi-session aggregation** — `evaluate_reports` for each session, then aggregate to a fleet-level CAGE-1 evaluation. The `report_digest` chain (concatenate session digests) is the natural fleet digest.
+- **Time-window slice** — `evaluate_reports(reports_in_window(start, end))` is a 1-line addition. The CLI's `--since / --until` flags make the CAGE-1 evaluation a time-series.
+- **CAGE-1 evaluation report -> advisory emitter** — feed the evaluation into the AIBOM/CSAF-VEX emitter. A fleet where operational_readiness.max_trip_upper_bound > 0.5 should auto-emit an advisory.
+- **A/B comparison CLI** — `cage1_report --before a.jsonl --after b.jsonl` emits a delta report: "admitted 60% -> 75% (+15pp); refused 5% -> 2% (-3pp)". A CAGE-1 evaluation with a delta is *meaningful*; a single CAGE-1 evaluation is just a snapshot.
