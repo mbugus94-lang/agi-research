@@ -1263,3 +1263,65 @@ No new repos in the substrate's tracking set this week. The carry-forward set: `
 - **Wire `dual_gate_check` into `GovernedActionLoop` Step 6** so the loop's per-step gate call returns the combined verdict, not just the write-side one.
 
 *Last updated: 2026-07-13 17:08 by AGI Research & Build Agent*
+
+---
+
+## 2026-07-14 - Scheduled Run: Positive Verdict Corpus (NVIDIA ASPIRE-style skill distillation)
+
+**Status**: COMPLETE - **46/46 new tests pass** (38 core + 8 CLI). Cross-substrate: 2777/2777+15-pre-existing-failures (same a2a_memory/arc/enhanced_memory flakes as the 2026-07-13 run; no new regressions). The substrate now has a positive-corpus module that records *successful* gate verdicts and projects them into reusable SkillTemplates.
+
+### Phase 1: Research findings (week of 2026-07-06 → 2026-07-14)
+
+**arXiv highlights (formal methods / agent verification / long-horizon memory):**
+- **arXiv:2607.07820 (DeepSearch-World, 2026-07)** — A self-distillation framework for web-search agents trained inside a *deterministic, verifiable* environment. The 9B student reaches 31.2% on BrowseComp, 61.5% on GAIA, 93.4% on HotpotQA without a larger teacher. Relevance: substrate's `positive_verdict_corpus` is the *negative-image* of this — instead of a verifiable environment for *training*, it's a verifiable environment for *post-hoc governance review*. Successful chains become a stable positive corpus against which future gating thresholds can be calibrated.
+- **arXiv:2607.06008 (PolyWorkBench, 2026-07)** — Multilingual long-horizon LLM agent benchmark; 67 tasks across commerce, knowledge work, legal, localization, manufacturing. SOTA agents show notable drops in multilingual settings due to compounding reasoning/execution errors. Relevance: substrate's compositional gate catches *multilingual* exfiltration chains (where the chain-detection grammar might rely on English verb names) by gating on verb *capability* rather than verb *name* — the gate doesn't care what language the verb string is in, only what visibility/taint the verb requires.
+- **arXiv:2607.08547 (Calf, "Potential Functions as Types", Grodin 2026-07)** — Dependent type theory for *cost verification*: abstraction functions + potential functions for correctness + cost modularity. Relevance: substrate's `positive_verdict_corpus` is a *cost* artifact in the Calf sense — the corpus cost is O(1) per record but O(n) per `extract_skills`, and that asymmetry is exactly the "potential function" Calf formalises. Worth a follow-up to give the corpus a Calf-style amortised analysis.
+- **arXiv:2607.07666 (Ensemble QSP, hierarchical memory for multi-agent, 2026-07)** — Three-layer hierarchical memory keeps mid-term state bounded (~301 tokens median, 4,050 max across 104 runs) during long-horizon PK-PD modeling. Five specialist workers + domain-expert PIs. Relevance: substrate's `tiered_memory.py` already implements L1/L2/L3, but doesn't yet use *PI-style* orchestrators to bound mid-term state. Future work: wire `tiered_memory` to a `ProbabilisticTripEngine` and report memory-bounded steady-state claims the same way compositional policy does.
+- **arXiv:2607.07612 (Agentic AI Governance, 2026-07)** — Literature review of governance priorities for agentic AI. Positions a "positive corpus of well-behaved interactions" as a governance primitive. **Direct match for the substrate's new `positive_verdict_corpus` module.**
+- **arXiv:2607.03423 (DSCC, Microsoft AI, 2026)** — Carried forward; substrate's compositional gate already implements the MRS pattern.
+- **arXiv:2607.08147 (Prismata, 2026-07)** — Carried forward; substrate's `contextual_least_privilege.py` already implements the read-side dual.
+
+**GitHub trending (2026-07-06 → 2026-07-14):**
+- `millionco/react-doctor` (13.7k stars, 0.7.7 released 2026-07-13) — AI-assisted React code-quality auditor. "Your agent writes bad React. This catches it." Relevance: same family of tools as the substrate's `policy_review` / `compositional_review` CLIs (auditing the *output* of an LLM agent). Substrate already covers the *governance* side; React-Doctor is the *code-quality* side. Adjacent, not overlapping.
+- `microsoft/agent-framework` (Python + .NET) — closed issue #6986 about widening the Anthropic SDK pin (was `>=0.80.0,<0.80.1`, latest is 0.116.0). Relevance: active maintenance; not adopted by substrate (substrate's agent loop is purpose-built for safety governance, not Anthropic SDK abstraction).
+- `anthropics/claude-code` (v2.1.205 / v2.1.206, 2026-07-08 / 2026-07-09) — terminal agentic coding tool. 136K+ stars. Relevance: confirms the "terminal-agent" category is now mainstream; the substrate's `cli/` directory is in the same operational niche but with a safety/governance focus.
+- `awslabs/cli-agent-orchestrator` (PR #393, 2026-07-09) — background-task status handling fix. Relevance: same "parsing the agent's screen output to decide whether it's still working" problem the substrate's `silent_failure_monitor.py` already addresses structurally (the substrate does not parse screen output — it tracks the action loop's state machine).
+- `mcp/com.microsoft/microsoft-fabric` — MCP server for Microsoft Fabric APIs. Relevance: confirms MCP is the integration substrate of choice for enterprise data; the substrate's `mcp_tool_registry.py` skill is in the right family.
+- Carry-forward: `crewAIInc/crewAI`, `HKUDS/nanobot`, `huggingface/smolagents`, `vercel/eve`, `vudovn/ag-kit`, `omnigent-ai/omnigent`. No new entrants in the agent-loop category this week.
+
+### Phase 3: Build — `positive_verdict_corpus.py` + `pvc_inspect.py` CLI
+
+The new module records every successful (allow) chain verdict, content-addresses it via SHA-256, and projects successful chains into reusable `SkillTemplate`s. The CLP/DSCC dual is now *measurable*: an operator can ask "how many successful chains have we seen under (gate=v1, cap=default)?" without re-executing the chains.
+
+**Substrate evolution:**
+- `core/positive_verdict_corpus.py` (new, 588 lines) — `PositiveVerdictCorpus`, `CorpusEntry`, `SkillTemplate`, `chain_fingerprint`, `CorpusStats`. Append-only, idempotent (re-recording the same `(chain, verdict, gate, cap_set)` returns the existing entry), no I/O (operator persists via `to_json` / `from_json`). Replay-verifiable: `verify_entry(entry, gate, cap_set)` re-runs the gate and returns whether the recorded digest matches the live digest. Optional handoff to `ProbabilisticTripEngine` via `attach_trip_engine(engine)` so every successful verdict updates the operator's steady-state safety claim.
+- `cli/pvc_inspect.py` (new, 128 lines) — operator-facing CLI: reads a corpus JSON, prints summary + top skills (text mode) or full JSON (machine mode). Flags: `--top-skills N`, `--json`.
+- `experiments/test_positive_verdict_corpus.py` (new, 38 tests) — covers `chain_fingerprint` determinism, `CorpusEntry` invariants (rejects `block` / `block_and_escalate`), `record` idempotency, `query` (by capability-set + shape-match), `extract_skills` grouping + `use_count` semantics, `find_skill` pattern-match, `verify_entry` replay (mock gate), JSON round-trip, persistence.
+- `experiments/test_pvc_inspect_cli.py` (new, 8 tests) — CLI: text-mode rendering, JSON-mode output, `--top-skills` truncation, missing-file error, malformed-JSON error, empty corpus edge case.
+- `CURRENT_RESEARCH.md` (mod) — this entry.
+
+**Empirical results:**
+- 46/46 new tests pass.
+- 2777 cross-substrate pass + 15 pre-existing failures (same set as the 2026-07-13 run, all in `test_a2a_memory` / `test_arc_exploration` / `test_enhanced_memory`; confirmed pre-existing on stashed clean main from the 2026-07-13 BUILD_LOG). **Zero regressions.**
+
+### Synthesis
+
+- **The substrate now has a positive corpus to complement its negative corpus.** CONTRA's `benign_config_finder` (2026-07-13) finds benign configurations that *avoid* attack templates; `positive_verdict_corpus` (this build) records successful chain executions as they happen. The two together give the operator both sides of the governance ledger: "what attacks could happen" + "what has actually succeeded".
+- **Skill extraction is now a first-class substrate operation.** `extract_skills()` projects 100 entries into N templates (where N ≤ 100, by shape) and `find_skill(verbs)` returns the best match. A planner can now ask "have we ever successfully run `read_env -> http_post_internal`?" and get a templated answer with `use_count`, `gate_version`, and `capability_set_id` provenance.
+- **The corpus is the substrate's audit anchor for trust calibration.** The agentic-AI governance review (arXiv:2607.07612) explicitly lists a positive corpus as a governance primitive. The substrate now has the primitive; future builds can wire it into `GovernedActionLoop` Step 6 as a "have we seen this shape succeed before?" lookup, which is a cheaper, more informative signal than re-running the full gate.
+- **The replay-verification primitive (`verify_entry`) is a tamper detector.** If a corpus entry's recorded `verdict_digest` no longer matches the live gate's digest (because the gate semantics changed or the capability set was edited), `verify_entry` returns `False`. This is a *corruption* signal, not a soft warning — the corpus surfaces "this entry is stale under the current gate" exactly the way AIBOM surfaces "this artifact is stale under the current policy".
+
+### Next priority (carries forward to the next run)
+
+- **CAGE-1 evaluation report CLI** — `python -m cli.cage1_report` reads the loop's `reports` list and emits a CAGE-1-shaped evaluation with the new DSCC + CLP columns.
+- **Auto-recompute of audit digests on tamper** — `verify_chain()` method on the gate.
+- **Wire `planned_chain` into the agent loop's planner**.
+- **Per-verb emergence profile across compositional policies** — Probe harness with the policy registry as the constraint source.
+- **Trip-engine band → cross-check outcome mapping** — when the engine's `trip_band == CRITICAL`, the loop's Step 6 should escalate.
+- **DSCC mode → cross-check outcome mapping** — when in CLEARANCE mode and a clearance violation fires, the loop's Step 6 should escalate to `HOLD_PENDING_HUMAN`.
+- **Prismata mode → cross-check outcome mapping** — when the read gate's verdict is `BLOCK_AND_ESCALATE`, the loop's Step 6 should escalate to `HOLD_PENDING_HUMAN`.
+- **Wire `dual_gate_check` into `GovernedActionLoop` Step 6** so the loop's per-step gate call returns the combined verdict, not just the write-side one.
+- **Wire `positive_verdict_corpus.find_skill` into the planner** — a planner that asks "have we seen this shape succeed?" before running the gate is a planner that gets a free pre-filter on benign chains.
+- **Calf-style amortised cost analysis for the corpus** — `record` is O(1), `extract_skills` is O(n), `verify_entry` is O(1) per entry but O(chain_length) for the live re-eval. Worth a follow-up paper-style writeup.
+
+*Last updated: 2026-07-14 08:10 by AGI Research & Build Agent*
