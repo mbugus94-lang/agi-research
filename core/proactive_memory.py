@@ -251,6 +251,33 @@ class ProactiveMemoryAgent:
             "interventions": [item.to_dict() for item in self._interventions],
         }
 
+    def integrity_report(self) -> dict[str, Any]:
+        """Return deterministic checks for memory identity and state consistency."""
+        duplicate_ids = len(self._records) != len({record.memory_id for record in self._records.values()})
+        invalid_records: list[str] = []
+        for record in self._records.values():
+            if not record.content.strip() or not 0 <= record.importance <= 1:
+                invalid_records.append(record.memory_id)
+            if record.recall_count < 0 or record.created_step < 0:
+                invalid_records.append(record.memory_id)
+            if record.last_recalled_step is not None and record.last_recalled_step < record.created_step:
+                invalid_records.append(record.memory_id)
+        invalid_interventions = [
+            item.memory_id
+            for item in self._interventions
+            if item.memory_id not in self._records
+            or item.step < 0
+            or not 0 <= item.score <= 1
+        ]
+        return {
+            "ok": not duplicate_ids and not invalid_records and not invalid_interventions,
+            "record_count": len(self._records),
+            "intervention_count": len(self._interventions),
+            "duplicate_ids": duplicate_ids,
+            "invalid_record_ids": sorted(set(invalid_records)),
+            "invalid_intervention_memory_ids": sorted(set(invalid_interventions)),
+        }
+
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "ProactiveMemoryAgent":
         agent = cls(ProactiveMemoryConfig(**dict(data.get("config", {}))))

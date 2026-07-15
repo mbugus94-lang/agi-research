@@ -1473,3 +1473,38 @@ Implemented a deterministic proactive-memory substrate for selective reminders:
 - Keep the next self-improvement step review-only: propose policy changes from benchmark traces, but do not auto-apply them.
 
 *Last updated: 2026-07-15 08:00 EAT by AGI Research & Build Agent*
+
+## 2026-07-15 20:05 EAT — Proactive-memory integrity hardening
+
+### Research
+
+- **Long-horizon memory:** *Remember When It Matters* (arXiv:2607.08716) reports a separate memory agent that updates structured memory from recent trajectory and injects reminders selectively; the paper reports +8.3 percentage points on Terminal-Bench 2.0 and +6.8 points on τ²-Bench.
+- **Fact-graph orchestration:** *Danus* (arXiv:2607.06447) combines a planning/coordinating agent, parallel proof workers, a stateless verifier, and fact-graph memory. The verifier-before-admission pattern is a useful analogue for memory integrity.
+- **State-centered execution:** *StructAgent* (arXiv:2607.11388) makes progress explicit and verifier-backed, with checkpointing and targeted recovery; its reported OSWorld-Verified results support treating state transitions as evidence rather than self-reported completion.
+- **Prospective memory:** *PM-Bench* (arXiv:2607.12385) evaluates deferred intentions and reports that the best tested method reaches 65.1% F1, indicating that “remember later” remains a measurable weakness.
+- **Open-source signals:** GitHub activity points to `pydantic/pydantic-ai-harness` for reusable agent capabilities, `desplega-ai/agent-swarm` for shared memory across isolated workers, `InternScience/Agents-A1` for long-horizon agent scaling, and GitHub Agentic Workflows’ July 13 update for gVisor/docker-sbx isolation. These are ecosystem signals, not a controlled popularity ranking.
+
+### Build completed
+
+- Added `ProactiveMemoryAgent.integrity_report()` in `core/proactive_memory.py`. It checks record identity, content/importance bounds, non-negative counters, recall chronology, and intervention references/scores without mutating state.
+- Added two tamper-detection tests in `experiments/test_proactive_memory.py`.
+- Validation: focused proactive-memory suite **9 passed**; prior CAGE-1 + proactive-memory regression baseline was **72 passed** before this change.
+
+### Safety and review
+
+The integrity report is read-only. No self-modifying behavior is auto-applied; this run made only the explicitly selected memory-integrity change.
+
+### Next priority
+
+Wire the read-only integrity report into CAGE-1’s currently unmeasured `MEMORY_INTEGRITY` dimension, preserving the existing report schema and adding tests for clean and tampered memory snapshots.
+
+### Sources
+
+- https://arxiv.org/html/2607.08716v1
+- https://arxiv.org/html/2607.06447v2
+- https://arxiv.org/html/2607.11388v1
+- https://arxiv.org/html/2607.12385v1
+- https://github.com/pydantic/pydantic-ai-harness
+- https://github.com/desplega-ai/agent-swarm
+- https://github.com/InternScience/Agents-A1
+- https://github.github.com/gh-aw/blog/2026-07-13-weekly-update/

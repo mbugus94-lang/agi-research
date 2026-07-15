@@ -97,3 +97,38 @@ def test_invalid_configuration_and_inputs_are_rejected():
         agent.write("", step=0)
     with pytest.raises(ValueError):
         agent.intervene("context", step=-1)
+
+
+def test_integrity_report_is_clean_for_valid_state():
+    agent = ProactiveMemoryAgent()
+    memory_id = agent.write("Keep the signed release manifest.", importance=0.9, step=2)
+    agent.intervene("Check the signed release manifest.", step=3)
+
+    report = agent.integrity_report()
+
+    assert report["ok"] is True
+    assert report["record_count"] == 1
+    assert report["intervention_count"] == 1
+    assert report["invalid_record_ids"] == []
+    assert report["invalid_intervention_memory_ids"] == []
+    assert memory_id in {record.memory_id for record in agent.records}
+
+
+def test_integrity_report_detects_tampered_record_and_intervention():
+    agent = ProactiveMemoryAgent()
+    memory_id = agent.write("A verified constraint.", step=0)
+    agent.intervene("A verified constraint.", step=1)
+    agent._records[memory_id].importance = 2.0
+    agent._interventions[0] = agent._interventions[0].__class__(
+        memory_id="missing",
+        content="tampered",
+        reason="tampered",
+        score=1.2,
+        step=1,
+    )
+
+    report = agent.integrity_report()
+
+    assert report["ok"] is False
+    assert report["invalid_record_ids"] == [memory_id]
+    assert report["invalid_intervention_memory_ids"] == ["missing"]
