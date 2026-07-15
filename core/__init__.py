@@ -8,6 +8,15 @@ This module provides the foundational components for building AGI-capable agents
 - ReflectionEngine: Self-correction and learning from execution
 """
 
+from .proactive_memory import (
+    Intervention,
+    MemoryKind,
+    MemoryRecord,
+    MemoryTrigger,
+    ProactiveMemoryAgent,
+    ProactiveMemoryConfig,
+)
+
 from .agent import BaseAgent, AgentState, Thought, Action, ExecutionResult
 from .memory import MemoryManager, MemoryEntry
 from .planner import Planner, PlanNode, ExecutionPlan

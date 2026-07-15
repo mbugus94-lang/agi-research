@@ -1429,3 +1429,47 @@ The substrate's primitives — `GovernedActionLoop`, `CompositionalPolicyGate`, 
 - **Self-evolving-agent test stabilization** — the 15 pre-existing failures in `test_self_evolving_agent.py` are unrelated to this build but have been in the substrate since 2026-07-09. A dedicated stabilization pass (separate from CAGE-1 work) is the substrate's outstanding test-debt item.
 
 *Last updated: 2026-07-14 17:20 by AGI Research & Build Agent*
+
+
+## 2026-07-15 - Scheduled Run: Proactive Memory Intervention
+
+**Status**: COMPLETE - **7/7 new tests pass** (`experiments/test_proactive_memory.py`). Build task: **A — implement a missing core component**, informed by current work on selective long-horizon memory.
+
+### Phase 1: Research findings (2026-07-01 → 2026-07-15)
+
+**Research synthesis**
+- **Remember When It Matters: Proactive Memory Agent for Long-Horizon Agents (arXiv:2607.08716, Jul 10)** — a separate memory agent updates a structured memory bank and injects a reminder only when it predicts that memory will affect the next action. The paper reports gains of **+8.3 percentage points on Terminal-Bench 2.0** and **+6.8 points on τ²-Bench**; stronger action agents still benefit. Design lesson: memory should be an active, selective control loop rather than unconditional context stuffing.
+- **SelfMem: Self-Optimizing Memory for AI Agents (arXiv:2607.03726, Jul 6)** — exposes memory-management decisions to the agent and lets feedback refine the strategy, reporting improvements over fixed retrieval/compression baselines across 100K–1M-token conversations. Design lesson: memory policy is itself a learnable/pluggable capability; this run keeps the policy explicit and deterministic so it can be evaluated before any self-modification.
+- **Recursive Self-Improvement in AI (arXiv:2607.07663, Jul 9)** — surveys 1,250 papers and frames verification signals as the limiting resource for closed improvement loops. Design lesson: the new component records intervention reasons and scores, but does not rewrite its own policy; proposed policy changes remain reviewable rather than auto-applied.
+- **ARCANA (arXiv:2607.09059, Jul 11)** — uses specialized perceptual, program, execution, and reflective agents connected through a shared blackboard for ARC-AGI-2. Design lesson: a memory intervention can be treated as a typed, auditable message on the coordination layer instead of opaque prompt text.
+- **Weekly AGI/agent coverage** — current reporting emphasizes conversational memory, hallucination reduction, and agentic reasoning. The useful engineering signal is consistent with the papers above: reliability is shifting from a single model call toward memory, verification, and control-loop architecture.
+
+**Open-source agent repositories observed**
+- **`vercel/eve`** — filesystem-first durable-agent framework; notable for inspectable state and conventional project structure.
+- **`Nanako0129/pilotfish`** — multi-model orchestration with separate planning, execution, and fresh-context verification roles; useful pattern for separating proposal from validation.
+- **`AAO-SH/fable-harness`** — project-local memory, decision traces, verification, and rollback for coding agents; directly reinforces auditable state and bounded recovery.
+
+### Phase 3: Build — `core/proactive_memory.py`
+
+Implemented a deterministic proactive-memory substrate for selective reminders:
+- Typed memory records with provenance (`source`, `step`), category, tags, importance, confidence, validity, and stale/revision state.
+- Trigger scoring over lexical context overlap, explicit trigger category, importance, confidence, recency, and memory kind.
+- Selective intervention: returns the top reminder only when its score clears a threshold; otherwise remains silent.
+- Cooldown and per-memory deduplication to prevent repeated injection of the same reminder.
+- Explicit `mark_stale()` and `revise()` operations for correction-aware memory maintenance.
+- Capacity control that evicts the lowest-value record while preserving higher-value memories.
+- JSON-safe `to_dict()` / `from_dict()` round-tripping for audit logs and persistence.
+
+**Safety boundary**: the module only proposes an intervention. It does not execute tools, alter model weights, or auto-apply self-modifications. The scoring policy is inspectable and test-covered.
+
+### Validation
+
+- `python -m pytest -q experiments/test_proactive_memory.py` → **7 passed**.
+- New tests cover relevance selection, stale suppression, cooldown, revision, capacity eviction, serialization, and invalid input/configuration.
+
+### Next priority
+
+- Add a benchmark adapter that compares proactive intervention against silent and always-inject baselines on a small deterministic long-horizon fixture, then expose its metrics to the existing CAGE-1 report's `memory_integrity` dimension.
+- Keep the next self-improvement step review-only: propose policy changes from benchmark traces, but do not auto-apply them.
+
+*Last updated: 2026-07-15 08:00 EAT by AGI Research & Build Agent*
