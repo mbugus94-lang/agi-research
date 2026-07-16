@@ -30,6 +30,7 @@ from core.cage1_evaluation import (
     CAGE1Dimension,
     CAGE1Evaluation,
     DimensionScore,
+    MemoryIntegrityMetrics,
     FUTURE_WORK_DIMENSIONS,
     OutcomeDistribution,
     OperationalReadinessMetrics,
@@ -43,6 +44,7 @@ from core.cage1_evaluation import (
     build_synthetic_session,
     cage1_state_distribution,
     evaluate_reports,
+    memory_integrity_metrics,
     load_reports_from_jsonl,
     row_to_cage1_state,
 )
@@ -715,3 +717,53 @@ class TestAdversarial:
         assert "## Operational readiness" in md
         assert "quarantined_for_cef" in md
         assert "admitted" in md
+
+
+class TestMemoryIntegrityDimension:
+    def test_unmeasured_without_snapshot_preserves_honest_gap(self):
+        evaluation = evaluate_reports([_row("allow")], label="no-memory")
+        assert evaluation.memory_integrity.measured is False
+        assert evaluation.memory_integrity.score is None
+        payload = evaluation.to_dict()
+        assert payload["memory_integrity"]["measured"] is False
+
+    def test_clean_proactive_memory_snapshot_is_measured(self):
+        from core.proactive_memory import ProactiveMemoryAgent
+
+        memory = ProactiveMemoryAgent()
+        memory.write("Keep the signed manifest.", importance=0.9, step=0)
+        result = evaluate_reports([], label="memory-clean", memory_snapshot=memory)
+        metrics = result.memory_integrity
+        assert metrics == memory_integrity_metrics(memory)
+        assert metrics.measured is True
+        assert metrics.ok is True
+        assert metrics.score == 1.0
+        assert metrics.record_count == 1
+
+    def test_tampered_snapshot_fails_without_mutation(self):
+        from core.proactive_memory import ProactiveMemoryAgent
+
+        memory = ProactiveMemoryAgent()
+        memory_id = memory.write("Verified constraint.", step=0)
+        memory.intervene("Verified constraint.", step=1)
+        memory._records[memory_id].importance = 2.0
+        before = memory.to_dict()
+        metrics = memory_integrity_metrics(memory)
+        assert metrics.measured is True
+        assert metrics.ok is False
+        assert metrics.invalid_record_count == 1
+        assert metrics.invalid_intervention_count == 0
+        assert memory.to_dict() == before
+
+    def test_mapping_snapshot_is_supported_and_bad_shape_is_not_guessed(self):
+        clean = {
+            "ok": True,
+            "record_count": 2,
+            "intervention_count": 1,
+            "invalid_record_ids": [],
+            "invalid_intervention_memory_ids": [],
+        }
+        assert memory_integrity_metrics(clean).score == 1.0
+        unknown = memory_integrity_metrics({"ok": True})
+        assert unknown.measured is False
+        assert unknown.score is None

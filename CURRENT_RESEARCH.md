@@ -1508,3 +1508,52 @@ Wire the read-only integrity report into CAGE-1’s currently unmeasured `MEMORY
 - https://github.com/desplega-ai/agent-swarm
 - https://github.com/InternScience/Agents-A1
 - https://github.github.com/gh-aw/blog/2026-07-13-weekly-update/
+
+## 2026-07-16 - Scheduled Run: CAGE-1 Memory Integrity Dimension
+
+**Status**: COMPLETE - 4 new tests pass; 191 focused governance/memory/CEF regression tests pass; zero regressions in the selected suite.
+
+### Research findings (past 2 weeks)
+
+- **Hierarchical memory for long-horizon multi-agent modeling** (arXiv:2607.07666) uses layered memory with category caps and eviction to preserve context across long-running, multi-session scientific workflows. The engineering signal is that memory continuity needs explicit capacity and hierarchy rather than unbounded prompt accumulation.
+- **DeepSearch-World / DeepSearch-Evolve** (arXiv:2607.07820) pairs a verifiable environment with grounded reflection and failure recovery, then uses self-distillation to improve a web agent. The useful substrate lesson is to keep improvement evidence tied to reproducible environment traces.
+- **CAGE-1** (arXiv:2607.03510) treats memory integrity as a separate enterprise-agent evaluation dimension; the prior CAGE-1 module honestly reported this dimension as `not_measured`.
+- **Steerability via constraints** (arXiv:2607.02389) reports a reviewer recall improvement from 54.5% to 90.9% when a coding agent uses a constrained substrate and docs tooling. This reinforces measuring control-surface integrity separately from task success.
+
+### Open-source agent signals
+
+- **`vercel/eve`** — filesystem-first durable-agent framework; 3,601 GitHub stars and pushed July 16, 2026 when checked. Its inspectable project state is a useful reference for durable agent memory.
+- **`Nanako0129/pilotfish`** — role-separated planning, execution, and fresh-context verification; 464 stars and pushed July 14, 2026 when checked. The separation mirrors the repo's proposal-versus-verification posture.
+- **`AAO-SH/fable-harness`** — project-local memory, decision traces, verification, and rollback; 10 stars and last pushed June 28, 2026 when checked. It is architecturally relevant but not a popularity leader, so it is recorded as a design signal rather than a top-trending repo.
+
+### Build: wire proactive-memory integrity into CAGE-1
+
+Implemented one focused integration:
+
+- Added `MemoryIntegrityMetrics` and `memory_integrity_metrics()` to `core/cage1_evaluation.py`.
+- `evaluate_reports(..., memory_snapshot=...)` now accepts a read-only `ProactiveMemoryAgent` or an integrity-report mapping.
+- The CAGE-1 envelope and Markdown report include memory integrity status, record/intervention counts, invalid-reference counts, and a bounded score.
+- The CAGE-1 `memory_integrity` dimension changes from `not_measured` to `measured` only when an explicit snapshot is supplied. Unsupported or incomplete snapshots remain honestly unmeasured.
+- Exported the new API from `core/__init__.py`.
+- Added four tests covering absent snapshots, clean snapshots, tampered snapshots without mutation, and malformed/mapping inputs.
+
+**Safety boundary**: integration is read-only. It calls `integrity_report()` and never repairs, deletes, rewrites, or auto-applies a memory change. A tampered snapshot is surfaced as a failed dimension rather than silently normalized.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_evaluation.py experiments/test_proactive_memory.py` -> **78 passed**.
+- Expanded selected regression: `test_cage1_evaluation.py`, `test_proactive_memory.py`, `test_governor_circuit.py`, `test_memprobe.py`, `test_agent_loop_cef_bridge.py` -> **191 passed**.
+
+### Next priority
+
+Add a small CAGE-1 retrieval-quality adapter backed by the existing `memprobe`/`EvidenceLedger` measurement layer, preserving explicit `not_measured` behavior when no probe result is supplied. Keep any self-improvement policy changes review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.07666
+- https://arxiv.org/abs/2607.07820
+- https://arxiv.org/abs/2607.03510v1
+- https://arxiv.org/abs/2607.02389v1
+- https://github.com/vercel/eve
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/AAO-SH/fable-harness

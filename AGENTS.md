@@ -6455,3 +6455,7 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 - **Time-window slice** — `evaluate_reports(reports_in_window(start, end))` is a 1-line addition. The CLI's `--since / --until` flags make the CAGE-1 evaluation a time-series.
 - **CAGE-1 evaluation report -> advisory emitter** — feed the evaluation into the AIBOM/CSAF-VEX emitter. A fleet where operational_readiness.max_trip_upper_bound > 0.5 should auto-emit an advisory.
 - **A/B comparison CLI** — `cage1_report --before a.jsonl --after b.jsonl` emits a delta report: "admitted 60% -> 75% (+15pp); refused 5% -> 2% (-3pp)". A CAGE-1 evaluation with a delta is *meaningful*; a single CAGE-1 evaluation is just a snapshot.
+
+### 2026-07-16 - Scheduled Run: CAGE-1 Memory Integrity Dimension
+**Status**: COMPLETE - added read-only `MemoryIntegrityMetrics` integration to `core/cage1_evaluation.py`; 4 new tests; 191 selected regression tests pass. `evaluate_reports(..., memory_snapshot=...)` measures the CAGE-1 memory-integrity dimension only when an explicit `ProactiveMemoryAgent` integrity snapshot or compatible mapping is supplied; otherwise it remains `not_measured`. No auto-repair or self-modification.
+**Next priority**: add a retrieval-quality adapter using `core/memprobe.py`/`EvidenceLedger`, with explicit unmeasured fallback.

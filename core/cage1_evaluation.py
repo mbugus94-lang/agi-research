@@ -224,6 +224,89 @@ class OperationalReadinessMetrics:
 
 
 @dataclass
+class MemoryIntegrityMetrics:
+    """Read-only CAGE-1 metrics for a memory integrity snapshot."""
+    measured: bool = False
+    ok: bool = False
+    score: Optional[float] = None
+    record_count: int = 0
+    intervention_count: int = 0
+    invalid_record_count: int = 0
+    invalid_intervention_count: int = 0
+    notes: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+def memory_integrity_metrics(snapshot: Any) -> MemoryIntegrityMetrics:
+    """Convert a read-only ``integrity_report`` result into CAGE-1 metrics.
+
+    ``snapshot`` may be a ``ProactiveMemoryAgent`` or its report mapping.
+    Other values are deliberately treated as unmeasured rather than guessed.
+    """
+    report = snapshot.integrity_report() if hasattr(snapshot, "integrity_report") else snapshot
+    if not isinstance(report, dict):
+        return MemoryIntegrityMetrics(notes="unsupported memory snapshot")
+    required = {"ok", "record_count", "intervention_count"}
+    if not required.issubset(report):
+        return MemoryIntegrityMetrics(notes="memory snapshot lacks integrity fields")
+    invalid_records = report.get("invalid_record_ids", [])
+    invalid_interventions = report.get("invalid_intervention_memory_ids", [])
+    try:
+        record_count = max(0, int(report["record_count"]))
+        intervention_count = max(0, int(report["intervention_count"]))
+    except (TypeError, ValueError):
+        return MemoryIntegrityMetrics(notes="memory snapshot has invalid counters")
+    invalid_record_count = len(invalid_records) if isinstance(invalid_records, (list, tuple, set)) else 0
+    invalid_intervention_count = len(invalid_interventions) if isinstance(invalid_interventions, (list, tuple, set)) else 0
+    total_checks = record_count + intervention_count
+    passed_checks = max(0, total_checks - invalid_record_count - invalid_intervention_count)
+    score = passed_checks / total_checks if total_checks else 1.0
+    ok = bool(report["ok"]) and invalid_record_count == 0 and invalid_intervention_count == 0
+    notes = "" if ok else "invalid memory records or intervention references detected"
+    return MemoryIntegrityMetrics(
+        measured=True,
+        ok=ok,
+        score=score,
+        record_count=record_count,
+        intervention_count=intervention_count,
+        invalid_record_count=invalid_record_count,
+        invalid_intervention_count=invalid_intervention_count,
+        notes=notes,
+    )
+
+
+def _memory_dimension_score(metrics: MemoryIntegrityMetrics) -> DimensionScore:
+    """Project memory integrity evidence into the CAGE-1 dimension shape."""
+    if not metrics.measured:
+        return DimensionScore(
+            dimension=CAGE1Dimension.MEMORY_INTEGRITY.value,
+            substrate_covered=False,
+            coverage="not_measured",
+            n_observations=0,
+            n_admitted=0,
+            n_held=0,
+            n_refused=0,
+            score=None,
+            notes=metrics.notes or "memory integrity snapshot was not supplied",
+        )
+    n_observations = metrics.record_count + metrics.intervention_count
+    n_refused = metrics.invalid_record_count + metrics.invalid_intervention_count
+    return DimensionScore(
+        dimension=CAGE1Dimension.MEMORY_INTEGRITY.value,
+        substrate_covered=True,
+        coverage="measured",
+        n_observations=n_observations,
+        n_admitted=max(0, n_observations - n_refused),
+        n_held=0,
+        n_refused=n_refused,
+        score=metrics.score,
+        notes=metrics.notes,
+    )
+
+
+@dataclass
 class CAGE1Evaluation:
     """The full CAGE-1 evaluation envelope.
 
@@ -237,14 +320,16 @@ class CAGE1Evaluation:
     operational_readiness: OperationalReadinessMetrics
     n_reports: int
     report_digest: str  # SHA-256 of (label + sorted(outcome_counts) + sorted(dim keys))
+    memory_integrity: MemoryIntegrityMetrics = field(default_factory=MemoryIntegrityMetrics)
     n_breach_attempts: int = 0  # rejected-after-breaker-open attempts
     n_positive_verdict_skill_matches: int = 0  # PVC matches across admitted entries
     notes: str = ""
 
     @property
     def substrate_coverage(self) -> float:
-        """Share of dimensions the substrate directly covers."""
-        return len(SUBSTRATE_COVERED_DIMENSIONS) / len(list(CAGE1Dimension))
+        """Share of dimensions measured in this evaluation."""
+        measured = sum(1 for dimension in self.dimensions if dimension.coverage != "not_measured")
+        return measured / len(list(CAGE1Dimension))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -253,6 +338,7 @@ class CAGE1Evaluation:
             "outcome_distribution": self.outcome_distribution.to_dict(),
             "dimensions": [d.to_dict() for d in self.dimensions],
             "operational_readiness": self.operational_readiness.to_dict(),
+            "memory_integrity": self.memory_integrity.to_dict(),
             "n_breach_attempts": self.n_breach_attempts,
             "n_positive_verdict_skill_matches": self.n_positive_verdict_skill_matches,
             "substrate_coverage": self.substrate_coverage,
@@ -301,6 +387,19 @@ class CAGE1Evaluation:
             lines.append(f"- Max `trip_upper_bound`: **{or_metrics.max_trip_upper_bound:.3f}**")
         lines.append(f"- Breaker opens: **{or_metrics.n_breaker_opens}**")
         lines.append(f"- CEF quarantines: **{or_metrics.n_circuit_quarantines}**")
+        lines.append("")
+        mi = self.memory_integrity
+        lines.append("## Memory integrity")
+        lines.append("")
+        if not mi.measured:
+            lines.append("- Coverage: **not measured**")
+        else:
+            state = "ok" if mi.ok else "failed"
+            lines.append(f"- Integrity: **{state}**")
+            lines.append(f"- Records: **{mi.record_count}**; interventions: **{mi.intervention_count}**")
+            lines.append(f"- Score: **{mi.score:.3f}**" if mi.score is not None else "- Score: **n/a**")
+            if mi.notes:
+                lines.append(f"- {mi.notes}")
         lines.append("")
         if self.n_breach_attempts:
             lines.append(f"## Post-breach attempts: {self.n_breach_attempts}")
@@ -535,6 +634,7 @@ def evaluate_reports(
     *,
     label: str = "default",
     positive_verdict_skill_matches: int = 0,
+    memory_snapshot: Any = None,
     notes: str = "",
 ) -> CAGE1Evaluation:
     """Build a CAGE1Evaluation from a list of `CrossCheckReport`s (or dicts).
@@ -561,6 +661,12 @@ def evaluate_reports(
     dims = [_dimension_score_from_rows(d, rows) for d in CAGE1Dimension]
     or_metrics = _operational_readiness(rows)
     n_breach = _breach_attempt_count(rows)
+    memory_metrics = memory_integrity_metrics(memory_snapshot)
+    if memory_snapshot is not None:
+        dims = [
+            _memory_dimension_score(memory_metrics) if d == CAGE1Dimension.MEMORY_INTEGRITY else dim
+            for d, dim in zip(CAGE1Dimension, dims)
+        ]
 
     eval_obj = CAGE1Evaluation(
         label=label,
@@ -569,6 +675,7 @@ def evaluate_reports(
         operational_readiness=or_metrics,
         n_reports=len(rows),
         report_digest="",  # filled in below
+        memory_integrity=memory_metrics,
         n_breach_attempts=n_breach,
         n_positive_verdict_skill_matches=positive_verdict_skill_matches,
         notes=notes,
@@ -703,6 +810,8 @@ __all__ = [
     "DimensionScore",
     "OutcomeDistribution",
     "OperationalReadinessMetrics",
+    "MemoryIntegrityMetrics",
+    "memory_integrity_metrics",
     "SUBSTRATE_COVERED_DIMENSIONS",
     "FUTURE_WORK_DIMENSIONS",
     "CAGE1_STATE_ADMITTED",
