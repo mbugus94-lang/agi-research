@@ -435,6 +435,8 @@ from .cage1_evaluation import (
     CAGE1Evaluation,
     MemoryIntegrityMetrics,
     memory_integrity_metrics,
+    RetrievalQualityMetrics,
+    retrieval_quality_metrics,
     CAGE1_STATE_ADMITTED,
     CAGE1_STATE_ESCALATED,
     CAGE1_STATE_HELD_EVIDENCE,

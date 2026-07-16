@@ -31,6 +31,7 @@ from core.cage1_evaluation import (
     CAGE1Evaluation,
     DimensionScore,
     MemoryIntegrityMetrics,
+    RetrievalQualityMetrics,
     FUTURE_WORK_DIMENSIONS,
     OutcomeDistribution,
     OperationalReadinessMetrics,
@@ -45,6 +46,7 @@ from core.cage1_evaluation import (
     cage1_state_distribution,
     evaluate_reports,
     memory_integrity_metrics,
+    retrieval_quality_metrics,
     load_reports_from_jsonl,
     row_to_cage1_state,
 )
@@ -767,3 +769,58 @@ class TestMemoryIntegrityDimension:
         unknown = memory_integrity_metrics({"ok": True})
         assert unknown.measured is False
         assert unknown.score is None
+
+
+class TestRetrievalQualityDimension:
+    def _probe_snapshot(self, **overrides):
+        snapshot = {
+            "target_name": "fixture",
+            "recovery_score": 0.75,
+            "task_completion_rate": 0.95,
+            "fidelity_gap": 0.20,
+            "topk_recovery_score": 0.50,
+            "topk_degradation": 0.25,
+            "num_scenarios": 50,
+            "num_dimensions": 12,
+        }
+        snapshot.update(overrides)
+        return snapshot
+
+    def test_probe_snapshot_measures_retrieval_without_using_task_success_as_score(self):
+        snapshot = self._probe_snapshot()
+        metrics = retrieval_quality_metrics(snapshot)
+        assert metrics == RetrievalQualityMetrics(
+            measured=True, target_name="fixture", score=0.75,
+            recovery_score=0.75, task_completion_rate=0.95,
+            fidelity_gap=0.20, topk_recovery_score=0.50,
+            topk_degradation=0.25, num_scenarios=50, num_dimensions=12,
+        )
+        result = evaluate_reports([], label="retrieval", retrieval_snapshot=snapshot)
+        dimension = next(d for d in result.dimensions if d.dimension == "retrieval_quality")
+        assert dimension.coverage == "measured"
+        assert dimension.score == 0.75
+        assert result.substrate_coverage == 6 / 7
+        assert result.to_dict()["retrieval_quality"]["topk_degradation"] == 0.25
+
+    def test_probe_object_round_trips_and_markdown_exposes_diagnostics(self):
+        from core.memprobe import quick_probe, in_memory_target
+        result = evaluate_reports([], label="object", retrieval_snapshot=quick_probe(in_memory_target()))
+        assert result.retrieval_quality.measured is True
+        markdown = result.to_cage1_markdown()
+        assert "## Retrieval quality" in markdown
+        assert "Recovery score:" in markdown
+        assert "Top-k degradation:" in markdown
+
+    def test_malformed_or_absent_snapshot_stays_unmeasured(self):
+        absent = evaluate_reports([], label="absent")
+        assert absent.retrieval_quality.measured is False
+        malformed = evaluate_reports([], label="bad", retrieval_snapshot={"target_name": "bad"})
+        assert malformed.retrieval_quality.measured is False
+        assert malformed.retrieval_quality.score is None
+        assert next(d for d in malformed.dimensions if d.dimension == "retrieval_quality").coverage == "not_measured"
+
+    def test_invalid_scores_are_not_guessed(self):
+        metrics = retrieval_quality_metrics(self._probe_snapshot(recovery_score=1.2))
+        assert metrics.measured is False
+        assert metrics.score is None
+        assert "between 0 and 1" in metrics.notes

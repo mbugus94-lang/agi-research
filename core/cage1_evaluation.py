@@ -307,6 +307,116 @@ def _memory_dimension_score(metrics: MemoryIntegrityMetrics) -> DimensionScore:
 
 
 @dataclass
+class RetrievalQualityMetrics:
+    """Read-only CAGE-1 metrics for a MEMPROBE retrieval result."""
+    measured: bool = False
+    target_name: Optional[str] = None
+    score: Optional[float] = None
+    recovery_score: Optional[float] = None
+    task_completion_rate: Optional[float] = None
+    fidelity_gap: Optional[float] = None
+    topk_recovery_score: Optional[float] = None
+    topk_degradation: Optional[float] = None
+    num_scenarios: int = 0
+    num_dimensions: int = 0
+    notes: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+def retrieval_quality_metrics(snapshot: Any) -> RetrievalQualityMetrics:
+    """Convert a MEMPROBE ``ProbeResult`` or mapping into CAGE-1 metrics.
+
+    Retrieval quality is measured by hidden-dimension recovery, while the
+    task-completion rate and top-k degradation remain visible diagnostics.
+    Unsupported or malformed snapshots are left unmeasured rather than
+    inferred from task success alone.
+    """
+    report = snapshot.to_dict() if hasattr(snapshot, "to_dict") else snapshot
+    if not isinstance(report, dict):
+        return RetrievalQualityMetrics(notes="unsupported retrieval snapshot")
+    required = {
+        "target_name",
+        "recovery_score",
+        "task_completion_rate",
+        "fidelity_gap",
+        "topk_recovery_score",
+        "topk_degradation",
+        "num_scenarios",
+        "num_dimensions",
+    }
+    if not required.issubset(report):
+        return RetrievalQualityMetrics(notes="retrieval snapshot lacks MEMPROBE fields")
+    try:
+        values = {
+            key: float(report[key])
+            for key in (
+                "recovery_score",
+                "task_completion_rate",
+                "fidelity_gap",
+                "topk_recovery_score",
+                "topk_degradation",
+            )
+        }
+        num_scenarios = max(0, int(report["num_scenarios"]))
+        num_dimensions = max(0, int(report["num_dimensions"]))
+    except (TypeError, ValueError):
+        return RetrievalQualityMetrics(notes="retrieval snapshot has invalid values")
+    import math
+    if any(not math.isfinite(value) for value in values.values()):
+        return RetrievalQualityMetrics(notes="retrieval snapshot has non-finite values")
+    bounded = ("recovery_score", "task_completion_rate", "topk_recovery_score")
+    if any(values[key] < 0.0 or values[key] > 1.0 for key in bounded):
+        return RetrievalQualityMetrics(notes="retrieval scores must be between 0 and 1")
+    return RetrievalQualityMetrics(
+        measured=True,
+        target_name=str(report["target_name"]),
+        score=values["recovery_score"],
+        recovery_score=values["recovery_score"],
+        task_completion_rate=values["task_completion_rate"],
+        fidelity_gap=values["fidelity_gap"],
+        topk_recovery_score=values["topk_recovery_score"],
+        topk_degradation=values["topk_degradation"],
+        num_scenarios=num_scenarios,
+        num_dimensions=num_dimensions,
+    )
+
+
+def _retrieval_dimension_score(metrics: RetrievalQualityMetrics) -> DimensionScore:
+    """Project MEMPROBE recovery evidence into the CAGE-1 dimension shape."""
+    if not metrics.measured or metrics.score is None:
+        return DimensionScore(
+            dimension=CAGE1Dimension.RETRIEVAL_QUALITY.value,
+            substrate_covered=False,
+            coverage="not_measured",
+            n_observations=0,
+            n_admitted=0,
+            n_held=0,
+            n_refused=0,
+            score=None,
+            notes=metrics.notes or "retrieval quality snapshot was not supplied",
+        )
+    n_observations = metrics.num_dimensions
+    n_admitted = round(metrics.score * n_observations)
+    return DimensionScore(
+        dimension=CAGE1Dimension.RETRIEVAL_QUALITY.value,
+        substrate_covered=True,
+        coverage="measured",
+        n_observations=n_observations,
+        n_admitted=n_admitted,
+        n_held=0,
+        n_refused=max(0, n_observations - n_admitted),
+        score=metrics.score,
+        notes=(
+            f"target={metrics.target_name}; task_completion={metrics.task_completion_rate:.3f}; "
+            f"topk_recovery={metrics.topk_recovery_score:.3f}; "
+            f"topk_degradation={metrics.topk_degradation:.3f}"
+        ),
+    )
+
+
+@dataclass
 class CAGE1Evaluation:
     """The full CAGE-1 evaluation envelope.
 
@@ -321,6 +431,7 @@ class CAGE1Evaluation:
     n_reports: int
     report_digest: str  # SHA-256 of (label + sorted(outcome_counts) + sorted(dim keys))
     memory_integrity: MemoryIntegrityMetrics = field(default_factory=MemoryIntegrityMetrics)
+    retrieval_quality: RetrievalQualityMetrics = field(default_factory=RetrievalQualityMetrics)
     n_breach_attempts: int = 0  # rejected-after-breaker-open attempts
     n_positive_verdict_skill_matches: int = 0  # PVC matches across admitted entries
     notes: str = ""
@@ -339,6 +450,7 @@ class CAGE1Evaluation:
             "dimensions": [d.to_dict() for d in self.dimensions],
             "operational_readiness": self.operational_readiness.to_dict(),
             "memory_integrity": self.memory_integrity.to_dict(),
+            "retrieval_quality": self.retrieval_quality.to_dict(),
             "n_breach_attempts": self.n_breach_attempts,
             "n_positive_verdict_skill_matches": self.n_positive_verdict_skill_matches,
             "substrate_coverage": self.substrate_coverage,
@@ -400,6 +512,21 @@ class CAGE1Evaluation:
             lines.append(f"- Score: **{mi.score:.3f}**" if mi.score is not None else "- Score: **n/a**")
             if mi.notes:
                 lines.append(f"- {mi.notes}")
+        lines.append("")
+        rq = self.retrieval_quality
+        lines.append("## Retrieval quality")
+        lines.append("")
+        if not rq.measured:
+            lines.append("- Coverage: **not measured**")
+        else:
+            lines.append(f"- Target: **{rq.target_name}**")
+            lines.append(f"- Recovery score: **{rq.recovery_score:.3f}**")
+            lines.append(f"- Task completion: **{rq.task_completion_rate:.3f}**")
+            lines.append(f"- Fidelity gap: **{rq.fidelity_gap:+.3f}**")
+            lines.append(f"- Top-k recovery: **{rq.topk_recovery_score:.3f}**")
+            lines.append(f"- Top-k degradation: **{rq.topk_degradation:+.3f}**")
+            if rq.notes:
+                lines.append(f"- {rq.notes}")
         lines.append("")
         if self.n_breach_attempts:
             lines.append(f"## Post-breach attempts: {self.n_breach_attempts}")
@@ -635,6 +762,7 @@ def evaluate_reports(
     label: str = "default",
     positive_verdict_skill_matches: int = 0,
     memory_snapshot: Any = None,
+    retrieval_snapshot: Any = None,
     notes: str = "",
 ) -> CAGE1Evaluation:
     """Build a CAGE1Evaluation from a list of `CrossCheckReport`s (or dicts).
@@ -662,9 +790,12 @@ def evaluate_reports(
     or_metrics = _operational_readiness(rows)
     n_breach = _breach_attempt_count(rows)
     memory_metrics = memory_integrity_metrics(memory_snapshot)
-    if memory_snapshot is not None:
+    retrieval_metrics = retrieval_quality_metrics(retrieval_snapshot)
+    if memory_snapshot is not None or retrieval_snapshot is not None:
         dims = [
-            _memory_dimension_score(memory_metrics) if d == CAGE1Dimension.MEMORY_INTEGRITY else dim
+            _memory_dimension_score(memory_metrics) if d == CAGE1Dimension.MEMORY_INTEGRITY
+            else _retrieval_dimension_score(retrieval_metrics) if d == CAGE1Dimension.RETRIEVAL_QUALITY
+            else dim
             for d, dim in zip(CAGE1Dimension, dims)
         ]
 
@@ -676,6 +807,7 @@ def evaluate_reports(
         n_reports=len(rows),
         report_digest="",  # filled in below
         memory_integrity=memory_metrics,
+        retrieval_quality=retrieval_metrics,
         n_breach_attempts=n_breach,
         n_positive_verdict_skill_matches=positive_verdict_skill_matches,
         notes=notes,
@@ -812,6 +944,8 @@ __all__ = [
     "OperationalReadinessMetrics",
     "MemoryIntegrityMetrics",
     "memory_integrity_metrics",
+    "RetrievalQualityMetrics",
+    "retrieval_quality_metrics",
     "SUBSTRATE_COVERED_DIMENSIONS",
     "FUTURE_WORK_DIMENSIONS",
     "CAGE1_STATE_ADMITTED",

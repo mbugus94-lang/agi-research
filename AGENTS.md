@@ -6459,3 +6459,8 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 ### 2026-07-16 - Scheduled Run: CAGE-1 Memory Integrity Dimension
 **Status**: COMPLETE - added read-only `MemoryIntegrityMetrics` integration to `core/cage1_evaluation.py`; 4 new tests; 191 selected regression tests pass. `evaluate_reports(..., memory_snapshot=...)` measures the CAGE-1 memory-integrity dimension only when an explicit `ProactiveMemoryAgent` integrity snapshot or compatible mapping is supplied; otherwise it remains `not_measured`. No auto-repair or self-modification.
 **Next priority**: add a retrieval-quality adapter using `core/memprobe.py`/`EvidenceLedger`, with explicit unmeasured fallback.
+
+
+### 2026-07-16 - Scheduled Run: CAGE-1 Retrieval Quality Dimension
+**Status**: COMPLETE - added read-only `RetrievalQualityMetrics` integration to `core/cage1_evaluation.py`; 4 new tests; 307 selected governance/memory/CEF/advisory regression tests pass. `evaluate_reports(..., retrieval_snapshot=...)` measures retrieval quality only when an explicit `core.memprobe.ProbeResult` or compatible snapshot is supplied; otherwise it remains `not_measured`. Recovery score is the CAGE-1 score; task completion and top-k degradation remain diagnostics. No auto-repair or self-modification.
+**Next priority**: add a CAGE-1 comparison mode with per-dimension and outcome-distribution deltas plus digest mismatch handling.

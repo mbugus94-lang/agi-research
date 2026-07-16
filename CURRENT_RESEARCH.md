@@ -1557,3 +1557,54 @@ Add a small CAGE-1 retrieval-quality adapter backed by the existing `memprobe`/`
 - https://github.com/vercel/eve
 - https://github.com/Nanako0129/pilotfish
 - https://github.com/AAO-SH/fable-harness
+
+
+## 2026-07-16 20:05 EAT — Retrieval-quality CAGE-1 adapter
+
+**Status**: COMPLETE — 4 new tests pass; the expanded selected regression suite passes **307/307**.
+
+### Research findings (past 2 weeks)
+
+- **Hierarchical memory for long-horizon multi-agent modeling** (arXiv:2607.07666, v2 July 13) uses bounded, layered memory with explicit eviction and specialist/PI supervision. The transferable design signal is that long-horizon continuity needs typed capacity management, not unlimited prompt accumulation.
+- **DeepSearch-World / DeepSearch-Evolve** (arXiv:2607.07820, v2 July 13) uses a deterministic, verifiable environment, grounded reflection, and failure recovery for self-distillation. The relevant safety pattern is to bind improvement claims to replayable traces.
+- **PolyWorkBench** (arXiv:2607.06008, v2 July 9) evaluates multilingual long-horizon workflows across 67 tasks and reports degradation relative to monolingual settings. Evaluation must therefore cover execution and retrieval behavior, not just final-answer quality.
+- **A formal hierarchical architecture for agentic orchestration** (arXiv:2607.11138) proposes lazy, path-scoped skill discovery and a stack-based execution loop. This supports treating retrieval/context exposure as a measurable control surface.
+- **Agentic AI governance** (arXiv:2607.07612) and **AgenticRei** emphasize runtime policy, auditability, and oversight as distinct from model capability.
+
+### Open-source agent signals
+
+- **`google/adk-python`** — recent v2.4.0 adds ManagedAgent and memory/profile tooling, reinforcing managed orchestration plus explicit memory interfaces.
+- **`ardhaecosystem/synapse`** — hippocampus-inspired temporal knowledge-graph memory with consolidation, forgetting, and pattern completion; a design signal for structured, lifecycle-aware memory.
+- **`Nanako0129/pilotfish`** — role-separated planning, execution, and fresh-context verification; useful for keeping proposal and validation distinct.
+
+### Build: wire MEMPROBE into CAGE-1 retrieval quality
+
+Implemented one focused integration:
+
+- Added read-only `RetrievalQualityMetrics` and `retrieval_quality_metrics()` to `core/cage1_evaluation.py`. It accepts a `core.memprobe.ProbeResult` or compatible mapping.
+- The CAGE-1 `retrieval_quality` dimension is now `measured` only when an explicit MEMPROBE snapshot is supplied; otherwise it remains honestly `not_measured`.
+- Recovery score is the dimension score. Task completion, fidelity gap, top-k recovery, and top-k degradation remain visible diagnostics rather than being conflated with retrieval fidelity.
+- Added `retrieval_quality` to the JSON envelope and operator Markdown report, exported the public API from `core/__init__.py`, and added four tests for clean, object, absent/malformed, and invalid snapshots.
+
+**Safety boundary**: the adapter is read-only and does not run memory writes, repair state, infer missing scores, or apply self-improvement. Invalid or incomplete evidence remains unmeasured.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_evaluation.py experiments/test_proactive_memory.py experiments/test_memprobe.py` → **118 passed**.
+- Expanded selected regression (`CAGE-1`, proactive memory, MEMPROBE, governor, CEF, AIBOM/advisory suites) → **307 passed**.
+- `python -m py_compile` on changed Python modules → pass.
+
+### Next priority
+
+Add a CAGE-1 comparison mode that computes per-dimension score and outcome-distribution deltas between two evaluation snapshots, preserving digest mismatch and explicit `not_measured` handling. Keep self-improvement proposals review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.07666
+- https://arxiv.org/abs/2607.07820
+- https://arxiv.org/abs/2607.06008
+- https://arxiv.org/abs/2607.11138
+- https://arxiv.org/abs/2607.07612
+- https://github.com/google/adk-python
+- https://github.com/ardhaecosystem/synapse
+- https://github.com/Nanako0129/pilotfish
