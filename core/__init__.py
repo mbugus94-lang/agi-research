@@ -430,6 +430,13 @@ from .memprobe import (
     summarize,
     tiered_memory_target,
 )
+from .cage1_compare import (
+    CAGE1Comparison,
+    DimensionDelta,
+    OutcomeDelta,
+    compare_evaluations,
+    load_evaluation,
+)
 from .cage1_evaluation import (
     CAGE1Dimension,
     CAGE1Evaluation,

@@ -1,3 +1,23 @@
+### 2026-07-17 - Scheduled Run: CAGE-1 Snapshot Comparison
+**Status**: COMPLETE - 5/5 new comparison tests pass; 192 focused CAGE-1/memory/retrieval/advisory tests pass; zero regressions in the selected suite.
+
+**Research Summary (July 17, 2026)**: Recent arXiv signals emphasize bounded memory, verifiable state transitions, evidence reliability, and runtime attestation: Ensemble QSP (arXiv:2607.07666), DeepSearch-World (2607.07820), PolyWorkBench (2607.06008), StructAgent (2607.11388), DeepStress (2607.13920), CAVA (2607.13716), MemCon (2607.13591), and StateFuse (2607.05844). Open-source signals included `google/adk-python` v2.4.0, `Nanako0129/pilotfish`, and GitHub Agentic Workflows with gVisor/docker-sbx isolation. The common design pressure is measurable, replayable state—not opaque self-reported progress.
+
+**Build Task**: Close the 2026-07-16 CAGE-1 retrieval adapter carryover by adding a read-only comparison surface.
+
+**Files changed**:
+- `core/cage1_compare.py`: new `OutcomeDelta`, `DimensionDelta`, and `CAGE1Comparison` dataclasses; `compare_evaluations()` computes outcome-count deltas, per-dimension score/coverage deltas, digest match, and explicit `not_measured` / `coverage_changed` statuses; `load_evaluation()` reads one JSON snapshot.
+- `cli/cage1_compare.py`: operator CLI for `--baseline`, `--current`, `--format {markdown,json,both}`, and optional notes. It never mutates snapshots or applies policy.
+- `experiments/test_cage1_compare.py`: five tests for stable comparisons, changed outcomes/scores, missing dimensions, serialization/loading, CLI JSON mode, and bad input.
+- `core/__init__.py`: public exports.
+- `CURRENT_RESEARCH.md`: appended this research/build entry.
+
+**Safety posture**: comparison is pure and review-only. It preserves digest mismatch, reports coverage changes explicitly, treats missing scores as `not_measured`, and makes no automatic remediation or self-modification.
+
+**Validation**: `experiments/test_cage1_compare.py`, `test_cage1_evaluation.py`, `test_proactive_memory.py`, `test_memprobe.py`, `test_aibom_advisory.py`, and `test_aibom_review_cli.py` -> **192 passed**; changed modules compile successfully.
+
+**Next priority**: add a small CAGE-1 trend/report mode over multiple saved snapshots (ordered score trajectory, regression flags, and digest lineage), still read-only and review-only.
+
 ### 2026-07-11 - Scheduled Run: Compositional gate + ProbabilisticTripEngine integration — steady-state safety claim
 **Status**: ✅ COMPLETE - **28/28 new tests pass** (21 in `TestTripEngineIntegration` + 7 in `TestChainTripEngineIntegration`); **487/487 cross-substrate regression check passes** (up from 459/459 on 2026-07-10, +28 new); 2610/2625 broader sweep (+28 new, 15 pre-existing failures in `test_a2a_memory`, `test_arc_exploration`, `test_enhanced_memory` confirmed pre-existing on stashed clean main). **Zero regressions**. The compositional gate now produces a steady-state safety claim — every chain check appends a `TripObservation` to an attached `ProbabilisticTripEngine`, whose `(1-α)` upper bound is the operator's empirical "we expect ≤ X% of chains to escalate" claim.
 

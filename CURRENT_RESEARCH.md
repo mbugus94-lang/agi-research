@@ -1608,3 +1608,102 @@ Add a CAGE-1 comparison mode that computes per-dimension score and outcome-distr
 - https://github.com/google/adk-python
 - https://github.com/ardhaecosystem/synapse
 - https://github.com/Nanako0129/pilotfish
+
+## 2026-07-17 - Scheduled Run: CAGE-1 Snapshot Comparison
+
+**Status**: COMPLETE — focused comparison suite passes; selected CAGE-1, memory, retrieval, and advisory regression passes.
+
+### Research findings (past 2 weeks)
+
+- **DeepSearch-World (arXiv:2607.07820)** uses a deterministic, verifiable environment with grounded reflection and failure recovery before self-distillation. The direct engineering implication is that evaluation comparisons should be replayable and should expose evidence changes instead of collapsing them into a single capability score.
+- **StructAgent (arXiv:2607.11388)** makes task progress explicit through verifier-backed state transitions and checkpoints. This supports comparing agent runs at the state/evidence layer, not only by final success.
+- **MemCon (arXiv:2607.13591)** treats memory operations as a controlled process and reports gains from learning when and how much to retrieve. The comparison surface should therefore preserve `not_measured` dimensions rather than treating missing retrieval evidence as failure or success.
+- **CAVA (arXiv:2607.13716)** emphasizes canonical action identity, approval binding, reproducible receipts, and tamper detection. The CAGE-1 report digest is the existing provenance anchor; this build makes digest mismatch visible in a run-to-run comparison.
+- **Open-source signals:** `Nanako0129/pilotfish` separates planning, execution, and fresh-context verification; Google ADK v2.4.0 adds ManagedAgent and memory/profile tooling; GitHub Agentic Workflows' July 13 update highlights gVisor/docker-sbx isolation. These are design signals, not a controlled popularity ranking.
+
+### Open-source agent repos observed
+
+- **`Nanako0129/pilotfish`** — multi-model planning, execution, and fresh-context verification.
+- **`google/adk-python`** — code-first agents with workflow and memory/profile support; v2.4.0 is the current release signal found.
+- **`github/gh-aw`** — agentic workflows with stronger sandbox-runtime options and credential-refresh hardening.
+
+### Build: read-only CAGE-1 comparison mode
+
+Implemented one focused task:
+
+- Added `core/cage1_compare.py` with immutable `OutcomeDelta`, `DimensionDelta`, and `CAGE1Comparison` records.
+- Added `compare_evaluations()` to compute outcome-count deltas, per-dimension score deltas, coverage transitions, digest match/mismatch, and explicit handling for missing or `not_measured` dimensions.
+- Added `cli/cage1_compare.py` for Markdown, JSON, or split output from two saved evaluation snapshots.
+- Added six tests covering identical runs, changed counts/scores, coverage changes, missing dimensions, serialization/loading, CLI success, and bad input.
+- Exported the comparison API from `core/__init__.py`.
+
+**Safety boundary**: comparison is read-only. It does not mutate snapshots, alter policies, repair evidence, or apply self-improvement. A digest mismatch is reported, never silently normalized.
+
+### Next priority
+
+Add an evidence-aware comparison fixture that carries `memory_integrity` and `retrieval_quality` metric deltas alongside the dimension deltas, then expose CAGE-1 comparison through the existing report CLI without changing its default output. Keep all policy changes review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.07820
+- https://arxiv.org/abs/2607.11388
+- https://arxiv.org/html/2607.13591v1
+- https://arxiv.org/html/2607.13716v1
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/google/adk-python
+- https://github.com/github/gh-aw
+
+
+## 2026-07-17 - Scheduled Run: CAGE-1 Snapshot Comparison
+
+**Status**: COMPLETE - 5/5 new comparison tests pass; 192 focused CAGE-1/memory/retrieval/advisory tests pass; zero regressions in the selected suite.
+
+### Research findings (past 2 weeks)
+
+- **Ensemble QSP hierarchical memory** (arXiv:2607.07666) keeps long-horizon multi-agent state bounded with layered memory and eviction. The transferable engineering signal is explicit state management instead of unbounded context accumulation.
+- **DeepSearch-World** (arXiv:2607.07820) couples self-distillation to a deterministic, verifiable environment with grounded reflection and recovery. Improvement claims need replayable evidence.
+- **PolyWorkBench** (arXiv:2607.06008) shows that multilingual long-horizon workflows compound execution and reasoning errors; evaluations should compare dimensions, not only final task success.
+- **StructAgent** (arXiv:2607.11388) uses verifier-backed state transitions and checkpoints, reinforcing that progress should be evidence-bound rather than self-reported.
+- **DeepStress** (arXiv:2607.13920) stress-tests deep-search agents against unreliable retrieval evidence; this supports keeping retrieval quality separate from generic task completion.
+- **CAVA** (arXiv:2607.13716) treats canonical action identity, approval binding, receipts, and attestation as runtime governance primitives. This is aligned with comparing content-addressed CAGE-1 reports and exposing digest mismatches.
+- **MemCon** (arXiv:2607.13591) models memory operations as a controlled process, while **StateFuse** (arXiv:2607.05844) preserves conflicts instead of collapsing them. Both support explicit, inspectable comparison states.
+
+### Open-source agent signals
+
+- **`google/adk-python` v2.4.0** adds managed-agent and memory/profile capabilities.
+- **`Nanako0129/pilotfish`** separates planning, execution, and fresh-context verification across model tiers.
+- **GitHub Agentic Workflows** highlights gVisor/docker-sbx isolation and credential-refresh hardening, making execution boundaries part of the agent architecture.
+
+### Build: CAGE-1 comparison mode
+
+Implemented one focused, read-only comparison layer:
+
+- `core/cage1_compare.py` compares two saved `CAGE1Evaluation.to_dict()` snapshots or compatible mappings/objects.
+- Outcome deltas cover all CAGE-1 states, including `made_non_effective`.
+- Dimension deltas report baseline/current coverage, scores, score delta, and status (`improved`, `regressed`, `unchanged`, `coverage_changed`, or `not_measured`). Missing dimensions and transitions into/out of measurement are explicit.
+- The comparison preserves baseline/current report digests and exposes `digest_match` as a tamper/reproducibility signal.
+- `cli/cage1_compare.py` provides Markdown, JSON, or split Markdown+JSON output from `--baseline` and `--current` snapshots.
+- No policy action, repair, memory mutation, or self-modification is performed.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_compare.py experiments/test_cage1_evaluation.py experiments/test_proactive_memory.py experiments/test_memprobe.py experiments/test_aibom_advisory.py experiments/test_aibom_review_cli.py` -> **192 passed**.
+- `python -m py_compile core/cage1_compare.py cli/cage1_compare.py core/__init__.py` -> passed.
+
+### Next priority
+
+Add a small CAGE-1 trend/report mode over multiple saved snapshots: ordered score trajectory, regression flags, and digest lineage. Keep it read-only and review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.07666
+- https://arxiv.org/abs/2607.07820
+- https://arxiv.org/abs/2607.06008
+- https://arxiv.org/abs/2607.11388
+- https://arxiv.org/abs/2607.13920
+- https://arxiv.org/abs/2607.13716
+- https://arxiv.org/abs/2607.13591
+- https://arxiv.org/abs/2607.05844
+- https://github.com/google/adk-python/releases/tag/v2.4.0
+- https://github.com/Nanako0129/pilotfish
+- https://github.github.com/gh-aw/blog/2026-07-13-weekly-update/
