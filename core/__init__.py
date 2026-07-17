@@ -437,6 +437,14 @@ from .cage1_compare import (
     compare_evaluations,
     load_evaluation,
 )
+from .cage1_trend import (
+    CAGE1Trend,
+    DigestLink,
+    RegressionFlag,
+    TrendPoint,
+    load_evaluations,
+    trend_evaluations,
+)
 from .cage1_evaluation import (
     CAGE1Dimension,
     CAGE1Evaluation,

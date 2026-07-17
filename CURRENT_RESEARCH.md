@@ -1707,3 +1707,49 @@ Add a small CAGE-1 trend/report mode over multiple saved snapshots: ordered scor
 - https://github.com/google/adk-python/releases/tag/v2.4.0
 - https://github.com/Nanako0129/pilotfish
 - https://github.github.com/gh-aw/blog/2026-07-13-weekly-update/
+
+
+## 2026-07-17 - Scheduled Run: CAGE-1 Trend and Digest Lineage
+
+**Status**: COMPLETE — added a read-only multi-snapshot trend layer; 6/6 new tests pass; 198 focused CAGE-1/memory/retrieval/advisory tests pass; zero regressions in the selected suite.
+
+### Research findings (past 2 weeks)
+
+- **DeepSearch-World** (arXiv:2607.07820, updated July 13) uses deterministic search and page-reading tools, grounded reflection, failure recovery, and self-distillation. The reusable design signal is that self-improvement should operate over replayable, verifiable trajectories rather than opaque success claims.
+- **Ensemble QSP hierarchical memory** (arXiv:2607.07666, updated July 13) bounds long-horizon multi-agent context with layered memory, category caps, and eviction. The direct implication for this repository is to keep trend reports bounded and explicit about missing measurements.
+- **CAGE-1** (arXiv:2607.03510) treats governance, memory integrity, retrieval quality, auditability, and safe failure as evaluation dimensions. A single snapshot cannot show whether these controls are improving or regressing.
+- **PolyWorkBench** (arXiv:2607.06008) finds compounding errors in multilingual long-horizon workflows and uses structural grading plus executable verification. Trend analysis should therefore preserve per-dimension trajectories, not only aggregate task success.
+- **DeepStress** (arXiv:2607.13920, July 15) introduces controllable stress testing for unreliable evidence. This supports flagging regression trajectories as review signals, never silently turning them into policy actions.
+- **Open-source agent signals:** Pilotfish separates frontier planning from cheaper execution and fresh-context verification; Google ADK v2.4.0 adds ManagedAgent and memory/profile tooling; GitHub Agentic Workflows highlights gVisor/docker-sbx isolation. These are architecture signals, not a controlled popularity ranking.
+
+### Build: read-only CAGE-1 trend mode
+
+Implemented one focused task:
+
+- Added `core/cage1_trend.py` with immutable trend points, explicit metric trajectories, regression flags, digest lineage, JSON/Markdown serialization, and safe loading of an ordered snapshot list.
+- Added `cli/cage1_trend.py` for `python -m cli.cage1_trend --input snapshots.json`, with `markdown`, `json`, and `both` formats.
+- Added `experiments/test_cage1_trend.py` with six tests covering stable trajectories, regressions, missing optional scores, serialization, CLI success, and bad input.
+- Exported the trend API from `core/__init__.py`.
+
+**Safety boundary**: trend analysis is read-only. It does not alter evaluations, policies, memory, retrieval, or self-improvement settings. Missing and `not_measured` metrics stay absent from regression calculations. Digest mismatches are surfaced as lineage signals, never normalized.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_trend.py experiments/test_cage1_compare.py experiments/test_cage1_evaluation.py experiments/test_proactive_memory.py experiments/test_memprobe.py experiments/test_aibom_advisory.py experiments/test_aibom_review_cli.py` -> **198 passed**.
+- `python -m py_compile core/cage1_trend.py cli/cage1_trend.py core/__init__.py` -> passed.
+- `git diff --check` -> passed.
+
+### Next priority
+
+Add an opt-in comparison mode to `cli/cage1_report.py` that consumes two or more existing snapshots and delegates to the read-only comparison/trend APIs without changing the default report output. Keep policy changes review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.07820v1
+- https://arxiv.org/abs/2607.07666v1
+- https://arxiv.org/abs/2607.03510v1
+- https://arxiv.org/abs/2607.06008v1
+- https://arxiv.org/abs/2607.13920v1
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/google/adk-python/releases/tag/v2.4.0
+- https://github.github.com/gh-aw/blog/2026-07-13-weekly-update/
