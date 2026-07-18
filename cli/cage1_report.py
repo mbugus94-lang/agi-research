@@ -34,6 +34,7 @@ import json
 import sys
 from typing import List, Optional
 
+from core.cage1_compare import compare_evaluations, load_evaluation
 from core.cage1_evaluation import (
     CAGE1Evaluation,
     build_synthetic_session,
@@ -41,6 +42,7 @@ from core.cage1_evaluation import (
     load_reports_from_jsonl,
     cage1_state_distribution,
 )
+from core.cage1_trend import trend_evaluations
 
 
 def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -58,6 +60,12 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--demo",
         action="store_true",
         help="Run a synthetic session and evaluate the reports.",
+    )
+    src.add_argument(
+        "--compare-snapshot",
+        action="append",
+        metavar="PATH",
+        help="Compare two or more saved CAGE-1 JSON snapshots; repeat for each path.",
     )
     p.add_argument(
         "--demo-actions",
@@ -141,8 +149,50 @@ def _emit(
         print(evaluation.to_json(), file=sys.stderr)
 
 
+def _comparison_payload(snapshot_paths: List[str], notes: str) -> tuple[dict, str]:
+    snapshots = [load_evaluation(path) for path in snapshot_paths]
+    trend = trend_evaluations(snapshots, notes=notes)
+    comparisons = [
+        compare_evaluations(snapshots[index - 1], snapshots[index], notes=notes)
+        for index in range(1, len(snapshots))
+    ]
+    payload = {
+        "trend": trend.to_dict(),
+        "comparisons": [comparison.to_dict() for comparison in comparisons],
+    }
+    markdown = trend.to_markdown()
+    if comparisons:
+        markdown += "\n## Adjacent comparisons\n\n"
+        markdown += "\n".join(comparison.to_markdown().rstrip() for comparison in comparisons)
+        markdown += "\n"
+    return payload, markdown
+
+
+def _emit_comparison(payload: dict, markdown: str, fmt: str) -> None:
+    if fmt == "json":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    elif fmt == "markdown":
+        print(markdown)
+    else:
+        print(markdown)
+        print("---", file=sys.stderr)
+        print(json.dumps(payload, indent=2, sort_keys=True), file=sys.stderr)
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = _parse_args(argv)
+    if args.compare_snapshot is not None:
+        if len(args.compare_snapshot) < 2:
+            print("ERROR: --compare-snapshot requires at least two paths", file=sys.stderr)
+            return 2
+        try:
+            payload, markdown = _comparison_payload(args.compare_snapshot, args.notes)
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        _emit_comparison(payload, markdown, args.format)
+        return 0
+
     if not args.demo and not args.audit_log:
         print(
             "ERROR: must supply --audit-log PATH or --demo",

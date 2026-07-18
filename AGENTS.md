@@ -1,3 +1,12 @@
+### 2026-07-18 - Scheduled Run: CAGE-1 Report Comparison Mode
+**Status**: COMPLETE - 4 new CLI tests pass; 202 focused CAGE-1/memory/retrieval/MEMPROBE/advisory tests pass; zero regressions in the selected suite.
+
+**Build**: Added opt-in `--compare-snapshot PATH` support to `cli/cage1_report.py`, composing the existing read-only trend and adjacent comparison APIs. Added `experiments/test_cage1_report_cli.py` for JSON, Markdown, minimum-input, and default-mode coverage. Comparison mode preserves digest mismatches and `not_measured` evidence, and never changes policy, memory, or self-improvement state.
+
+**Research**: Current signals include bounded hierarchical memory (arXiv:2607.07666), agentic governance (2607.07612), multilingual long-horizon evaluation (2607.06008), verifiable reflection (2607.07820), canonical action attestation (2607.13716), LHTB, Pilotfish, and Google ADK v2.4.0.
+
+**Next priority**: carry `memory_integrity` and `retrieval_quality` metric deltas into the report comparison envelope, preserving explicit `not_measured` handling. Keep policy and self-improvement changes review-only.
+
 ### 2026-07-17 - Scheduled Run: CAGE-1 Snapshot Comparison
 **Status**: COMPLETE - 5/5 new comparison tests pass; 192 focused CAGE-1/memory/retrieval/advisory tests pass; zero regressions in the selected suite.
 

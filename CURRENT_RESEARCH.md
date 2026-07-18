@@ -1753,3 +1753,53 @@ Add an opt-in comparison mode to `cli/cage1_report.py` that consumes two or more
 - https://github.com/Nanako0129/pilotfish
 - https://github.com/google/adk-python/releases/tag/v2.4.0
 - https://github.github.com/gh-aw/blog/2026-07-13-weekly-update/
+
+## 2026-07-18 - Scheduled Run: CAGE-1 Report Comparison Mode
+
+**Status**: COMPLETE — 4 new CLI tests pass; the focused CAGE-1, memory, retrieval, MEMPROBE, and advisory regression suite passes **202/202**.
+
+### Research findings (past 2 weeks)
+
+- **Ensemble QSP hierarchical memory** (arXiv:2607.07666, updated July 13) uses bounded, layered memory with explicit eviction and specialist oversight. The transferable signal is that long-horizon state should be capacity-managed and inspectable rather than appended indefinitely.
+- **Agentic AI Governance** (arXiv:2607.07612, July 8) frames autonomy, planning, accountability, transparency, and risk management as distinct governance concerns. This supports keeping CAGE-1 comparison outputs advisory and auditable rather than automatically changing policy.
+- **PolyWorkBench** (arXiv:2607.06008, updated July 9) evaluates 67 multilingual long-horizon workflows with structural grading, executable verification, and semantic assessment. The practical implication is to compare evidence-bearing dimensions and execution outcomes, not just final success.
+- **DeepSearch-World / DeepSearch-Evolve** (arXiv:2607.07820, updated July 13) couples reflection and self-distillation to deterministic, verifiable trajectories. Any improvement signal in this repository should remain replayable and grounded in saved evaluation evidence.
+- **CAVA** (arXiv:2607.13716, July 16) emphasizes canonical action identity, approval binding, reproducible receipts, and tamper detection. CAGE-1 report digests and adjacent comparison lineage provide a smaller analogous audit surface.
+
+### Open-source agent signals
+
+- **`zli12321/LHTB`** — a newly active long-horizon terminal benchmark with hidden verifiers; the reported difficulty reinforces the need for persistent state and non-self-reported progress checks.
+- **`Nanako0129/pilotfish`** — separates frontier planning, cheaper execution, and fresh-context verification, a useful role split for reviewable orchestration.
+- **`google/adk-python` v2.4.0** — recent memory/profile and ManagedAgent changes show continued convergence on explicit memory and managed orchestration interfaces.
+
+### Build: opt-in comparison mode in the existing report CLI
+
+Implemented one focused, read-only task:
+
+- Added repeatable `--compare-snapshot PATH` arguments to `cli/cage1_report.py`. Two or more saved CAGE-1 JSON snapshots now produce an ordered trend plus adjacent pairwise comparisons.
+- Added JSON output containing `trend` and `comparisons`, Markdown output with the trend and adjacent comparison sections, and preserved the existing `--demo` / `--audit-log` default behavior unchanged.
+- Added `experiments/test_cage1_report_cli.py` covering JSON comparison output, Markdown comparison output, the minimum-two-snapshot guard, and default report mode.
+
+**Safety boundary**: comparison mode is opt-in and read-only. It loads snapshots, does not mutate them, does not apply policy or memory changes, and preserves digest mismatches and unmeasured dimensions as review signals.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_report_cli.py` -> **4 passed**.
+- Selected regression (`test_cage1_report_cli.py`, `test_cage1_trend.py`, `test_cage1_compare.py`, `test_cage1_evaluation.py`, `test_proactive_memory.py`, `test_memprobe.py`, `test_aibom_advisory.py`, `test_aibom_review_cli.py`) -> **202 passed**.
+- `python -m py_compile cli/cage1_report.py core/cage1_compare.py core/cage1_trend.py experiments/test_cage1_report_cli.py` -> passed.
+- `git diff --check` -> passed.
+
+### Next priority
+
+Add evidence-aware CAGE-1 report comparison fixtures that carry `memory_integrity` and `retrieval_quality` metric deltas into the report CLI envelope, while preserving explicit `not_measured` handling. Keep all self-improvement and policy changes review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.07666
+- https://arxiv.org/abs/2607.07612
+- https://arxiv.org/abs/2607.06008
+- https://arxiv.org/abs/2607.07820
+- https://arxiv.org/abs/2607.13716
+- https://github.com/zli12321/LHTB
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/google/adk-python/releases/tag/v2.4.0

@@ -1,0 +1,99 @@
+"""Tests for the opt-in CAGE-1 report comparison mode."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+
+
+def _snapshot(label: str, digest: str, admitted: int, refused: int, score: float) -> dict:
+    return {
+        "label": label,
+        "report_digest": digest,
+        "n_reports": admitted + refused,
+        "outcome_distribution": {
+            "admitted": admitted,
+            "held_for_evidence": 0,
+            "narrowed_for_ring": 0,
+            "narrowed_for_chain": 0,
+            "quarantined_for_cef": 0,
+            "escalated": 0,
+            "refused": refused,
+            "made_non_effective": 0,
+        },
+        "dimensions": [
+            {"dimension": "authority_and_policy_enforcement", "coverage": "measured", "score": score},
+            {"dimension": "retrieval_quality", "coverage": "not_measured", "score": None},
+        ],
+    }
+
+
+def test_report_cli_comparison_json_mode(tmp_path):
+    before = tmp_path / "before.json"
+    after = tmp_path / "after.json"
+    before.write_text(json.dumps(_snapshot("before", "a", 3, 0, 0.5)), encoding="utf-8")
+    after.write_text(json.dumps(_snapshot("after", "b", 2, 1, 0.8)), encoding="utf-8")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "cli.cage1_report",
+            "--compare-snapshot",
+            str(before),
+            "--compare-snapshot",
+            str(after),
+            "--format",
+            "json",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert len(payload["trend"]["points"]) == 2
+    assert len(payload["comparisons"]) == 1
+    assert payload["comparisons"][0]["digest_match"] is False
+
+
+def test_report_cli_comparison_markdown_mode(tmp_path):
+    paths = []
+    for index in range(3):
+        path = tmp_path / f"snapshot-{index}.json"
+        path.write_text(json.dumps(_snapshot(str(index), str(index), 3 - index, index, 0.5 + index * 0.1)), encoding="utf-8")
+        paths.append(path)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "cli.cage1_report",
+            *sum((["--compare-snapshot", str(path)] for path in paths), []),
+            "--format",
+            "markdown",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "CAGE-1 Trend" in result.stdout
+    assert "Adjacent comparisons" in result.stdout
+
+
+def test_report_cli_comparison_requires_two_snapshots():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_report", "--compare-snapshot", "one.json"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert "at least two paths" in result.stderr
+
+
+def test_report_cli_default_mode_remains_available():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_report", "--demo", "--format", "json"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["label"] == "default"
