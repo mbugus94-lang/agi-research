@@ -1,11 +1,23 @@
-### 2026-07-18 - Scheduled Run: CAGE-1 Report Comparison Mode
-**Status**: COMPLETE - 4 new CLI tests pass; 202 focused CAGE-1/memory/retrieval/MEMPROBE/advisory tests pass; zero regressions in the selected suite.
+### 2026-07-18 - Scheduled Run: Evidence-Aware CAGE-1 Comparison
+**Status**: COMPLETE - added read-only evidence metric deltas to `core/cage1_compare.py`; `EvidenceMetricDelta` is exported from `core.__init__`; 205 focused comparison/report/evaluation/memory/retrieval/advisory tests pass.
 
-**Build**: Added opt-in `--compare-snapshot PATH` support to `cli/cage1_report.py`, composing the existing read-only trend and adjacent comparison APIs. Added `experiments/test_cage1_report_cli.py` for JSON, Markdown, minimum-input, and default-mode coverage. Comparison mode preserves digest mismatches and `not_measured` evidence, and never changes policy, memory, or self-improvement state.
+**Build**:
+- `CAGE1Comparison` now carries `evidence_deltas` for `memory_integrity` and `retrieval_quality`.
+- Evidence fields compare score, recovery, completion, fidelity, top-k, counts, and invalid-record metrics where present.
+- Higher/lower-is-better metrics receive directional statuses; diagnostic metrics remain explicitly diagnostic.
+- Measurement transitions are `coverage_changed`; absent or unmeasured evidence remains `not_measured`.
+- Existing `cli.cage1_report --compare-snapshot` output inherits JSON and Markdown evidence sections. Default report mode is unchanged.
 
-**Research**: Current signals include bounded hierarchical memory (arXiv:2607.07666), agentic governance (2607.07612), multilingual long-horizon evaluation (2607.06008), verifiable reflection (2607.07820), canonical action attestation (2607.13716), LHTB, Pilotfish, and Google ADK v2.4.0.
+**Safety boundary**: comparison is read-only. It does not infer missing evidence, mutate snapshots, alter policy, repair memory, or apply self-improvement.
 
-**Next priority**: carry `memory_integrity` and `retrieval_quality` metric deltas into the report comparison envelope, preserving explicit `not_measured` handling. Keep policy and self-improvement changes review-only.
+**Validation**:
+- `python -m pytest -q experiments/test_cage1_evidence_comparison.py experiments/test_cage1_compare.py experiments/test_cage1_trend.py experiments/test_cage1_report_cli.py experiments/test_cage1_evaluation.py experiments/test_proactive_memory.py experiments/test_memprobe.py experiments/test_aibom_advisory.py experiments/test_aibom_review_cli.py` -> **205 passed**.
+- `python -m py_compile core/cage1_compare.py core/__init__.py experiments/test_cage1_evidence_comparison.py` -> passed.
+- `git diff --check` -> passed.
+
+**Research synthesis**: recent work on memory-augmented speculation, grounded world models, pairwise self-evolution validation, unreliable-evidence stress testing, responsible-AI enforcement gaps, dynamic tool loading, skill scanning, and gVisor/docker-sbx isolation all reinforce the same design choice: long-horizon agent improvement needs explicit, replayable evidence and strong execution boundaries.
+
+**Next priority**: add an opt-in read-only CAGE-1 fleet aggregation over ordered session snapshots, preserving per-session evidence, digest lineage, and explicit unmeasured dimensions. All policy and self-improvement changes remain review-only.
 
 ### 2026-07-17 - Scheduled Run: CAGE-1 Snapshot Comparison
 **Status**: COMPLETE - 5/5 new comparison tests pass; 192 focused CAGE-1/memory/retrieval/advisory tests pass; zero regressions in the selected suite.

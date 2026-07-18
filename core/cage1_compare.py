@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -47,6 +47,22 @@ class DimensionDelta:
 
 
 @dataclass(frozen=True)
+class EvidenceMetricDelta:
+    section: str
+    metric: str
+    baseline_measured: bool
+    current_measured: bool
+    baseline: Optional[float]
+    current: Optional[float]
+    delta: Optional[float]
+    status: str
+    notes: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class CAGE1Comparison:
     baseline_label: str
     current_label: str
@@ -57,6 +73,7 @@ class CAGE1Comparison:
     dimension_deltas: List[DimensionDelta]
     changed_outcome_count: int
     changed_dimension_count: int
+    evidence_deltas: List[EvidenceMetricDelta] = field(default_factory=list)
     notes: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,6 +87,7 @@ class CAGE1Comparison:
             "dimension_deltas": [item.to_dict() for item in self.dimension_deltas],
             "changed_outcome_count": self.changed_outcome_count,
             "changed_dimension_count": self.changed_dimension_count,
+            "evidence_deltas": [item.to_dict() for item in self.evidence_deltas],
             "notes": self.notes,
         }
 
@@ -103,6 +121,19 @@ class CAGE1Comparison:
             current = item.current_score if item.current_score is not None else "n/a"
             delta = f"{item.score_delta:+.3f}" if item.score_delta is not None else "n/a"
             lines.append(f"| `{item.dimension}` | {base} | {current} | {delta} | {item.status} |")
+        if self.evidence_deltas:
+            lines.extend([
+                "",
+                "## Evidence metric deltas",
+                "",
+                "| Section | Metric | Baseline | Current | Delta | Status |",
+                "|---|---|---:|---:|---:|---|",
+            ])
+            for item in self.evidence_deltas:
+                base = item.baseline if item.baseline is not None else "n/a"
+                current = item.current if item.current is not None else "n/a"
+                delta = f"{item.delta:+.3f}" if item.delta is not None else "n/a"
+                lines.append(f"| `{item.section}` | `{item.metric}` | {base} | {current} | {delta} | {item.status} |")
         if self.notes:
             lines.extend(["", "## Notes", "", self.notes])
         return "\n".join(lines) + "\n"
@@ -151,6 +182,51 @@ def _dimension_status(
     if delta < 0:
         return "regressed", ""
     return "unchanged", ""
+
+
+_EVIDENCE_METRICS = {
+    "memory_integrity": ("score", "record_count", "intervention_count", "invalid_record_count", "invalid_intervention_count"),
+    "retrieval_quality": ("score", "recovery_score", "task_completion_rate", "fidelity_gap", "topk_recovery_score", "topk_degradation", "num_scenarios", "num_dimensions"),
+}
+_HIGHER_IS_BETTER = {"score", "recovery_score", "task_completion_rate", "topk_recovery_score"}
+_LOWER_IS_BETTER = {"invalid_record_count", "invalid_intervention_count", "topk_degradation"}
+
+
+def _numeric_value(value: Any) -> Optional[float]:
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _evidence_deltas(snapshot: Mapping[str, Any], current: Mapping[str, Any]) -> List[EvidenceMetricDelta]:
+    deltas: List[EvidenceMetricDelta] = []
+    for section, metrics in _EVIDENCE_METRICS.items():
+        before = snapshot.get(section, {})
+        after = current.get(section, {})
+        before = before if isinstance(before, Mapping) else {}
+        after = after if isinstance(after, Mapping) else {}
+        before_measured = bool(before.get("measured", False))
+        after_measured = bool(after.get("measured", False))
+        for metric in metrics:
+            baseline = _numeric_value(before.get(metric))
+            value = _numeric_value(after.get(metric))
+            if baseline is None and value is None and before_measured == after_measured and metric != "score":
+                continue
+            if before_measured != after_measured:
+                status, note = "coverage_changed", f"measurement changed from {before_measured} to {after_measured}"
+            elif not before_measured:
+                status, note = "not_measured", "evidence section is explicitly unmeasured"
+            elif baseline is None or value is None:
+                status, note = "not_measured", "metric unavailable in one or both measured snapshots"
+            elif value == baseline:
+                status, note = "unchanged", ""
+            elif metric in _HIGHER_IS_BETTER:
+                status, note = ("improved" if value > baseline else "regressed"), "higher is better"
+            elif metric in _LOWER_IS_BETTER:
+                status, note = ("improved" if value < baseline else "regressed"), "lower is better"
+            else:
+                status, note = ("increased" if value > baseline else "decreased"), "direction is diagnostic, not a quality judgment"
+            delta = value - baseline if baseline is not None and value is not None else None
+            deltas.append(EvidenceMetricDelta(section, metric, before_measured, after_measured, baseline, value, delta, status, note))
+    return deltas
 
 
 def compare_evaluations(baseline: Any, current: Any, *, notes: str = "") -> CAGE1Comparison:
@@ -214,6 +290,7 @@ def compare_evaluations(baseline: Any, current: Any, *, notes: str = "") -> CAGE
         dimension_deltas=dimension_deltas,
         changed_outcome_count=changed_outcomes,
         changed_dimension_count=changed_dimensions,
+        evidence_deltas=_evidence_deltas(before, after),
         notes=notes,
     )
 
@@ -229,6 +306,7 @@ def load_evaluation(path: str) -> Dict[str, Any]:
 __all__ = [
     "CAGE1Comparison",
     "DimensionDelta",
+    "EvidenceMetricDelta",
     "OutcomeDelta",
     "compare_evaluations",
     "load_evaluation",

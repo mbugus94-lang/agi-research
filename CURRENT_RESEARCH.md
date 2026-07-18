@@ -1803,3 +1803,49 @@ Add evidence-aware CAGE-1 report comparison fixtures that carry `memory_integrit
 - https://github.com/zli12321/LHTB
 - https://github.com/Nanako0129/pilotfish
 - https://github.com/google/adk-python/releases/tag/v2.4.0
+## 2026-07-18 - Scheduled Run: Evidence-Aware CAGE-1 Comparison
+
+**Status**: COMPLETE — added read-only evidence metric deltas to the CAGE-1 comparison API; 205 focused comparison, report, evaluation, memory, retrieval, and advisory tests pass.
+
+### Research findings (past 2 weeks)
+
+- **Speculate with Memory** (arXiv:2607.12236, July 14) reports lossless agent speculation gains from a contrastive transition table, episodic retrieval, and a confusion tracker. The design signal is that memory should improve long-horizon prediction without changing the executed trajectory; comparisons therefore need to keep memory evidence separate from task outcomes.
+- **Grounded world models in biological organisms and future embodied AI** (arXiv:2607.13560) argues that interaction-grounded world models, active perception, intrinsic dynamics, and self/world outcome distinction are foundations for robust planning. This reinforces treating retrieval and memory measures as explicit evidence dimensions rather than inferring them from final success.
+- **Reward-Free Evolving Agents via Pairwise Validator** (arXiv:2607.14408, July 15) replaces scalar rewards with pairwise parent/child validation for self-evolving agents. The safety implication for this repository is direct: improvement signals should remain reviewable comparisons over saved evidence, not automatic self-modification.
+- **DeepStress** (arXiv:2607.13920) stress-tests deep-search agents under controlled unreliable evidence. Its focus on trustworthiness, relevance, and factuality supports the comparison layer's preservation of retrieval-quality submetrics and explicit `not_measured` states.
+- **Global Index on Responsible AI 2026** (arXiv:2607.14782) reports a gap between policy adoption and enforceable protections. For the substrate, this supports emitting governance comparisons as audit signals without silently changing policy.
+- **Open-source agent signals:** `earendil-works/pi` v0.80.7 emphasizes dynamic tool loading and tool choice; `NVIDIA/SkillSpector` scans agent skills for prompt injection, privilege escalation, memory poisoning, and MCP risks; GitHub Agentic Workflows v0.82.8 highlights gVisor and docker-sbx isolation. These are architecture and security signals, not a controlled popularity ranking.
+
+### Build: evidence-aware CAGE-1 comparison
+
+Implemented one focused, read-only task:
+
+- Added immutable `EvidenceMetricDelta` records to `core/cage1_compare.py`.
+- Comparisons now include explicit deltas for `memory_integrity` and `retrieval_quality`, including score, recovery, completion, fidelity, top-k, count, and invalid-record metrics where present.
+- Directional statuses are conservative: higher-is-better and lower-is-better metrics are classified; diagnostic metrics such as `fidelity_gap` are reported as increased/decreased without a quality judgment.
+- Measurement transitions are reported as `coverage_changed`; missing evidence remains `not_measured` rather than being guessed. Explicitly unmeasured score rows are retained so the report shows the evidence gap.
+- Existing `cli.cage1_report --compare-snapshot` output inherits the new JSON and Markdown evidence sections without changing default report mode.
+- Exported `EvidenceMetricDelta` from `core.__init__` and added focused tests for metric direction, unmeasured evidence, serialization, and rendering.
+
+**Safety boundary**: comparison is read-only. It does not mutate snapshots, infer missing evidence, alter policies, repair memory, or apply self-improvement. All policy and self-modification decisions remain review-only.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_evidence_comparison.py experiments/test_cage1_compare.py experiments/test_cage1_trend.py experiments/test_cage1_report_cli.py experiments/test_cage1_evaluation.py experiments/test_proactive_memory.py experiments/test_memprobe.py experiments/test_aibom_advisory.py experiments/test_aibom_review_cli.py` -> **205 passed**.
+- `python -m py_compile core/cage1_compare.py core/__init__.py experiments/test_cage1_evidence_comparison.py` -> passed.
+- `git diff --check` -> passed.
+
+### Next priority
+
+Add an opt-in CAGE-1 fleet aggregation over ordered session snapshots, preserving per-session evidence, digest lineage, and explicit unmeasured dimensions. Keep aggregation read-only and all policy/self-improvement changes review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.12236
+- https://arxiv.org/abs/2607.13560
+- https://arxiv.org/abs/2607.14408
+- https://arxiv.org/abs/2607.13920
+- https://arxiv.org/abs/2607.14782
+- https://github.com/earendil-works/pi/releases/tag/v0.80.7
+- https://github.com/NVIDIA/SkillSpector
+- https://github.github.com/gh-aw/blog/2026-07-13-weekly-update/

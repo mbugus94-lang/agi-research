@@ -433,6 +433,7 @@ from .memprobe import (
 from .cage1_compare import (
     CAGE1Comparison,
     DimensionDelta,
+    EvidenceMetricDelta,
     OutcomeDelta,
     compare_evaluations,
     load_evaluation,
