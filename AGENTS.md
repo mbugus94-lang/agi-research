@@ -6505,3 +6505,10 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 ### 2026-07-16 - Scheduled Run: CAGE-1 Retrieval Quality Dimension
 **Status**: COMPLETE - added read-only `RetrievalQualityMetrics` integration to `core/cage1_evaluation.py`; 4 new tests; 307 selected governance/memory/CEF/advisory regression tests pass. `evaluate_reports(..., retrieval_snapshot=...)` measures retrieval quality only when an explicit `core.memprobe.ProbeResult` or compatible snapshot is supplied; otherwise it remains `not_measured`. Recovery score is the CAGE-1 score; task completion and top-k degradation remain diagnostics. No auto-repair or self-modification.
 **Next priority**: add a CAGE-1 comparison mode with per-dimension and outcome-distribution deltas plus digest mismatch handling.
+
+### 2026-07-19 - Scheduled Run: Adversarial CAGE-1 Fleet Fixtures
+**Status**: COMPLETE - hardened the read-only fleet aggregator against malformed/non-finite optional evidence and invalid counts; added per-session `invalid_fields`, fleet `anomalies`, out-of-order label and duplicate digest detection; 5/5 fleet tests pass.
+
+**Safety boundary**: malformed evidence is surfaced and left unmeasured. Aggregation preserves input order, does not mutate snapshots, and never applies policy or self-modification.
+
+**Next priority**: add opt-in JSONL input to the fleet CLI with strict malformed-record reporting while preserving the existing JSON-array interface.

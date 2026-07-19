@@ -1893,3 +1893,50 @@ Add adversarial fleet fixtures: out-of-order labels, repeated digests, sessions 
 - https://github.com/earendil-works/pi/releases/tag/v0.80.7
 - https://github.com/bytedance/deer-flow
 - https://github.com/microclaw/microclaw
+
+## 2026-07-19 - Scheduled Run: Adversarial CAGE-1 Fleet Fixtures
+
+**Status**: COMPLETE — added adversarial input handling to the read-only fleet aggregator; 5 focused fleet tests pass and the existing CAGE-1 comparison/evaluation/memory/retrieval/advisory suite remains green.
+
+### Research findings (past 2 weeks)
+
+- **ARCANA** (arXiv:2607.09059) uses reflective multi-agent program synthesis for ARC-AGI 2 under strict test-time and hardware constraints. The useful architecture signal is to make reflection a bounded, testable stage rather than an unconstrained self-editing loop.
+- **RuBench** (arXiv:2607.06411) evaluates deployed coding-agent configurations at repository level and audits silent model substitution. This supports treating the deployed product configuration and trajectory—not only the nominal model—as the unit of evaluation.
+- **TrustX ARC** (arXiv:2607.09586) proposes twelve-dimensional risk scoring and autonomy levels for internally created agentic systems. This reinforces keeping governance dimensions explicit and preserving missing measurements instead of collapsing them into a single score.
+- **GDM AI Control Roadmap** (arXiv:2607.13087) defines detection and prevention/response as control invariants for increasingly capable agents. The fleet layer's anomaly reporting is a detection surface only; it does not apply remediation.
+- **Agentic skill optimization** (arXiv:2607.11493) studies systematic skill selection and optimization for agent systems. This is relevant to future capability-module experiments, but it does not justify automatic skill mutation in this repository.
+- **Open-source agent signals:** `earendil-works/pi` v0.80.7 (~73k stars) continues active development of a modular agent loop and coding CLI; `google/adk-python` v2.4.0 adds managed-agent and memory/profile tooling; `Nanako0129/pilotfish` emphasizes frontier planning, cheaper execution, and fresh-context verification; `Robbyant/lingbot-world-v2` combines a pilot agent and director agent for interactive world modeling. These are architecture signals, not a controlled popularity ranking.
+
+### Build: adversarial fleet fixtures and validation
+
+Implemented one focused, read-only task:
+
+- Hardened `core/cage1_fleet.py` against malformed optional sections, non-finite numeric values, negative/non-integral counts, and invalid outcome counts.
+- Added per-session `invalid_fields` and fleet-level `anomalies` so malformed evidence is surfaced rather than silently coerced into measurements.
+- Added anomaly detection for decreasing numeric session labels and repeated non-empty digests; ordered input remains preserved exactly as supplied.
+- Kept malformed evidence unmeasured, and kept aggregation deterministic, non-mutating, and policy-free.
+- Added adversarial tests covering out-of-order labels, repeated digests, NaN/string/negative values, malformed optional sections, serialization, Markdown rendering, and input preservation.
+
+**Safety boundary**: this is detection and reporting only. No policy, memory, retrieval, or self-improvement setting is changed automatically. Malformed data is not treated as a regression or success claim.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_fleet.py` -> **5 passed**.
+- `python -m py_compile core/cage1_fleet.py experiments/test_cage1_fleet.py` -> passed.
+- `git diff --check` -> passed.
+
+### Next priority
+
+Add an opt-in fleet CLI fixture mode that accepts JSONL as well as JSON arrays, while preserving strict malformed-record reporting and the existing JSON-array interface. Keep the aggregator read-only and policy/self-improvement changes review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.09059
+- https://arxiv.org/abs/2607.06411
+- https://arxiv.org/abs/2607.09586
+- https://arxiv.org/abs/2607.13087
+- https://arxiv.org/abs/2607.11493
+- https://github.com/earendil-works/pi/releases/tag/v0.80.7
+- https://github.com/google/adk-python/releases/tag/v2.4.0
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/Robbyant/lingbot-world-v2

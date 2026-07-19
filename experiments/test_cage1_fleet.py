@@ -46,3 +46,35 @@ def test_cli_json_mode(tmp_path):
     result = subprocess.run([sys.executable, "-m", "cli.cage1_fleet", "--input", str(path), "--format", "json"], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert len(json.loads(result.stdout)["sessions"]) == 1
+
+
+def test_adversarial_inputs_are_reported_without_mutation():
+    snapshots = [
+        _snapshot("session-2", "same", 1, 0.5, 0.6, 0.7),
+        _snapshot("session-1", "same", 1, 0.5, 0.6, 0.7),
+    ]
+    snapshots[0]["n_reports"] = -3
+    snapshots[0]["substrate_coverage"] = "unknown"
+    snapshots[0]["memory_integrity"]["score"] = float("nan")
+    original = [dict(item) for item in snapshots]
+    result = aggregate_fleet(snapshots)
+    assert snapshots[0]["n_reports"] == original[0]["n_reports"]
+    assert snapshots[0]["substrate_coverage"] == original[0]["substrate_coverage"]
+    assert snapshots[0]["memory_integrity"]["score"] != snapshots[0]["memory_integrity"]["score"]
+    assert "n_reports" in result.sessions[0].invalid_fields
+    assert "substrate_coverage" in result.sessions[0].invalid_fields
+    assert "memory_integrity.score" in result.sessions[0].invalid_fields
+    assert any("label order decreases" in item for item in result.anomalies)
+    assert any("duplicate digest" in item for item in result.anomalies)
+    payload = result.to_dict()
+    assert payload["anomalies"]
+    assert "Anomalies" in result.to_markdown()
+
+
+def test_malformed_optional_sections_stay_unmeasured():
+    snapshot = _snapshot("a", "x", 1, 0.5, None, None)
+    snapshot["retrieval_quality"] = ["not", "a", "mapping"]
+    result = aggregate_fleet([snapshot])
+    assert result.sessions[0].retrieval_quality == {}
+    assert "retrieval_quality" in result.sessions[0].invalid_fields
+    assert result.evidence_metrics == []

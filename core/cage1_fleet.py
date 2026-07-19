@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+import math
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Sequence
 
@@ -18,6 +19,7 @@ class FleetSession:
     outcome_distribution: Dict[str, int]
     memory_integrity: Dict[str, Any]
     retrieval_quality: Dict[str, Any]
+    invalid_fields: List[str]
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -75,6 +77,7 @@ class CAGE1Fleet:
     evidence_metrics: List[EvidenceFleetMetric]
     outcome_totals: Dict[str, int]
     notes: str = ""
+    anomalies: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -84,6 +87,7 @@ class CAGE1Fleet:
             "evidence_metrics": [item.to_dict() for item in self.evidence_metrics],
             "outcome_totals": self.outcome_totals,
             "notes": self.notes,
+            "anomalies": list(self.anomalies or []),
         }
 
     def to_json(self) -> str:
@@ -95,6 +99,7 @@ class CAGE1Fleet:
             "",
             f"- Sessions: **{len(self.sessions)}**",
             f"- Digest mismatches: **{sum(not item.matches_previous for item in self.digest_links)}**",
+            f"- Anomalies: **{len(self.anomalies or [])}**",
             "",
             "## Outcome totals",
             "",
@@ -107,15 +112,16 @@ class CAGE1Fleet:
             "",
             "## Session evidence",
             "",
-            "| # | Label | Reports | Coverage | Memory | Retrieval | Digest |",
-            "|---:|---|---:|---:|---:|---:|---|",
+            "| # | Label | Reports | Coverage | Memory | Retrieval | Digest | Invalid |",
+            "|---:|---|---:|---:|---:|---:|---|---|",
         ])
         for session in self.sessions:
             memory = _fmt(session.memory_integrity.get("score"))
             retrieval = _fmt(session.retrieval_quality.get("score"))
+            invalid = ", ".join(session.invalid_fields) if session.invalid_fields else "none"
             lines.append(
                 f"| {session.position} | `{session.label}` | {session.n_reports} | "
-                f"{session.substrate_coverage:.3f} | {memory} | {retrieval} | `{session.digest[:12]}` |"
+                f"{session.substrate_coverage:.3f} | {memory} | {retrieval} | `{session.digest[:12]}` | {invalid} |"
             )
         lines.extend([
             "",
@@ -145,6 +151,8 @@ class CAGE1Fleet:
         lines.extend(["", "## Digest lineage", "", "| # | Label | Digest | Match |", "|---:|---|---|---|"])
         for item in self.digest_links:
             lines.append(f"| {item.position} | `{item.label}` | `{item.digest[:12]}` | {'yes' if item.matches_previous else 'no'} |")
+        if self.anomalies:
+            lines.extend(["", "## Anomalies", "", *[f"- {item}" for item in self.anomalies]])
         if self.notes:
             lines.extend(["", "## Notes", "", self.notes])
         return "\n".join(lines) + "\n"
@@ -166,23 +174,59 @@ def _mapping(value: Any) -> Mapping[str, Any]:
     return value
 
 
+def _finite_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value))
+
+
 def _number(value: Any, default: float = 0.0) -> float:
-    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else default
+    return float(value) if _finite_number(value) else default
 
 
 def _session(snapshot: Any, position: int) -> FleetSession:
     data = _mapping(snapshot)
+    invalid: List[str] = []
+    raw_reports = data.get("n_reports", 0)
+    if not _finite_number(raw_reports) or int(raw_reports) != raw_reports or raw_reports < 0:
+        invalid.append("n_reports")
+        n_reports = 0
+    else:
+        n_reports = int(raw_reports)
+    raw_coverage = data.get("substrate_coverage")
+    if raw_coverage is not None and not _finite_number(raw_coverage):
+        invalid.append("substrate_coverage")
     outcomes = data.get("outcome_distribution", {})
     outcomes = outcomes if isinstance(outcomes, Mapping) else {}
+    if not isinstance(data.get("outcome_distribution", {}), Mapping):
+        invalid.append("outcome_distribution")
+    clean_outcomes: Dict[str, int] = {}
+    for key, value in outcomes.items():
+        if not _finite_number(value) or int(value) != value or value < 0:
+            invalid.append(f"outcome_distribution.{key}")
+            continue
+        clean_outcomes[str(key)] = int(value)
+    evidence: Dict[str, Dict[str, Any]] = {}
+    for section in ("memory_integrity", "retrieval_quality"):
+        raw_section = data.get(section, {})
+        if not isinstance(raw_section, Mapping):
+            invalid.append(section)
+            evidence[section] = {}
+            continue
+        evidence[section] = dict(raw_section)
+        for key, value in raw_section.items():
+            if key == "measured":
+                continue
+            if value is not None and not _finite_number(value):
+                invalid.append(f"{section}.{key}")
     return FleetSession(
         position=position,
         label=str(data.get("label", f"session-{position}")),
         digest=str(data.get("report_digest", "")),
-        n_reports=int(data.get("n_reports", 0) or 0),
-        substrate_coverage=_number(data.get("substrate_coverage")),
-        outcome_distribution={str(k): int(v or 0) for k, v in outcomes.items() if isinstance(v, (int, float)) and not isinstance(v, bool)},
-        memory_integrity=dict(data.get("memory_integrity", {})) if isinstance(data.get("memory_integrity"), Mapping) else {},
-        retrieval_quality=dict(data.get("retrieval_quality", {})) if isinstance(data.get("retrieval_quality"), Mapping) else {},
+        n_reports=n_reports,
+        substrate_coverage=_number(raw_coverage),
+        outcome_distribution=clean_outcomes,
+        memory_integrity=evidence["memory_integrity"],
+        retrieval_quality=evidence["retrieval_quality"],
+        invalid_fields=invalid,
     )
 
 
@@ -204,7 +248,7 @@ def _dimension_summaries(snapshots: Sequence[Mapping[str, Any]]) -> List[Dimensi
             dimensions = data.get("dimensions", [])
             row = next((item for item in dimensions if isinstance(item, Mapping) and str(item.get("dimension")) == name), None) if isinstance(dimensions, list) else None
             value = row.get("score") if isinstance(row, Mapping) else None
-            values.append(float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None)
+            values.append(float(value) if _finite_number(value) else None)
         measured = [value for value in values if value is not None]
         first = next((value for value in values if value is not None), None)
         last = next((value for value in reversed(values) if value is not None), None)
@@ -226,7 +270,7 @@ def _evidence_metrics(snapshots: Sequence[Mapping[str, Any]]) -> List[EvidenceFl
             for data in snapshots:
                 section_data = data.get(section, {})
                 value = section_data.get(name) if isinstance(section_data, Mapping) and section_data.get("measured", False) else None
-                values.append(float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None)
+                values.append(float(value) if _finite_number(value) else None)
             measured = [value for value in values if value is not None]
             if not measured:
                 continue
@@ -235,6 +279,18 @@ def _evidence_metrics(snapshots: Sequence[Mapping[str, Any]]) -> List[EvidenceFl
             higher = name not in {"invalid_record_count", "invalid_intervention_count", "topk_degradation", "fidelity_gap"}
             metrics.append(EvidenceFleetMetric(section, name, len(measured), len(values), sum(measured) / len(measured), min(measured), max(measured), first, last, last - first if first is not None and last is not None else None, _status(first, last, higher)))
     return metrics
+
+
+def _label_order_anomalies(sessions: Sequence[FleetSession]) -> List[str]:
+    values = []
+    for session in sessions:
+        suffix = session.label.rsplit("-", 1)[-1]
+        values.append(int(suffix) if suffix.isdigit() else None)
+    anomalies = []
+    for previous, current, session in zip(values, values[1:], sessions[1:]):
+        if previous is not None and current is not None and current < previous:
+            anomalies.append(f"label order decreases at position {session.position}: {session.label}")
+    return anomalies
 
 
 def aggregate_fleet(snapshots: Sequence[Any], *, notes: str = "") -> CAGE1Fleet:
@@ -248,7 +304,17 @@ def aggregate_fleet(snapshots: Sequence[Any], *, notes: str = "") -> CAGE1Fleet:
             if state == "total":
                 continue
             totals[state] = totals.get(state, 0) + count
-    return CAGE1Fleet(sessions, links, _dimension_summaries(data), _evidence_metrics(data), dict(sorted(totals.items())), notes)
+    anomalies = _label_order_anomalies(sessions)
+    for session in sessions:
+        anomalies.extend(f"position {session.position}: invalid {field}" for field in session.invalid_fields)
+    seen: Dict[str, int] = {}
+    for session in sessions:
+        if session.digest:
+            if session.digest in seen:
+                anomalies.append(f"duplicate digest at positions {seen[session.digest]} and {session.position}")
+            else:
+                seen[session.digest] = session.position
+    return CAGE1Fleet(sessions, links, _dimension_summaries(data), _evidence_metrics(data), dict(sorted(totals.items())), notes, anomalies)
 
 
 def load_fleet_snapshots(path: str) -> List[Dict[str, Any]]:
