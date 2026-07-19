@@ -446,6 +446,15 @@ from .cage1_trend import (
     load_evaluations,
     trend_evaluations,
 )
+from .cage1_fleet import (
+    CAGE1Fleet,
+    DimensionFleetSummary,
+    EvidenceFleetMetric,
+    FleetDigestLink,
+    FleetSession,
+    aggregate_fleet,
+    load_fleet_snapshots,
+)
 from .cage1_evaluation import (
     CAGE1Dimension,
     CAGE1Evaluation,

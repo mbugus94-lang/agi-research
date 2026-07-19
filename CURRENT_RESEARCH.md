@@ -1849,3 +1849,47 @@ Add an opt-in CAGE-1 fleet aggregation over ordered session snapshots, preservin
 - https://github.com/earendil-works/pi/releases/tag/v0.80.7
 - https://github.com/NVIDIA/SkillSpector
 - https://github.github.com/gh-aw/blog/2026-07-13-weekly-update/
+## 2026-07-19 - Scheduled Run: Read-only CAGE-1 Fleet Aggregation
+
+**Status**: COMPLETE - added an opt-in fleet aggregation layer; 3 new tests pass and the focused CAGE-1/memory/retrieval/advisory regression suite passes **208/208**.
+
+### Research findings (past 2 weeks)
+
+- **RxBrain** (arXiv:2607.14187, July 15) couples language planning with visual imagination and predicted world-state transitions. The architecture signal is that planning evidence should retain its grounding context instead of collapsing to a final answer.
+- **Reward-Free Evolving Agents via Pairwise Validator** (arXiv:2607.14408, July 15) uses parent/child comparison rather than an absolute scalar reward for self-evolution. This reinforces reviewable, pairwise or longitudinal evidence instead of automatic self-modification.
+- **Speculate with Memory** (arXiv:2607.12236, July 14) combines transition, episodic, and confusion memories for lossless agent acceleration. Fleet reports therefore preserve per-session memory and retrieval evidence rather than treating all sessions as interchangeable counts.
+- **DeepStress** (arXiv:2607.13920) evaluates search agents under controlled unreliable evidence. This supports keeping retrieval quality explicitly measured, missing, or unmeasured in aggregated reports.
+- **Grounded world models in biological organisms and future embodied AI** (arXiv:2607.13560) emphasizes interaction-grounded state, active perception, and self/world distinction. The fleet layer keeps session order and digest lineage visible as a minimal grounding and replay signal.
+- **Open-source agent signals:** `earendil-works/pi` v0.80.7 continues a high-activity modular agent toolkit; `bytedance/deer-flow` presents a super-agent harness built around sub-agents, memory, sandboxes, and extensible skills; `microclaw/microclaw` emphasizes one runtime across channels with persistent memory, scheduling, skills, MCP, and a local control plane. These are architecture signals, not a controlled popularity ranking.
+
+### Build: opt-in fleet aggregation
+
+Implemented one focused, read-only task:
+
+- Added `core/cage1_fleet.py` with immutable session records, outcome totals, digest lineage, per-dimension summaries, and evidence metric summaries for `memory_integrity` and `retrieval_quality`.
+- Added `cli/cage1_fleet.py` for `python -m cli.cage1_fleet --input snapshots.json --format {markdown,json,both}`.
+- Added `experiments/test_cage1_fleet.py` covering ordered session preservation, outcome totals, digest mismatch lineage, missing evidence, serialization, and CLI JSON output.
+- Exported the fleet API from `core/__init__.py`.
+
+**Safety boundary**: aggregation is read-only. It does not mutate snapshots, infer missing evidence, alter policy, repair memory, or apply self-improvement. Missing evidence remains absent; digest mismatches remain visible.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_fleet.py experiments/test_cage1_evidence_comparison.py experiments/test_cage1_report_cli.py experiments/test_cage1_trend.py experiments/test_cage1_compare.py experiments/test_cage1_evaluation.py experiments/test_proactive_memory.py experiments/test_memprobe.py experiments/test_aibom_advisory.py experiments/test_aibom_review_cli.py` -> **208 passed**.
+- `python -m py_compile core/cage1_fleet.py cli/cage1_fleet.py experiments/test_cage1_fleet.py` -> passed.
+- `git diff --check` -> passed.
+
+### Next priority
+
+Add adversarial fleet fixtures: out-of-order labels, repeated digests, sessions with mixed evidence coverage, and malformed optional metric values. Keep the aggregator deterministic, read-only, and explicit about invalid or unmeasured evidence.
+
+### Sources
+
+- https://arxiv.org/abs/2607.14187
+- https://arxiv.org/abs/2607.14408
+- https://arxiv.org/abs/2607.12236
+- https://arxiv.org/abs/2607.13920
+- https://arxiv.org/abs/2607.13560
+- https://github.com/earendil-works/pi/releases/tag/v0.80.7
+- https://github.com/bytedance/deer-flow
+- https://github.com/microclaw/microclaw
