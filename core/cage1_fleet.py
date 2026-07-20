@@ -318,10 +318,38 @@ def aggregate_fleet(snapshots: Sequence[Any], *, notes: str = "") -> CAGE1Fleet:
 
 
 def load_fleet_snapshots(path: str) -> List[Dict[str, Any]]:
-    value = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(value, list):
-        raise ValueError("fleet JSON must contain an array")
-    return [dict(_mapping(item)) for item in value]
+    """Load an ordered JSON array or newline-delimited JSON records.
+
+    JSONL is parsed line by line after array parsing fails, so malformed
+    records identify their source line instead of being silently skipped.
+    Blank lines are ignored; every non-blank record must be a mapping.
+    """
+    text = Path(path).read_text(encoding="utf-8")
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError:
+        value = None
+    else:
+        if isinstance(value, list):
+            return [dict(_mapping(item)) for item in value]
+        if isinstance(value, dict) and "\\n" not in text.strip():
+            return [dict(_mapping(value))]
+
+    records: List[Dict[str, Any]] = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"invalid JSONL record at line {line_number}: {exc.msg}") from exc
+        try:
+            records.append(dict(_mapping(item)))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"JSONL record at line {line_number} must be an object") from exc
+    if not records:
+        raise ValueError("fleet input must contain a JSON array or at least one JSONL object")
+    return records
 
 
 __all__ = [

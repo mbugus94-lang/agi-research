@@ -16,8 +16,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         prog="python -m cli.cage1_fleet",
         description="Aggregate CAGE-1 session snapshots without applying policy changes.",
     )
-    parser.add_argument("--input", required=True, help="JSON array of ordered CAGE-1 evaluation snapshots.")
-    parser.add_argument("--format", choices=("markdown", "json", "both"), default="both")
+    parser.add_argument("--input", required=True, help="JSON array or JSONL file of ordered CAGE-1 evaluation snapshots.")
+    parser.add_argument("--format", choices=("markdown", "json", "both"), default="both", help="Output format; both writes Markdown to stdout and JSON to stderr.")
     parser.add_argument("--notes", default="", help="Optional report note.")
     args = parser.parse_args(argv)
     try:

@@ -78,3 +78,29 @@ def test_malformed_optional_sections_stay_unmeasured():
     assert result.sessions[0].retrieval_quality == {}
     assert "retrieval_quality" in result.sessions[0].invalid_fields
     assert result.evidence_metrics == []
+
+
+def test_jsonl_loader_accepts_blank_lines_and_preserves_order(tmp_path):
+    from core.cage1_fleet import load_fleet_snapshots
+
+    path = tmp_path / "snapshots.jsonl"
+    rows = [_snapshot("session-1", "one", 1, 0.5, None, None), _snapshot("session-2", "two", 2, 0.75, 0.8, 0.9)]
+    path.write_text("\n" + json.dumps(rows[0]) + "\n\n" + json.dumps(rows[1]) + "\n", encoding="utf-8")
+    assert [row["label"] for row in load_fleet_snapshots(str(path))] == ["session-1", "session-2"]
+
+
+def test_jsonl_input_is_loaded_in_order(tmp_path):
+    path = tmp_path / "snapshots.jsonl"
+    rows = [_snapshot("session-1", "one", 1, 0.5, None, None), _snapshot("session-2", "two", 2, 0.75, 0.8, 0.9)]
+    path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+    result = subprocess.run([sys.executable, "-m", "cli.cage1_fleet", "--input", str(path), "--format", "json"], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert [item["label"] for item in json.loads(result.stdout)["sessions"]] == ["session-1", "session-2"]
+
+
+def test_jsonl_malformed_record_reports_line(tmp_path):
+    path = tmp_path / "snapshots.jsonl"
+    path.write_text(json.dumps(_snapshot("session-1", "one", 1, 0.5, None, None)) + "\nnot-json\n", encoding="utf-8")
+    result = subprocess.run([sys.executable, "-m", "cli.cage1_fleet", "--input", str(path), "--format", "json"], capture_output=True, text=True)
+    assert result.returncode == 2
+    assert "line 2" in result.stderr

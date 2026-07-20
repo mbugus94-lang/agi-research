@@ -1940,3 +1940,52 @@ Add an opt-in fleet CLI fixture mode that accepts JSONL as well as JSON arrays, 
 - https://github.com/google/adk-python/releases/tag/v2.4.0
 - https://github.com/Nanako0129/pilotfish
 - https://github.com/Robbyant/lingbot-world-v2
+
+## 2026-07-20 - Scheduled Run: JSONL CAGE-1 Fleet Input
+
+**Status**: COMPLETE — added opt-in JSONL input support to the read-only fleet CLI; 8 focused fleet tests pass.
+
+### Research findings (past 2 weeks)
+
+- **Speculate with Memory** (arXiv:2607.12236, July 14) adds a contrastive transition table, episodic memory, and confusion tracking to speculative agent execution. The reported gains are lossless because the actor trajectory is unchanged; this supports keeping fleet aggregation observational and separate from execution policy.
+- **Self-Aware Recursively Self-Improving Agents** (arXiv:2607.12254, revised July 16) proposes goal contracts, bounded scopes, validated tools, benchmarks, owner-controlled autonomy, structured handoffs, and an evidence-gated improvement loop. It is a systems-design proposal, not evidence of unrestricted recursive self-improvement; the useful substrate signal is explicit scope and review gates.
+- **ABot-AgentOS** (arXiv:2607.10350, revised July 17) combines a deliberative robot-agent layer with source-grounded multimodal graph memory, verification, and gated failure-driven evolution. The transferable design pattern is persistent memory with traceable provenance and promotion only after later evaluation.
+- **Agentic Skill Optimization over Lie Algebroids** (arXiv:2607.11493, July 13) models skill edits as structured, order-sensitive operations and screens cheap compatibility signals before expensive validation. This reinforces review-only, deterministic prechecks before any future skill change.
+
+### Open-source agent signals
+
+- **`earendil-works/pi`** — unified LLM API, agent loop, TUI, and coding-agent CLI; representative of compact, modular agent runtimes.
+- **`bytedance/deer-flow`** — long-horizon SuperAgent harness with sandboxes, memory, tools, skills, subagents, and a message gateway; representative of production-oriented orchestration breadth.
+- **`NVIDIA/SkillSpector`** — scanner for malicious patterns and vulnerabilities in AI-agent skills; representative of the emerging skill supply-chain security layer.
+
+These are architecture signals from repository pages, not a controlled popularity ranking.
+
+### Build: JSONL fleet input
+
+Implemented one focused task, D (small refactor / compatibility improvement):
+
+- `core/cage1_fleet.py`: `load_fleet_snapshots()` now accepts either the existing JSON array format or newline-delimited JSON objects. Blank lines are ignored, record order is preserved, and malformed JSONL reports its line number instead of being skipped.
+- `cli/cage1_fleet.py`: help text now documents JSON-array and JSONL input and the `both` output behavior.
+- `experiments/test_cage1_fleet.py`: added coverage for JSONL order, blank lines, malformed-record reporting, and CLI loading.
+
+**Safety boundary**: aggregation remains read-only. The loader does not mutate records, infer missing evidence, alter policy, or apply self-improvement. Malformed records fail closed with an actionable error.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_fleet.py` -> **8 passed**.
+- `python -m py_compile core/cage1_fleet.py cli/cage1_fleet.py experiments/test_cage1_fleet.py` -> passed.
+- `git diff --check` -> passed.
+
+### Next priority
+
+Add a read-only fleet CLI fixture mode for explicit mixed-coverage and duplicate-digest cases, or wire the fleet envelope into a broader CAGE-1 report only after preserving per-session provenance and anomaly fields. Keep policy and self-improvement changes review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.12236
+- https://arxiv.org/abs/2607.12254
+- https://arxiv.org/abs/2607.10350
+- https://arxiv.org/abs/2607.11493
+- https://github.com/earendil-works/pi
+- https://github.com/bytedance/deer-flow
+- https://github.com/NVIDIA/SkillSpector
