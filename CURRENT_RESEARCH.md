@@ -1989,3 +1989,61 @@ Add a read-only fleet CLI fixture mode for explicit mixed-coverage and duplicate
 - https://github.com/earendil-works/pi
 - https://github.com/bytedance/deer-flow
 - https://github.com/NVIDIA/SkillSpector
+
+## 2026-07-20 - Scheduled Run: Read-only CAGE-1 Fleet Fixture Mode
+
+**Status**: COMPLETE — added deterministic fixture input to the fleet CLI; 11 fleet tests pass and the focused CAGE-1/memory/retrieval/advisory regression suite passes **216/216**.
+
+### Research findings (past 2 weeks)
+
+- **Hierarchical memory for long-horizon multi-agent modeling** (arXiv:2607.07666) bounds context through layered memory, explicit eviction, and specialist oversight. The practical signal is to make memory coverage and capacity effects visible in fleet evidence instead of treating missing measurements as zeros.
+- **Speculate with Memory** (arXiv:2607.12236) combines transition, episodic, and confusion memories for lossless planning acceleration. The fleet layer should remain observational: it can compare evidence without changing the trajectory it measures.
+- **MILES** (arXiv:2607.06974) uses modular instruction memory with coarse-to-fine selection for self-improving reasoning. This supports preserving provenance and coverage status when comparing evolving agent configurations.
+- **RxBrain** (arXiv:2607.14187) couples language planning with visual grounding and imagined world states. The general architecture signal is that planning claims need grounded, inspectable evidence rather than only an end-state score.
+- **DeepSearch-World** (arXiv:2607.07820) uses deterministic verification, reflection, and failure recovery for self-distillation. This reinforces fail-closed parsing and replayable fixture inputs for evaluation tooling.
+- **Reward-Free Evolving Agents via Pairwise Validator** (arXiv:2607.14408) uses parent/child validation instead of an opaque scalar reward. The safety implication remains review-only comparison and no automatic self-modification.
+
+### Open-source agent signals
+
+- **`earendil-works/pi` v0.80.7** — active modular agent loop with cache-friendly dynamic tool loading and broad provider support.
+- **`bytedance/deer-flow`** — long-horizon SuperAgent architecture built around subagents, memory, sandboxes, tools, and skills.
+- **`NVIDIA/SkillSpector`** — agent-skill security scanning for prompt injection, privilege escalation, memory poisoning, and MCP risks.
+- **`ardhaecosystem/synapse`** — self-hosted temporal knowledge-graph memory with biologically inspired consolidation and forgetting.
+
+These are architecture and activity signals from public repository pages, not a controlled popularity ranking.
+
+### Build: deterministic fleet fixtures
+
+Implemented one focused task, C/D (validation experiment plus read-only CLI improvement):
+
+- `cli/cage1_fleet.py` now supports an opt-in `--fixture {mixed-coverage,duplicate-digest}` mode in addition to JSON-array/JSONL input.
+- `mixed-coverage` demonstrates an explicitly unmeasured first session followed by measured memory and retrieval evidence; the report preserves that coverage boundary.
+- `duplicate-digest` demonstrates lineage anomaly reporting without mutating or deduplicating sessions.
+- The CLI now requires exactly one source: `--input` or `--fixture`.
+- Added three tests covering mixed evidence coverage, duplicate-digest anomaly reporting, and the required source guard.
+
+**Safety boundary**: fixtures are deterministic, read-only, and diagnostic. They do not alter policies, memory, retrieval, agent skills, or self-improvement settings. Missing evidence remains unmeasured; duplicate digests remain visible as anomalies.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_fleet.py` -> **11 passed**.
+- Focused regression (`test_cage1_fleet.py`, `test_cage1_evidence_comparison.py`, `test_cage1_report_cli.py`, `test_cage1_trend.py`, `test_cage1_compare.py`, `test_cage1_evaluation.py`, `test_proactive_memory.py`, `test_memprobe.py`, `test_aibom_advisory.py`, `test_aibom_review_cli.py`) -> **216 passed**.
+- `python -m py_compile cli/cage1_fleet.py experiments/test_cage1_fleet.py` -> passed.
+- `git diff --check` -> passed.
+
+### Next priority
+
+Add a read-only CAGE-1 fleet envelope to the broader report CLI only if it can preserve per-session provenance, digest lineage, anomalies, and explicit unmeasured evidence. Keep policy changes and self-modification review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.07666
+- https://arxiv.org/abs/2607.12236
+- https://arxiv.org/abs/2607.06974
+- https://arxiv.org/abs/2607.14187
+- https://arxiv.org/abs/2607.07820
+- https://arxiv.org/abs/2607.14408
+- https://github.com/earendil-works/pi/releases/tag/v0.80.7
+- https://github.com/bytedance/deer-flow
+- https://github.com/NVIDIA/SkillSpector
+- https://github.com/ardhaecosystem/synapse

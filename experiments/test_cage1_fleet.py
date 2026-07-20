@@ -104,3 +104,37 @@ def test_jsonl_malformed_record_reports_line(tmp_path):
     result = subprocess.run([sys.executable, "-m", "cli.cage1_fleet", "--input", str(path), "--format", "json"], capture_output=True, text=True)
     assert result.returncode == 2
     assert "line 2" in result.stderr
+
+
+def test_cli_mixed_coverage_fixture_preserves_unmeasured_evidence():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_fleet", "--fixture", "mixed-coverage", "--format", "json"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["notes"] == "fixture: mixed-coverage"
+    assert payload["sessions"][0]["memory_integrity"]["measured"] is False
+    assert any(item["metric"] == "score" and item["measured_sessions"] == 1 for item in payload["evidence_metrics"])
+
+
+def test_cli_duplicate_digest_fixture_reports_anomaly():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_fleet", "--fixture", "duplicate-digest", "--format", "json"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert any("duplicate digest" in item for item in payload["anomalies"])
+
+
+def test_cli_requires_input_or_fixture():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_fleet", "--format", "json"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert "required" in result.stderr
