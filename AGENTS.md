@@ -1,3 +1,34 @@
+### 2026-07-22 - Scheduled Run: Adversarial CAGE-1 Fleet CLI Coverage
+**Status**: COMPLETE - added malformed-input, lineage-anomaly, mixed-coverage, and non-finite-metric tests to the higher-level fleet report CLI; 26 focused fleet/report tests pass.
+
+**Build**:
+- `experiments/test_cage1_report_cli.py` now verifies malformed JSONL reports its source line, duplicate digests and decreasing labels remain visible, mixed measured/unmeasured evidence remains explicit, and NaN/Infinity never become evidence scores.
+- The change is test-only; fleet aggregation and report behavior remain read-only, deterministic, provenance-preserving, and fail-closed.
+
+**Validation**:
+- `python -m pytest -q experiments/test_cage1_report_cli.py experiments/test_cage1_fleet.py` -> **26 passed**.
+- `git diff --check` -> passed.
+
+**Research synthesis**: recent work on bounded hierarchical memory, verifiable self-distillation, unreliable-evidence stress testing, grounded planning, and local-first agent memory reinforces the repository's evidence-first posture: malformed or missing evidence must remain explicit, and self-improvement must remain review-only.
+
+**Next priority**: run the focused fleet/report regression against the adjacent CAGE-1 evidence suite, then consider a read-only fleet envelope in trend output only if it preserves session provenance, digest lineage, anomalies, and unmeasured coverage.
+
+### 2026-07-22 - Scheduled Run: Adversarial CAGE-1 Fleet CLI Coverage
+**Status**: COMPLETE - added five adversarial CLI tests covering malformed JSONL, duplicate digests, decreasing labels, mixed evidence coverage, and non-finite metrics; focused fleet/report tests pass 26/26; adjacent CAGE-1/memory/retrieval/advisory suite passes 227/227.
+
+**Build**:
+- `experiments/test_cage1_report_cli.py` now verifies malformed JSONL reports its source line, duplicate/decreasing-label anomalies remain visible, measured/unmeasured evidence boundaries remain explicit, and non-finite optional metrics become `invalid_fields` rather than scores.
+- Tests exercise the existing read-only fleet/report integration only. No policy, memory, retrieval, skill, or self-improvement behavior changed.
+
+**Research synthesis**: recent work on bounded hierarchical memory, pairwise validation, lossless memory speculation, deterministic self-distillation environments, unreliable-evidence stress testing, and grounded multimodal planning reinforces fail-closed parsing, explicit coverage, replayable provenance, and review-only improvement.
+
+**Validation**:
+- `python -m pytest -q experiments/test_cage1_report_cli.py experiments/test_cage1_fleet.py` -> 26 passed.
+- Adjacent CAGE-1/memory/retrieval/advisory suite -> 227 passed.
+- Changed modules compile; `git diff --check` passes.
+
+**Next priority**: run the full CAGE-1 fleet/report regression against the repository baseline, then consider a read-only fleet envelope in trend output only if it preserves per-session provenance, digest lineage, anomalies, and explicit unmeasured evidence. Keep policy and self-modification changes review-only.
+
 ### 2026-07-18 - Scheduled Run: Evidence-Aware CAGE-1 Comparison
 **Status**: COMPLETE - added read-only evidence metric deltas to `core/cage1_compare.py`; `EvidenceMetricDelta` is exported from `core.__init__`; 205 focused comparison/report/evaluation/memory/retrieval/advisory tests pass.
 
@@ -6512,6 +6543,15 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Safety boundary**: malformed evidence is surfaced and left unmeasured. Aggregation preserves input order, does not mutate snapshots, and never applies policy or self-modification.
 
 **Next priority**: add opt-in JSONL input to the fleet CLI with strict malformed-record reporting while preserving the existing JSON-array interface.
+
+### 2026-07-22 - Scheduled Run: Adversarial CAGE-1 Fleet CLI Coverage
+**Status**: COMPLETE - added five read-only adversarial CLI tests; 26 focused fleet/report tests and 227 adjacent CAGE-1/memory/retrieval/advisory tests pass.
+
+**Build**:
+- `experiments/test_cage1_report_cli.py` covers malformed JSONL line reporting, duplicate digest anomalies, decreasing label anomalies, mixed measured/unmeasured evidence, and non-finite optional metrics.
+- No production policy, memory, retrieval, skill, or self-improvement behavior changed; invalid evidence remains explicit and review-only.
+
+**Next priority**: run the full CAGE-1 fleet/report regression, then consider trend integration only if per-session provenance, digest lineage, anomalies, and unmeasured evidence remain intact.
 
 ### 2026-07-21 - Scheduled Run: Expose CAGE-1 Fleet in Report CLI
 **Status**: ✅ COMPLETE — added read-only `--fleet-input` mode to `cli/cage1_report.py`; 17/17 focused fleet/report tests and 215/215 broader CAGE-1/memory/retrieval/advisory tests pass. Commit `b2646c2` pushed to `origin/main`.

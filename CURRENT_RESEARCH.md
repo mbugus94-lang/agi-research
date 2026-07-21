@@ -2096,3 +2096,138 @@ Add adversarial fleet CLI coverage for malformed JSONL, duplicate digests, decre
 - https://github.com/HKUDS/OpenSpace
 - https://github.com/tracer-cloud/opensre
 - https://github.com/HKUDS/OpenPhone
+
+## 2026-07-22 - Scheduled Run: Adversarial CAGE-1 Fleet CLI Coverage
+
+**Status**: COMPLETE — added five adversarial report-CLI tests; the focused fleet/report suite passes **26/26**.
+
+### Research findings (past week and past 2 weeks)
+
+- **A hierarchical memory architecture overcomes context limits** (arXiv:2607.07666) uses bounded layered memory and specialist oversight for long-horizon multi-agent work. The operational lesson is to preserve explicit coverage and eviction boundaries in evaluation output.
+- **Reward-Free Evolving Agents via Pairwise Validator** (arXiv:2607.14408) uses parent/child validation instead of a scalar reward. It reinforces review-only improvement: evidence may recommend a change, but the repository must not auto-apply it.
+- **Speculate with Memory** (arXiv:2607.12236) separates predictive memory from the actor trajectory. This supports keeping fleet analysis observational and read-only.
+- **DeepSearch-World** (arXiv:2607.07820) combines deterministic tools, progress verification, grounded reflection, and failure recovery. Its reproducibility emphasis supports fail-closed JSONL parsing and deterministic fixtures.
+- **DeepStress** (arXiv:2607.13920) stress-tests agents under unreliable evidence. Malformed, missing, or non-finite evidence must remain visible as invalid/unmeasured rather than being converted into a score.
+- **RxBrain** (arXiv:2607.14187) couples language plans to visual world-state predictions. Plans and outcomes need inspectable grounding, not only end-state metrics.
+
+Open-source signals included **google/adk-python** (managed agents, workflows, sandbox hardening, and memory tooling), **NVIDIA/SkillSpector** (skill supply-chain scanning), **antoinezambelli/forge** (self-hosted tool-calling with guardrails and context compaction), and **oleksiijko/pmb** (local-first persistent agent memory). These are architecture/activity signals, not a controlled popularity ranking.
+
+### Build: adversarial fleet/report CLI validation
+
+- `experiments/test_cage1_report_cli.py` now covers malformed JSONL with a reported source line, duplicate digest and decreasing-label anomalies, mixed measured/unmeasured memory evidence, and non-finite optional metrics.
+- The tests exercise the existing read-only `--fleet-input` integration; no policy or aggregation behavior changed.
+- Non-finite JSON values are verified to become explicit `invalid_fields` with no evidence metrics emitted.
+
+**Safety boundary**: this run changes tests only. Fleet/report behavior remains read-only, deterministic, provenance-preserving, and fail-closed for malformed input. No policy, memory, retrieval, skill, or self-improvement behavior changed.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_report_cli.py experiments/test_cage1_fleet.py` -> **26 passed**.
+- `git diff --check` -> passed.
+
+### Next priority
+
+Run the focused CAGE-1 fleet/report regression against the full adjacent evidence suite, then consider a read-only fleet envelope in trend output only if it preserves per-session provenance, digest lineage, anomalies, and explicit unmeasured evidence. Keep policy and self-modification changes review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.07666
+- https://arxiv.org/abs/2607.14408
+- https://arxiv.org/abs/2607.12236
+- https://arxiv.org/abs/2607.07820
+- https://arxiv.org/abs/2607.13920
+- https://arxiv.org/abs/2607.14187
+- https://github.com/google/adk-python/releases/tag/v2.4.0
+- https://github.com/NVIDIA/SkillSpector
+- https://github.com/antoinezambelli/forge
+- https://github.com/oleksiijko/pmb
+
+## 2026-07-22 - Scheduled Run: Adversarial CAGE-1 Fleet CLI Coverage
+
+**Status**: COMPLETE — added five adversarial CLI tests; focused fleet/report tests pass **26/26**, and the adjacent CAGE-1/memory/retrieval/advisory suite passes **227/227**.
+
+### Research findings (past 1–2 weeks)
+
+- **A hierarchical memory architecture overcomes context limits** (arXiv:2607.07666) uses bounded layered memory and specialist oversight for long-horizon multi-agent work. The operational lesson is to preserve explicit coverage and eviction boundaries in evaluation output.
+- **Reward-Free Evolving Agents via Pairwise Validator** (arXiv:2607.14408) uses parent/child validation instead of a scalar reward. It reinforces review-only improvement: evidence may recommend a change, but the repository must not auto-apply it.
+- **Speculate with Memory** (arXiv:2607.12236) separates predictive memory from the actor trajectory. This supports keeping fleet analysis observational and read-only.
+- **DeepSearch-World** (arXiv:2607.07820) combines deterministic tools, progress verification, grounded reflection, and failure recovery. Its reproducibility emphasis supports fail-closed JSONL parsing and deterministic fixtures.
+- **DeepStress** (arXiv:2607.13920) stress-tests agents under unreliable evidence. Malformed, missing, or non-finite evidence must stay visible as invalid/unmeasured rather than becoming a score.
+- **RxBrain** (arXiv:2607.14187) couples language plans to visual world-state predictions, reinforcing inspectable grounding rather than end-state-only metrics.
+
+Open-source signals from public GitHub pages included **google/adk-python** (managed agents, workflows, sandbox hardening, and memory tooling), **NVIDIA/SkillSpector** (skill supply-chain scanning), **antoinezambelli/forge** (self-hosted tool-calling with guardrails and context compaction), and **oleksiijko/pmb** (local-first persistent agent memory). These are architecture/activity signals, not a controlled popularity ranking.
+
+### Build: adversarial fleet/report validation
+
+Implemented task C/D: expanded `experiments/test_cage1_report_cli.py` to exercise the existing read-only `--fleet-input` integration with malformed JSONL, duplicate digests, decreasing labels, mixed measured/unmeasured evidence, and non-finite optional metrics. The tests verify that invalid input is reported with its source line or `invalid_fields`, while valid anomalies and coverage boundaries remain visible in JSON output.
+
+**Safety boundary**: tests only. Fleet aggregation remains deterministic, read-only, provenance-preserving, and fail-closed for malformed input. No policy, memory, retrieval, skill, or self-improvement behavior changed.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_report_cli.py experiments/test_cage1_fleet.py` → **26 passed**.
+- Adjacent CAGE-1/memory/retrieval/advisory suite → **227 passed**.
+- `python -m py_compile cli/cage1_report.py core/cage1_fleet.py experiments/test_cage1_report_cli.py` → passed.
+- `git diff --check` → passed.
+
+### Next priority
+
+Run the full CAGE-1 fleet/report regression against the repository baseline, then consider a read-only fleet envelope in trend output only if it preserves per-session provenance, digest lineage, anomalies, and explicit unmeasured evidence. Keep policy and self-modification changes review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.07666
+- https://arxiv.org/abs/2607.14408
+- https://arxiv.org/abs/2607.12236
+- https://arxiv.org/abs/2607.07820
+- https://arxiv.org/abs/2607.13920
+- https://arxiv.org/abs/2607.14187
+- https://github.com/google/adk-python/releases/tag/v2.4.0
+- https://github.com/NVIDIA/SkillSpector
+- https://github.com/antoinezambelli/forge
+- https://github.com/oleksiijko/pmb
+
+## 2026-07-22 - Scheduled Run: Adversarial CAGE-1 Fleet CLI Coverage
+
+**Status**: COMPLETE — added five adversarial tests around the read-only CAGE-1 fleet/report CLI integration; focused fleet/report tests pass **26/26**, and the adjacent CAGE-1/memory/retrieval/advisory suite passes **227/227**.
+
+### Research findings (past two weeks)
+
+- **A hierarchical memory architecture overcomes context limits** (arXiv:2607.07666) uses bounded layered memory and specialist oversight for long-horizon multi-agent work. Evaluation output should preserve explicit coverage and eviction boundaries.
+- **Reward-Free Evolving Agents via Pairwise Validator** (arXiv:2607.14408) uses parent/child validation rather than a scalar reward. It reinforces review-only improvement: evidence can recommend a change, but must not auto-apply it.
+- **Speculate with Memory** (arXiv:2607.12236) separates predictive memory from the actor trajectory, supporting observational fleet analysis.
+- **DeepSearch-World** (arXiv:2607.07820) combines deterministic tools, progress verification, grounded reflection, and failure recovery; its reproducibility emphasis supports fail-closed JSONL parsing.
+- **DeepStress** (arXiv:2607.13920) stress-tests agents under unreliable evidence. Malformed, missing, or non-finite evidence should remain visible as invalid/unmeasured, not become a score.
+- **RxBrain** (arXiv:2607.14187) couples language plans to visual world-state predictions, reinforcing inspectable grounding rather than relying only on end-state metrics.
+
+Open-source signals included **google/adk-python** (managed agents, workflows, sandbox hardening, and memory tooling), **NVIDIA/SkillSpector** (skill supply-chain scanning), **antoinezambelli/forge** (self-hosted tool-calling with guardrails and context compaction), and **oleksiijko/pmb** (local-first persistent agent memory). These are architecture/activity signals, not a controlled popularity ranking.
+
+### Build: adversarial fleet/report validation
+
+- `experiments/test_cage1_report_cli.py` now verifies malformed JSONL reports its source line; duplicate digests and decreasing labels remain visible as anomalies; mixed measured/unmeasured evidence preserves coverage boundaries; and non-finite optional metrics become `invalid_fields` instead of scores.
+- The tests exercise the existing read-only `--fleet-input` integration only. No policy, memory, retrieval, skill, or self-improvement behavior changed.
+
+**Safety boundary**: fleet parsing and rendering remain deterministic, read-only, provenance-preserving, and fail-closed for malformed input. No automatic remediation or self-modification is performed.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_report_cli.py experiments/test_cage1_fleet.py` -> **26 passed**.
+- Adjacent CAGE-1/memory/retrieval/advisory suite -> **227 passed**.
+- Changed modules compile; `git diff --check` passes.
+
+### Next priority
+
+Run the full CAGE-1 fleet/report regression against the repository baseline, then consider a read-only fleet envelope in trend output only if it preserves per-session provenance, digest lineage, anomalies, and explicit unmeasured evidence. Keep policy and self-modification changes review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.07666
+- https://arxiv.org/abs/2607.14408
+- https://arxiv.org/abs/2607.12236
+- https://arxiv.org/abs/2607.07820
+- https://arxiv.org/abs/2607.13920
+- https://arxiv.org/abs/2607.14187
+- https://github.com/google/adk-python/releases/tag/v2.4.0
+- https://github.com/NVIDIA/SkillSpector
+- https://github.com/antoinezambelli/forge
+- https://github.com/oleksiijko/pmb
