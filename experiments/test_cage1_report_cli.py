@@ -97,3 +97,53 @@ def test_report_cli_default_mode_remains_available():
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["label"] == "default"
+
+
+def test_report_cli_fleet_input_jsonl_mode(tmp_path):
+    path = tmp_path / "fleet.jsonl"
+    rows = [
+        {
+            "label": "session-1",
+            "report_digest": "one",
+            "n_reports": 1,
+            "substrate_coverage": 0.5,
+            "outcome_distribution": {"admitted": 1, "refused": 0, "total": 1},
+            "dimensions": [],
+            "memory_integrity": {"measured": False},
+            "retrieval_quality": {"measured": False},
+        },
+        {
+            "label": "session-2",
+            "report_digest": "two",
+            "n_reports": 2,
+            "substrate_coverage": 0.75,
+            "outcome_distribution": {"admitted": 1, "refused": 1, "total": 2},
+            "dimensions": [],
+            "memory_integrity": {"measured": True, "score": 0.8},
+            "retrieval_quality": {"measured": False},
+        },
+    ]
+    path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_report", "--fleet-input", str(path), "--format", "json"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert [item["label"] for item in payload["sessions"]] == ["session-1", "session-2"]
+    assert payload["outcome_totals"]["admitted"] == 2
+
+
+def test_report_cli_fleet_input_is_read_only(tmp_path):
+    path = tmp_path / "fleet.json"
+    row = {"label": "session-1", "report_digest": "one", "n_reports": 1, "outcome_distribution": {"admitted": 1}, "dimensions": []}
+    original = json.dumps([row])
+    path.write_text(original, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_report", "--fleet-input", str(path), "--format", "json"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert path.read_text(encoding="utf-8") == original

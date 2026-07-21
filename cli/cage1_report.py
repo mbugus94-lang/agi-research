@@ -42,6 +42,7 @@ from core.cage1_evaluation import (
     load_reports_from_jsonl,
     cage1_state_distribution,
 )
+from core.cage1_fleet import CAGE1Fleet, aggregate_fleet, load_fleet_snapshots
 from core.cage1_trend import trend_evaluations
 
 
@@ -66,6 +67,11 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         action="append",
         metavar="PATH",
         help="Compare two or more saved CAGE-1 JSON snapshots; repeat for each path.",
+    )
+    src.add_argument(
+        "--fleet-input",
+        metavar="PATH",
+        help="Aggregate ordered CAGE-1 session snapshots from a JSON array or JSONL file.",
     )
     p.add_argument(
         "--demo-actions",
@@ -149,6 +155,17 @@ def _emit(
         print(evaluation.to_json(), file=sys.stderr)
 
 
+def _emit_fleet(fleet: CAGE1Fleet, fmt: str) -> None:
+    if fmt == "json":
+        print(fleet.to_json())
+    elif fmt == "markdown":
+        print(fleet.to_markdown())
+    else:
+        print(fleet.to_markdown())
+        print("---", file=sys.stderr)
+        print(fleet.to_json(), file=sys.stderr)
+
+
 def _comparison_payload(snapshot_paths: List[str], notes: str) -> tuple[dict, str]:
     snapshots = [load_evaluation(path) for path in snapshot_paths]
     trend = trend_evaluations(snapshots, notes=notes)
@@ -181,6 +198,14 @@ def _emit_comparison(payload: dict, markdown: str, fmt: str) -> None:
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = _parse_args(argv)
+    if args.fleet_input:
+        try:
+            fleet = aggregate_fleet(load_fleet_snapshots(args.fleet_input), notes=args.notes)
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        _emit_fleet(fleet, args.format)
+        return 0
     if args.compare_snapshot is not None:
         if len(args.compare_snapshot) < 2:
             print("ERROR: --compare-snapshot requires at least two paths", file=sys.stderr)
