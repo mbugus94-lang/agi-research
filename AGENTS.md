@@ -6512,3 +6512,12 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Safety boundary**: malformed evidence is surfaced and left unmeasured. Aggregation preserves input order, does not mutate snapshots, and never applies policy or self-modification.
 
 **Next priority**: add opt-in JSONL input to the fleet CLI with strict malformed-record reporting while preserving the existing JSON-array interface.
+
+### 2026-07-21 - Scheduled Run: Expose CAGE-1 Fleet in Report CLI
+**Status**: ✅ COMPLETE — added read-only `--fleet-input` mode to `cli/cage1_report.py`; 17/17 focused fleet/report tests and 215/215 broader CAGE-1/memory/retrieval/advisory tests pass. Commit `b2646c2` pushed to `origin/main`.
+
+**Research signal**: StructAgent, TopoAgent, DeepSearch-World, Reward-Free Evolving Agents, Speculate with Memory, DeepStress, and ABot-AgentOS converge on compact evidence-backed state, dependency/provenance preservation, deterministic verification, and gated self-improvement. Open-source signals checked: HKUDS/OpenSpace, Tracer-Cloud/OpenSRE, and HKUDS/OpenPhone. These are architecture/activity signals, not a controlled popularity ranking.
+
+**Build**: `cli/cage1_report.py --fleet-input PATH` now exposes ordered JSON/JSONL fleet aggregation with Markdown/JSON/both output. Tests verify JSONL handling and input immutability. The mode remains read-only: no policy, memory, retrieval, deduplication, or self-modification occurs.
+
+**Next priority**: adversarial fleet CLI fixtures for malformed JSONL, duplicate digests, decreasing labels, mixed evidence coverage, and non-finite optional metrics. Preserve explicit invalid/unmeasured evidence and keep self-modification review-only.

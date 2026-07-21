@@ -2047,3 +2047,52 @@ Add a read-only CAGE-1 fleet envelope to the broader report CLI only if it can p
 - https://github.com/bytedance/deer-flow
 - https://github.com/NVIDIA/SkillSpector
 - https://github.com/ardhaecosystem/synapse
+
+## 2026-07-21 - Scheduled Run: Expose CAGE-1 Fleet in the Report CLI
+
+**Status**: COMPLETE — added a read-only `--fleet-input` mode to the higher-level CAGE-1 report CLI; focused fleet/report tests pass **17/17**, and the broader CAGE-1/memory/retrieval/advisory regression suite passes **215/215**.
+
+### Research findings (past 2 weeks)
+
+- **StructAgent** (arXiv:2607.11388) maintains a compact causal task state with verifier-backed transitions and reports substantial OSWorld-Verified gains. The transferable signal is to keep task progress compact, evidence-backed, and recoverable rather than treating the full transcript as authoritative state.
+- **TopoAgent** (arXiv:2607.14658) uses a state-isolated dependency graph for multimodal scientific reasoning and self-correction. It supports preserving causal/dependency structure in future fleet and trend reports.
+- **DeepSearch-World** (arXiv:2607.07820) combines deterministic web tools, progress verification, grounded reflection, and failure recovery for self-distillation. This reinforces replayable fixtures and fail-closed input handling.
+- **Reward-Free Evolving Agents via Pairwise Validator** (arXiv:2607.14408) replaces scalar reward with parent/child comparison. It supports reviewable evidence-based improvement, not automatic repository mutation.
+- **Speculate with Memory** (arXiv:2607.12236) combines transition, episodic, and confusion memories for lossless acceleration. Analysis should remain observational and separate from the execution trajectory.
+- **DeepStress** (arXiv:2607.13920) evaluates search agents under controlled evidence degradation. Missing or malformed retrieval evidence should remain explicitly unmeasured/anomalous, never silently become a score.
+- **ABot-AgentOS** (arXiv:2607.10350) couples graph memory, context-isolated skills, verification, and gated failure-driven evolution. Provenance and promotion gates remain the strongest architecture pattern for this repository.
+
+Open-source signals: **HKUDS/OpenSpace** (quality-first skill hub with runtime state, grounding, security, and skill evolution), **Tracer-Cloud/OpenSRE** (AI SRE agents plus an open incident-response training/evaluation environment), and **HKUDS/OpenPhone** (on-device agent model with navigation graphs and VLM fallback). These are public architecture/activity signals, not a controlled popularity ranking.
+
+### Build: read-only fleet mode
+
+- `cli/cage1_report.py` now accepts `--fleet-input PATH` for ordered JSON-array or JSONL CAGE-1 session snapshots.
+- Fleet output supports `--format markdown`, `json`, and `both`, preserving the fleet aggregator’s session order, digest lineage, anomalies, per-dimension summaries, and explicit unmeasured evidence.
+- `experiments/test_cage1_report_cli.py` adds JSONL fleet-mode coverage and verifies that the input file remains unchanged.
+
+**Safety boundary**: the CLI only reads, aggregates, and renders. It does not alter policy, repair memory, change retrieval, deduplicate sessions, or apply self-improvement. Invalid evidence remains visible as invalid or unmeasured.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_fleet.py experiments/test_cage1_report_cli.py` -> **17 passed**.
+- Broader CAGE-1/memory/retrieval/advisory suite -> **215 passed**.
+- `python -m py_compile cli/cage1_report.py core/cage1_fleet.py experiments/test_cage1_report_cli.py` -> passed.
+- `git diff --check` -> passed.
+- Pushed commit: `b2646c2` (`20260721-0504: expose CAGE-1 fleet in report CLI`).
+
+### Next priority
+
+Add adversarial fleet CLI coverage for malformed JSONL, duplicate digests, decreasing labels, mixed evidence coverage, and non-finite optional metrics. Keep the aggregator deterministic, read-only, and explicit about invalid or unmeasured evidence; keep policy and self-modification changes review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.11388
+- https://arxiv.org/html/2607.14658v1
+- https://arxiv.org/abs/2607.07820
+- https://arxiv.org/abs/2607.14408
+- https://arxiv.org/abs/2607.12236
+- https://arxiv.org/abs/2607.13920
+- https://arxiv.org/html/2607.10350v1
+- https://github.com/HKUDS/OpenSpace
+- https://github.com/tracer-cloud/opensre
+- https://github.com/HKUDS/OpenPhone
