@@ -430,6 +430,12 @@ from .memprobe import (
     summarize,
     tiered_memory_target,
 )
+from .cage1_advisory import (
+    CAGE1ReviewAdvisory,
+    SCHEMA_VERSION as CAGE1_ADVISORY_SCHEMA_VERSION,
+    project_review_advisory,
+    write_review_advisory,
+)
 from .cage1_compare import (
     CAGE1Comparison,
     DimensionDelta,

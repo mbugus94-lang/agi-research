@@ -1,3 +1,12 @@
+### 2026-07-22 - Scheduled Run: Review-Only CAGE-1 Fleet Advisory Projection
+**Status**: ✅ COMPLETE - `core/cage1_advisory.py` and `cli/cage1_review.py` add a read-only, provenance-preserving advisory over CAGE-1 fleet/trend evidence; 107/107 focused tests pass.
+
+**Build**: `project_review_advisory(...)` preserves raw trend/fleet envelopes, exposes explicit `operator_decision_required`, and hard-codes `automatic_action_taken=False`. Duplicate digest lineage or invalid evidence maps to `critical`/`escalate`; regressions map to `high`/`review`; clean evidence maps to `none`/`defer`. The CLI accepts `--fleet-input` or repeated `--compare-snapshot` paths and emits JSON/Markdown.
+
+**Safety boundary**: advisory generation is read-only and never repairs evidence, changes policy, runs remediation, or auto-applies self-modification.
+
+**Next priority**: add a review-only signed operator decision record for accept/reject/defer while retaining immutable raw evidence.
+
 ### 2026-07-22 - Scheduled Run: Adversarial CAGE-1 Fleet CLI Coverage
 **Status**: COMPLETE - added malformed-input, lineage-anomaly, mixed-coverage, and non-finite-metric tests to the higher-level fleet report CLI; 26 focused fleet/report tests pass.
 

@@ -2279,3 +2279,54 @@ Add a review-only advisory projection for fleet/trend anomalies only if it prese
 - https://github.com/antoinezambelli/forge
 - https://github.com/oleksiijko/pmb
 - https://github.com/openai/openai-agents-python/releases/tag/v0.18.3
+
+## 2026-07-22 - Scheduled Run: Review-Only CAGE-1 Fleet Advisory Projection
+
+**Status**: COMPLETE — added a review-only advisory projection for CAGE-1 fleet/trend anomalies. The focused CAGE-1, memory, retrieval, and AIBOM-adjacent suite passes **107/107** after the new tests.
+
+### Research findings (past week and past two weeks)
+
+- **PM-Bench: Evaluating Prospective Memory in LLM Agents** (arXiv:2607.12385) reports that deferred-intention execution remains difficult even for strong agents; prospective-memory coverage should therefore be measured explicitly rather than inferred from general task success.
+- **MRMS: A Multi-Resolution Memory Substrate for Long-Lived AI Agents** (arXiv:2607.04617) separates structured records, vector recall, and graph relations across temporal resolutions, with synchronization and boundary-aware context projection. This supports preserving raw evidence and attribution in fleet reports.
+- **Shared Selective Persistent Memory for Agentic LLM Systems** (arXiv:2607.09493) retains reusable task specifications, schemas, tool configurations, and output constraints while discarding session-specific traces. The operational analogue here is a compact advisory over a preserved raw fleet envelope.
+- **Recursive Harness Self-Improvement** (arXiv:2607.15524) frames harness changes as reviewable data-generating artifacts and emphasizes pairwise feedback. It reinforces the repository rule that recommendations must not auto-apply self-modification.
+- **Experience Memory Graph** (arXiv:2607.13884) turns failure recovery into graph matching over successful and failed trajectories, strengthening the case for retaining digest lineage and anomaly provenance rather than emitting only a scalar score.
+- **Agents in the Wild: Where Research Meets Deployment** (arXiv:2607.19336) identifies individual planning, multi-agent coordination, and deployment robustness/safety as the central practical challenges.
+
+Open-source signals included **NousResearch/hermes-agent v0.19.0** (durable delivery ledger, smart approvals, subagent visibility), **microsoft/agent-framework** (mid-turn message injection, context-aware skill filtering, and human-in-the-loop workflow routing), **aget-framework/aget** (persistent domain intelligence and governed fleet learning), and **InternScience/Agents-A1** (open agentic model scaling the horizon rather than only parameter count). These are activity and architecture signals, not a controlled popularity ranking.
+
+### Build: review-only CAGE-1 advisory projection
+
+Implemented task D, following the previous run's priority:
+
+- Added `core/cage1_advisory.py` with `CAGE1ReviewAdvisory` and `project_review_advisory(...)`.
+- Added `cli/cage1_review.py` for JSON/Markdown advisory output from fleet input or snapshot comparisons.
+- The projection preserves the complete raw fleet and trend envelopes, reports regressions and anomalies, and explicitly records `operator_decision_required` plus `automatic_action_taken=False`.
+- Severity is conservative and explainable: duplicate digest lineage or invalid evidence is `critical`/`escalate`; regressions or other anomalies are `high`/`review`; a clean report is `none`/`defer`.
+- Added four tests covering clean deferral, regression review, duplicate-digest escalation, raw-envelope preservation, and CLI output.
+- Exported the advisory API from `core/__init__.py`.
+
+**Safety boundary**: advisory generation is read-only. It does not mutate snapshots, repair evidence, change policy, run remediation, or apply self-improvement. An operator must decide what to do with the recommendation.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_advisory.py experiments/test_cage1_trend.py experiments/test_cage1_report_cli.py experiments/test_cage1_fleet.py experiments/test_aibom_advisory.py experiments/test_aibom_review_cli.py` → **107 passed**.
+- Changed modules compile with `python -m py_compile`.
+- `git diff --check` passes.
+
+### Next priority
+
+Add a review-only signed envelope or machine-readable decision record for an operator's explicit accept/reject/defer response, while retaining the immutable raw fleet/trend evidence. Do not let the advisory itself trigger policy or code changes.
+
+### Sources
+
+- https://arxiv.org/abs/2607.12385
+- https://arxiv.org/abs/2607.04617
+- https://arxiv.org/abs/2607.09493
+- https://arxiv.org/abs/2607.15524
+- https://arxiv.org/abs/2607.13884
+- https://arxiv.org/html/2607.19336v1
+- https://github.com/NousResearch/hermes-agent/releases/tag/v0.19.0
+- https://github.com/microsoft/agent-framework/releases
+- https://github.com/aget-framework/aget
+- https://github.com/InternScience/Agents-A1
