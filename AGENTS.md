@@ -6561,3 +6561,8 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Build**: `cli/cage1_report.py --fleet-input PATH` now exposes ordered JSON/JSONL fleet aggregation with Markdown/JSON/both output. Tests verify JSONL handling and input immutability. The mode remains read-only: no policy, memory, retrieval, deduplication, or self-modification occurs.
 
 **Next priority**: adversarial fleet CLI fixtures for malformed JSONL, duplicate digests, decreasing labels, mixed evidence coverage, and non-finite optional metrics. Preserve explicit invalid/unmeasured evidence and keep self-modification review-only.
+
+### 2026-07-22 - Scheduled Run: CAGE-1 Fleet Trend Envelope
+**Status**: COMPLETE - added read-only `CAGE1FleetTrend` / `trend_fleet_snapshots(...)` and included the provenance-preserving fleet envelope in `cli/cage1_report.py --compare-snapshot`; 230 focused CAGE-1/memory/retrieval/advisory tests pass. No policy or self-modification behavior changed.
+
+**Next priority**: add a review-only advisory projection for fleet/trend anomalies only if it preserves raw fleet evidence and requires explicit operator review.

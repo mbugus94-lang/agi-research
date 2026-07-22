@@ -439,12 +439,14 @@ from .cage1_compare import (
     load_evaluation,
 )
 from .cage1_trend import (
+    CAGE1FleetTrend,
     CAGE1Trend,
     DigestLink,
     RegressionFlag,
     TrendPoint,
     load_evaluations,
     trend_evaluations,
+    trend_fleet_snapshots,
 )
 from .cage1_fleet import (
     CAGE1Fleet,

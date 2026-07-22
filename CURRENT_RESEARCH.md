@@ -2231,3 +2231,51 @@ Run the full CAGE-1 fleet/report regression against the repository baseline, the
 - https://github.com/NVIDIA/SkillSpector
 - https://github.com/antoinezambelli/forge
 - https://github.com/oleksiijko/pmb
+
+## 2026-07-22 - Scheduled Run: CAGE-1 Fleet Trend Envelope
+
+**Status**: COMPLETE — added a read-only fleet envelope to CAGE-1 trend/comparison output; 230 focused CAGE-1/memory/retrieval/advisory tests pass, with syntax and whitespace checks clean.
+
+### Research findings (past two weeks)
+
+- **DeepSearch-World** (arXiv:2607.07820) uses deterministic tools, progress verification, grounded reflection, and failure recovery. This supports keeping compact trend metrics paired with replayable fleet evidence.
+- **DeepStress** (arXiv:2607.13920) stress-tests search agents under unreliable evidence. Invalid, missing, and low-quality evidence must remain explicit rather than silently becoming scores.
+- **A hierarchical memory architecture** (arXiv:2607.07666) bounds long-horizon state and preserves specialist oversight, reinforcing ordered session provenance and bounded summaries.
+- **Reward-Free Evolving Agents via Pairwise Validator** (arXiv:2607.14408) supports review-gated improvement; reports should recommend, not auto-apply, changes.
+- **Speculate with Memory** (arXiv:2607.12236) separates predictive memory from the executed trajectory, reinforcing read-only observational analysis.
+- **RxBrain** (arXiv:2607.14187) links plans to grounded world-state predictions, supporting inspectable intermediate evidence rather than end-state-only evaluation.
+
+Open-source signals included **antoinezambelli/forge** (self-hosted tool calling with guardrails), **oleksiijko/pmb** (local-first persistent memory), and **openai/openai-agents-python v0.18.3** (session-memory and hosted multi-agent updates). These are architecture/activity signals, not a controlled popularity ranking.
+
+### Build: provenance-preserving fleet trend envelope
+
+Implemented task D, a small read-only reporting extension:
+
+- Added `CAGE1FleetTrend` and `trend_fleet_snapshots(...)` in `core/cage1_trend.py`.
+- Updated `cli/cage1_report.py --compare-snapshot` so JSON includes both the compact `trend` and the full `fleet` envelope; Markdown renders both.
+- Exported the new API from `core/__init__.py`.
+- Added tests proving ordered session provenance, explicit unmeasured evidence, anomaly visibility, input immutability, and CLI output.
+
+**Safety boundary**: no policy, memory, retrieval, remediation, or self-modification behavior changed. Fleet aggregation remains deterministic and read-only; invalid evidence remains invalid/unmeasured.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_trend.py experiments/test_cage1_report_cli.py experiments/test_cage1_fleet.py experiments/test_cage1_compare.py experiments/test_cage1_evidence_comparison.py experiments/test_cage1_evaluation.py experiments/test_proactive_memory.py experiments/test_memprobe.py experiments/test_aibom_advisory.py experiments/test_aibom_review_cli.py` → **230 passed**.
+- Changed modules compile with `python -m py_compile`.
+- `git diff --check` passes.
+
+### Next priority
+
+Add a review-only advisory projection for fleet/trend anomalies only if it preserves the raw fleet envelope and requires an explicit operator decision. Keep policy changes and self-modification review-only.
+
+### Sources
+
+- https://arxiv.org/abs/2607.07820
+- https://arxiv.org/abs/2607.13920
+- https://arxiv.org/abs/2607.07666
+- https://arxiv.org/abs/2607.14408
+- https://arxiv.org/abs/2607.12236
+- https://arxiv.org/abs/2607.14187
+- https://github.com/antoinezambelli/forge
+- https://github.com/oleksiijko/pmb
+- https://github.com/openai/openai-agents-python/releases/tag/v0.18.3

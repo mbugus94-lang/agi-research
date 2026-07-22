@@ -310,3 +310,30 @@ def test_report_cli_fleet_nonfinite_metrics_are_invalid_not_scores(tmp_path):
     payload = json.loads(result.stdout)
     assert "memory_integrity.score" in payload["sessions"][0]["invalid_fields"]
     assert payload["evidence_metrics"] == []
+
+
+def test_report_cli_comparison_includes_fleet_envelope(tmp_path):
+    before = tmp_path / "before.json"
+    after = tmp_path / "after.json"
+    before.write_text(json.dumps(_fleet_row("session-1", "one", measured=False)), encoding="utf-8")
+    after.write_text(json.dumps(_fleet_row("session-2", "two", measured=True, score=0.9)), encoding="utf-8")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "cli.cage1_report",
+            "--compare-snapshot",
+            str(before),
+            "--compare-snapshot",
+            str(after),
+            "--format",
+            "json",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert [item["label"] for item in payload["fleet"]["sessions"]] == ["session-1", "session-2"]
+    assert payload["fleet"]["sessions"][0]["memory_integrity"]["measured"] is False
+    assert payload["comparisons"]

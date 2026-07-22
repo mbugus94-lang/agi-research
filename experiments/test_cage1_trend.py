@@ -6,7 +6,7 @@ import json
 import subprocess
 import sys
 
-from core.cage1_trend import load_evaluations, trend_evaluations
+from core.cage1_trend import load_evaluations, trend_evaluations, trend_fleet_snapshots
 
 
 def _snapshot(label, digest, admitted=3, refused=0, coverage=0.5, memory=None, retrieval=None):
@@ -73,3 +73,26 @@ def test_cli_bad_input_returns_error(tmp_path):
     )
     assert result.returncode == 2
     assert "ERROR:" in result.stderr
+
+
+def test_fleet_trend_preserves_fleet_provenance_and_unmeasured_evidence():
+    snapshots = [
+        _snapshot("session-1", "one", memory=None),
+        _snapshot("session-2", "two", memory=0.8),
+    ]
+    result = trend_fleet_snapshots(snapshots, notes="review only")
+    payload = result.to_dict()
+    assert len(payload["trend"]["points"]) == 2
+    assert [item["label"] for item in payload["fleet"]["sessions"]] == ["session-1", "session-2"]
+    assert payload["fleet"]["sessions"][0]["memory_integrity"]["measured"] is False
+    assert payload["fleet"]["notes"] == "review only"
+    assert result.to_markdown().count("CAGE-1") >= 2
+
+
+def test_fleet_trend_does_not_mutate_input_on_anomaly():
+    snapshots = [_snapshot("session-2", "same"), _snapshot("session-1", "same")]
+    original = json.loads(json.dumps(snapshots))
+    result = trend_fleet_snapshots(snapshots)
+    assert snapshots == original
+    assert any("label order decreases" in item for item in result.fleet.anomalies)
+    assert any("duplicate digest" in item for item in result.fleet.anomalies)

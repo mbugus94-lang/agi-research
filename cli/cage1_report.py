@@ -43,7 +43,7 @@ from core.cage1_evaluation import (
     cage1_state_distribution,
 )
 from core.cage1_fleet import CAGE1Fleet, aggregate_fleet, load_fleet_snapshots
-from core.cage1_trend import trend_evaluations
+from core.cage1_trend import trend_evaluations, trend_fleet_snapshots
 
 
 def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -168,16 +168,18 @@ def _emit_fleet(fleet: CAGE1Fleet, fmt: str) -> None:
 
 def _comparison_payload(snapshot_paths: List[str], notes: str) -> tuple[dict, str]:
     snapshots = [load_evaluation(path) for path in snapshot_paths]
-    trend = trend_evaluations(snapshots, notes=notes)
+    envelope = trend_fleet_snapshots(snapshots, notes=notes)
+    trend = envelope.trend
     comparisons = [
         compare_evaluations(snapshots[index - 1], snapshots[index], notes=notes)
         for index in range(1, len(snapshots))
     ]
     payload = {
         "trend": trend.to_dict(),
+        "fleet": envelope.fleet.to_dict(),
         "comparisons": [comparison.to_dict() for comparison in comparisons],
     }
-    markdown = trend.to_markdown()
+    markdown = envelope.to_markdown()
     if comparisons:
         markdown += "\n## Adjacent comparisons\n\n"
         markdown += "\n".join(comparison.to_markdown().rstrip() for comparison in comparisons)

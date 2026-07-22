@@ -53,6 +53,21 @@ class RegressionFlag:
 
 
 @dataclass(frozen=True)
+class CAGE1FleetTrend:
+    trend: "CAGE1Trend"
+    fleet: Any
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"trend": self.trend.to_dict(), "fleet": self.fleet.to_dict()}
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2, sort_keys=True)
+
+    def to_markdown(self) -> str:
+        return self.trend.to_markdown() + "\n" + self.fleet.to_markdown()
+
+
+@dataclass(frozen=True)
 class CAGE1Trend:
     points: List[TrendPoint]
     digest_links: List[DigestLink]
@@ -208,6 +223,21 @@ def trend_evaluations(snapshots: Sequence[Any], *, notes: str = "") -> CAGE1Tren
     return CAGE1Trend(points=points, digest_links=links, regressions=regressions, notes=notes)
 
 
+def trend_fleet_snapshots(snapshots: Sequence[Any], *, notes: str = "") -> CAGE1FleetTrend:
+    """Build a trend plus a provenance-preserving fleet envelope.
+
+    The trend is a compact trajectory; the fleet retains ordered sessions,
+    digest lineage, anomalies, and explicit unmeasured evidence. Neither
+    layer mutates the supplied snapshots or applies policy.
+    """
+    from .cage1_fleet import aggregate_fleet
+
+    return CAGE1FleetTrend(
+        trend=trend_evaluations(snapshots, notes=notes),
+        fleet=aggregate_fleet(snapshots, notes=notes),
+    )
+
+
 def load_evaluations(path: str) -> List[Dict[str, Any]]:
     """Load an ordered JSON array of CAGE-1 snapshots."""
     value = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -217,10 +247,12 @@ def load_evaluations(path: str) -> List[Dict[str, Any]]:
 
 
 __all__ = [
+    "CAGE1FleetTrend",
     "CAGE1Trend",
     "DigestLink",
     "RegressionFlag",
     "TrendPoint",
     "load_evaluations",
     "trend_evaluations",
+    "trend_fleet_snapshots",
 ]
