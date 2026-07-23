@@ -430,6 +430,18 @@ from .memprobe import (
     summarize,
     tiered_memory_target,
 )
+from .cage1_decision import (
+    DECISION_CATEGORY,
+    DecisionVerification,
+    OperatorDecision,
+    SCHEMA_VERSION as CAGE1_DECISION_SCHEMA_VERSION,
+    VALID_DECISIONS,
+    create_operator_decision,
+    sign_operator_decision,
+    verify_operator_decision,
+    write_operator_decision,
+    write_signed_decision,
+)
 from .cage1_advisory import (
     CAGE1ReviewAdvisory,
     SCHEMA_VERSION as CAGE1_ADVISORY_SCHEMA_VERSION,

@@ -1,3 +1,10 @@
+### 2026-07-23 - Scheduled Run: Signed CAGE-1 Operator Decision Records
+**Status**: COMPLETE - added `core/cage1_decision.py`, `cli/cage1_decision.py`, and six validation tests. Focused CAGE-1/advisory/signing regression: 215/215 pass.
+
+**Build**: immutable, content-addressed `accept`/`reject`/`defer` records embed the complete CAGE-1 advisory, bind it with SHA-256, and can be signed/verified through the existing HMAC/Ed25519 envelope. `automatic_action_taken` is structurally forbidden. The CLI supports create/sign/verify; no decision is applied automatically.
+
+**Next priority**: add a verification-only consumer/report joining advisory, signed decision, and raw fleet evidence. Missing, invalid, expired, or conflicting decisions must remain visible; never auto-apply policy or self-modification.
+
 ### 2026-07-22 - Scheduled Run: Review-Only CAGE-1 Fleet Advisory Projection
 **Status**: ✅ COMPLETE - `core/cage1_advisory.py` and `cli/cage1_review.py` add a read-only, provenance-preserving advisory over CAGE-1 fleet/trend evidence; 107/107 focused tests pass.
 

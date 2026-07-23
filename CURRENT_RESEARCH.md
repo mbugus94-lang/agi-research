@@ -2330,3 +2330,51 @@ Add a review-only signed envelope or machine-readable decision record for an ope
 - https://github.com/microsoft/agent-framework/releases
 - https://github.com/aget-framework/aget
 - https://github.com/InternScience/Agents-A1
+
+## 2026-07-23 - Scheduled Run: Signed CAGE-1 Operator Decision Records
+
+**Status**: COMPLETE — added signed, review-only `accept`/`reject`/`defer` decision records; the focused CAGE-1/advisory/signing regression passes **215/215**.
+
+### Research findings (past two weeks)
+
+- **Self-Improvements in Modern Agentic Systems: A Survey** (arXiv:2607.13104) models an agent as a coupled configuration of foundation model, prompts, memory, tools, and control logic. Its operational implication for this repository is direct: self-improvement proposals must be evaluated and committed through an explicit governance boundary, not silently applied.
+- **Isolation as a First-Class Principle for LLM-Agent System Safety** (arXiv:2607.12406) organizes failures around system boundaries: agent/core, agent/tool, agent/execution, agent/environment, agent/peer, and memory. This supports treating signed advisory decisions as a boundary artifact between evidence and action.
+- **From Memory to Skills: Evidence-Grounded Co-Evolution** (arXiv:2607.16621) argues for evidence-grounded skill and memory evolution in long-horizon workflows. The repository should retain the source advisory and its digest alongside any operator decision.
+- **GDM AI Control Roadmap** (arXiv:2607.13087) frames reliable detection and effective prevention/response as control invariants. CAGE-1 already provides the detection/advisory side; this run adds a tamper-evident response record without executing it.
+- **AgentCompass** (arXiv:2607.13705) provides unified infrastructure across tool use, web/research, scientific reasoning, coding, and productivity benchmarks. Its emphasis on incremental, reproducible evaluation reinforces keeping decision records machine-readable and provenance-preserving.
+- **AnovaX** (arXiv:2607.15367) demonstrates a local agent architecture with typed executors, layered memory, adaptive recovery, and a safety filter on every plan entry. The relevant pattern is mediation: plans and recovery paths should pass through the same explicit control boundary.
+
+Open-source signals included **openai/openai-agents-python** (v0.18.3, multi-agent workflows and hosted multi-agent support), **openakita/openakita** (policy engine, sandbox executor, confirmation gate, persistent memory modes, plugin isolation, and tracing), and **earendil-works/pi** (v0.80.9, provider-neutral agent loop with dynamic/deferred tool loading and prompt-cache-aware execution). These are architecture/activity signals, not a controlled popularity ranking.
+
+### Build: signed, review-only operator decisions
+
+- Added `core/cage1_decision.py` with immutable `OperatorDecision` and `DecisionVerification` dataclasses.
+- Decision records accept only `accept`, `reject`, or `defer`, embed the complete advisory, and bind it with a SHA-256 digest.
+- Added HMAC/Ed25519 signing through the existing `core.signed_advisory_envelope` substrate.
+- Added `cli/cage1_decision.py` for `create`, `sign`, and `verify` workflows.
+- Exported the API from `core/__init__.py`.
+- Added six tests covering digest tampering, automatic-action rejection, signature verification, signed tampering, and CLI end-to-end behavior.
+
+**Safety boundary**: this is a review artifact only. It does not apply an operator decision, alter policy, mutate source evidence, or self-modify the repository. `automatic_action_taken` is permanently false for valid records.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_decision.py experiments/test_cage1_advisory.py experiments/test_signed_advisory_envelope.py experiments/test_adversarial_signed_envelope.py experiments/test_cage1_trend.py experiments/test_cage1_report_cli.py experiments/test_cage1_fleet.py experiments/test_aibom_advisory.py experiments/test_aibom_review_cli.py` → **215 passed**.
+- Changed modules compile with `python -m py_compile`.
+- `git diff --check` passes.
+
+### Next priority
+
+Add a verification-only consumer/report that joins a CAGE-1 advisory, its signed operator decision, and the preserved raw fleet/trend envelope. It must report missing, invalid, expired, and conflicting decisions without applying any decision or changing repository state.
+
+### Sources
+
+- https://arxiv.org/html/2607.13104v1
+- https://arxiv.org/html/2607.12406v1
+- https://arxiv.org/pdf/2607.16621
+- https://arxiv.org/html/2607.13087v1
+- https://arxiv.org/html/2607.13705v1
+- https://arxiv.org/pdf/2607.15367
+- https://github.com/openai/openai-agents-python/releases/tag/v0.18.3
+- https://github.com/openakita/openakita
+- https://github.com/earendil-works/pi/releases/tag/v0.80.9
