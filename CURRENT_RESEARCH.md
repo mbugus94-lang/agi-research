@@ -2378,3 +2378,49 @@ Add a verification-only consumer/report that joins a CAGE-1 advisory, its signed
 - https://github.com/openai/openai-agents-python/releases/tag/v0.18.3
 - https://github.com/openakita/openakita
 - https://github.com/earendil-works/pi/releases/tag/v0.80.9
+
+## 2026-07-24 - Scheduled Run: Verification-Only CAGE-1 Decision Consumer
+
+**Status**: COMPLETE — added the verification-only consumer/report path; focused decision/advisory/consumer suite passes **15/15**.
+
+### Research findings (past two weeks)
+
+- **Knowledge-Centric Self-Improvement** (arXiv:2607.19592): improve a curated, evidence-grounded knowledge base rather than silently mutating the agent. This reinforces review-gated repository changes.
+- **Programmatic Memory Enables Long-Horizon Reasoning** (arXiv:2607.20064): interactive long-horizon performance depends on explicit programmatic memory and harness state, not only the base model.
+- **Evaluating Scientific Memory as Budgeted Context** (arXiv:2607.16848): memory should be measured as a bounded context resource with explicit evaluation, not treated as an opaque store.
+- **AI Agents Do Not Fail Alone: The Context Fails First** (arXiv:2607.14275): context quality across instructions, tools, grounding, injection hardening, and token efficiency is an auditable leading indicator of reliability.
+- **MRMS** (arXiv:2607.04617): structured, vector, and graph memory should be synchronized before projecting context; this maps to verifying advisory, decision, and raw-evidence content identity before consumption.
+
+Open-source signals included **agentscope-ai/AgentTeams**, **NousResearch/hermes-agent v0.19.0**, **aget-framework/aget**, and **triggerdotdev/trigger.dev**. These are architecture/activity signals, not controlled popularity rankings.
+
+### Build: verification-only decision consumer
+
+- Added `core/cage1_decision_consumer.py` and `DecisionConsumerReport`.
+- Added `consume_operator_decision(...)`, which verifies signed decisions, advisory digest binding, raw trend/fleet equality, missing/invalid/ambiguous/conflicting states, and provenance fields.
+- Added `cli/cage1_consume.py` for advisory/raw-source/envelope inputs, HMAC verification, repeated decision envelopes, and optional report output.
+- Exported the API from `core/__init__.py`.
+- Added five tests for valid joins, missing evidence, tampered evidence, conflicting decisions, and CLI behavior.
+
+**Safety boundary**: verification only. `decision_applied=False` and `automatic_action_taken=False` are hard-coded in every report. No decision, policy, evidence, code, or self-improvement state is applied or mutated.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_decision_consumer.py experiments/test_cage1_decision.py experiments/test_cage1_advisory.py` → **15 passed**.
+- Changed modules compile with `py_compile`.
+- `git diff --check` passes.
+
+### Next priority
+
+Add expiry-specific and malformed-envelope fixtures to the consumer CLI, then consider a machine-readable audit-line format for joining multiple decision reviews without dropping invalid records. Keep all policy and self-modification changes review-gated.
+
+### Sources
+
+- https://arxiv.org/html/2607.19592v1
+- https://arxiv.org/html/2607.20064v1
+- https://arxiv.org/pdf/2607.16848
+- https://arxiv.org/html/2607.14275v1
+- https://arxiv.org/html/2607.04617
+- https://github.com/agentscope-ai/AgentTeams
+- https://github.com/NousResearch/hermes-agent/releases/tag/v0.19.0
+- https://github.com/aget-framework/aget
+- https://github.com/triggerdotdev/trigger.dev

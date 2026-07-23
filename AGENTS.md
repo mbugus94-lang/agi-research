@@ -6582,3 +6582,12 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Status**: COMPLETE - added read-only `CAGE1FleetTrend` / `trend_fleet_snapshots(...)` and included the provenance-preserving fleet envelope in `cli/cage1_report.py --compare-snapshot`; 230 focused CAGE-1/memory/retrieval/advisory tests pass. No policy or self-modification behavior changed.
 
 **Next priority**: add a review-only advisory projection for fleet/trend anomalies only if it preserves raw fleet evidence and requires explicit operator review.
+
+### 2026-07-24 - Scheduled Run: Verification-Only CAGE-1 Decision Consumer
+**Status**: COMPLETE - added `core/cage1_decision_consumer.py`, `cli/cage1_consume.py`, and five validation tests; focused decision/advisory/consumer suite passes 15/15.
+
+**Build**: joins a CAGE-1 advisory, signed operator decision envelopes, and preserved raw trend/fleet evidence. Verifies content digests, signatures, raw-evidence equality, and missing/invalid/ambiguous/conflicting states. Reports are strictly verification-only: `decision_applied=False` and `automatic_action_taken=False`; no decision or self-modification is applied.
+
+**Research synthesis**: current work on knowledge-centric improvement, programmatic long-horizon memory, budgeted context, context-quality measurement, and synchronized memory layers reinforces evidence identity and review-gated autonomy.
+
+**Next priority**: add expiry-specific and malformed-envelope fixtures to the consumer CLI, then consider machine-readable audit-line joining without dropping invalid records. Keep policy and self-modification review-gated.

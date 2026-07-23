@@ -448,6 +448,12 @@ from .cage1_advisory import (
     project_review_advisory,
     write_review_advisory,
 )
+from .cage1_decision_consumer import (
+    CONSUMER_CATEGORY as CAGE1_CONSUMER_CATEGORY,
+    DecisionConsumerReport,
+    consume_operator_decision,
+    write_consumer_report,
+)
 from .cage1_compare import (
     CAGE1Comparison,
     DimensionDelta,
