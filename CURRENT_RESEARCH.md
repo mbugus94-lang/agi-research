@@ -2424,3 +2424,49 @@ Add expiry-specific and malformed-envelope fixtures to the consumer CLI, then co
 - https://github.com/NousResearch/hermes-agent/releases/tag/v0.19.0
 - https://github.com/aget-framework/aget
 - https://github.com/triggerdotdev/trigger.dev
+
+## 2026-07-24 - Scheduled Run Follow-up: Expiry and Malformed-Envelope Coverage
+
+**Status**: COMPLETE — extended the verification-only CAGE-1 consumer coverage; 120 focused decision/advisory/envelope tests pass.
+
+### Research findings (past two weeks)
+
+- **PRO-LONG: Programmatic Memory Enables Long-Horizon Reasoning** (arXiv:2607.20064) reports an average 18-point gain over a base coding agent on ARC-AGI-3, with up to 76.1% pass@1 and 4.2–5.8× lower token use. The implementation lesson is to keep long-horizon state explicit, bounded, and inspectable rather than trusting an unstructured context window.
+- **Knowledge-Centric Self-Improvement** (arXiv:2607.19592) keeps agents generic while persisting a curated, evidence-grounded knowledge base whose improvements transfer across tasks and model families. This reinforces review-gated changes and durable evidence artifacts over silent code mutation.
+- **Evaluating Scientific Memory as Budgeted Context** (arXiv:2607.16848) evaluates memory as bounded context restoration and finds sparse–dense hybrid retrieval to be a strong intervention on the reported benchmark. Evidence consumers should therefore preserve coverage and source identity rather than collapse missing context into a score.
+- **The Autonomous Agency Scale** (arXiv:2607.17947) separates active task behavior from ambient self-directed behavior and proposes an idle-gap counterfactual. This is a useful warning for the repository: scheduled execution is not evidence of autonomous improvement, and every run needs attributable evidence.
+- **Agentic ERP** (arXiv:2607.17331) combines role-aligned agents, graph orchestration, risk-tiered human oversight, and production-backend simulation. The relevant pattern is explicit separation between execution and approval, matching this repository's verification-only decision consumer.
+
+Open-source activity signals included **openai/openai-agents-python v0.18.3** (session and multi-agent reliability fixes), **Miguok/fable-harness** (token-efficient routing with verification/adversarial review), and **Nanako0129/pilotfish** (plan-first multi-model orchestration with fresh-context verification). These are architecture/activity signals, not a controlled popularity ranking.
+
+### Build: expiry and malformed-envelope fixtures
+
+Closed the previous run's next priority:
+
+- `cli/cage1_consume.py` now catches the envelope module's structured `EnvelopeError` family and returns exit code `2` for malformed envelope input instead of leaking an exception.
+- Added direct expiry coverage: an expired but correctly signed decision is reported as `invalid`, retains `expired` in `invalid_statuses`, and cannot select a decision.
+- Added CLI coverage proving expired envelopes remain machine-readable on stdout with exit code `1`.
+- Added CLI coverage proving malformed envelopes produce an explicit stderr error and exit code `2` with no misleading report on stdout.
+
+**Safety boundary**: the consumer remains verification-only. Expiry and malformed input are surfaced, never repaired, ignored, or applied. `decision_applied=False` and `automatic_action_taken=False` remain unchanged.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_decision_consumer.py experiments/test_cage1_decision.py experiments/test_cage1_advisory.py experiments/test_signed_advisory_envelope.py experiments/test_adversarial_signed_envelope.py` → **120 passed**.
+- Changed modules compile with `py_compile`.
+- `git diff --check` passes.
+
+### Next priority
+
+Add a machine-readable JSONL audit-line format for joining multiple decision reviews without dropping malformed, expired, conflicting, or otherwise invalid records. Keep policy and self-modification changes review-gated.
+
+### Sources
+
+- https://arxiv.org/html/2607.20064v1
+- https://arxiv.org/html/2607.19592v1
+- https://arxiv.org/pdf/2607.16848
+- https://arxiv.org/html/2607.17947v1
+- https://arxiv.org/html/2607.17331v1
+- https://github.com/openai/openai-agents-python/releases/tag/v0.18.3
+- https://github.com/Miguok/fable-harness
+- https://github.com/Nanako0129/pilotfish

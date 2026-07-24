@@ -1,3 +1,10 @@
+### 2026-07-24 - Scheduled Run Follow-up: Expiry and Malformed-Envelope Fixtures
+**Status**: COMPLETE - `cli/cage1_consume.py` now handles malformed signed-envelope errors with exit code 2; expired and malformed input coverage added; 120 focused decision/advisory/envelope tests pass.
+
+**Build**: expired decisions remain visible as `invalid` with `expired` in `invalid_statuses` and no selected decision; malformed envelopes return a structured CLI error without emitting a misleading report. The consumer remains verification-only and never applies policy or self-modification.
+
+**Next priority**: add machine-readable JSONL audit-line joining for multiple decision reviews while preserving malformed, expired, conflicting, and invalid records.
+
 ### 2026-07-23 - Scheduled Run: Signed CAGE-1 Operator Decision Records
 **Status**: COMPLETE - added `core/cage1_decision.py`, `cli/cage1_decision.py`, and six validation tests. Focused CAGE-1/advisory/signing regression: 215/215 pass.
 

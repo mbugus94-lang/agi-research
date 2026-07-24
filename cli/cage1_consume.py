@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from core.cage1_decision_consumer import consume_operator_decision, write_consumer_report
-from core.signed_advisory_envelope import KeyRegistry, envelope_from_json
+from core.signed_advisory_envelope import EnvelopeError, KeyRegistry, envelope_from_json
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -49,7 +49,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             write_consumer_report(report, args.out)
         print(report.to_json())
         return 0 if report.valid else 1
-    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+    except (EnvelopeError, OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 

@@ -91,3 +91,70 @@ def test_cli_consume_valid(tmp_path):
     payload = json.loads(result.stdout)
     assert payload["valid"] is True
     assert payload["decision_applied"] is False
+
+
+def test_expired_decision_is_reported_without_selection():
+    source, advisory, _, keys = _fixture()
+    record = create_operator_decision(advisory.to_dict(), "defer", "operator-expired", decided_at=10)
+    expired = sign_operator_decision(
+        record,
+        "k1",
+        b"secret",
+        config=EnvelopeConfig(issued_at=10, expires_at=10),
+        now=10,
+    )
+    report = consume_operator_decision(advisory, [expired], keys, raw_source=source, now=10)
+    assert report.valid is False
+    assert report.status == "invalid"
+    assert report.decision is None
+    assert report.invalid_statuses == ["expired"]
+
+
+def test_cli_expired_envelope_is_machine_readable(tmp_path):
+    source, advisory, _, _ = _fixture()
+    record = create_operator_decision(advisory.to_dict(), "defer", "operator-expired", decided_at=10)
+    expired = sign_operator_decision(
+        record,
+        "k1",
+        b"secret",
+        config=EnvelopeConfig(issued_at=10, expires_at=10),
+        now=10,
+    )
+    from core.signed_advisory_envelope import envelope_to_json
+    advisory_path = tmp_path / "advisory.json"
+    raw_path = tmp_path / "raw.json"
+    envelope_path = tmp_path / "expired.json"
+    advisory_path.write_text(advisory.to_json(), encoding="utf-8")
+    raw_path.write_text(source.to_json(), encoding="utf-8")
+    envelope_path.write_text(envelope_to_json(expired, indent=2), encoding="utf-8")
+    result = subprocess.run([
+        sys.executable, "-m", "cli.cage1_consume",
+        "--advisory", str(advisory_path), "--raw-source", str(raw_path),
+        "--envelope", str(envelope_path), "--key-id", "k1",
+        "--hmac-secret", "secret", "--now", "10",
+    ], capture_output=True, text=True)
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "invalid"
+    assert payload["invalid_statuses"] == ["expired"]
+    assert payload["decision"] is None
+
+
+def test_cli_malformed_envelope_returns_structured_error(tmp_path):
+    source, advisory, _, _ = _fixture()
+    advisory_path = tmp_path / "advisory.json"
+    raw_path = tmp_path / "raw.json"
+    envelope_path = tmp_path / "malformed.json"
+    advisory_path.write_text(advisory.to_json(), encoding="utf-8")
+    raw_path.write_text(source.to_json(), encoding="utf-8")
+    envelope_path.write_text("{}", encoding="utf-8")
+    result = subprocess.run([
+        sys.executable, "-m", "cli.cage1_consume",
+        "--advisory", str(advisory_path), "--raw-source", str(raw_path),
+        "--envelope", str(envelope_path), "--key-id", "k1",
+        "--hmac-secret", "secret", "--now", "10",
+    ], capture_output=True, text=True)
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert "ERROR:" in result.stderr
+    assert "missing required fields" in result.stderr
