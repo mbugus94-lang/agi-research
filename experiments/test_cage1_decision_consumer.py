@@ -6,7 +6,7 @@ import sys
 
 from core.cage1_advisory import project_review_advisory
 from core.cage1_decision import create_operator_decision, sign_operator_decision
-from core.cage1_decision_consumer import consume_operator_decision
+from core.cage1_decision_consumer import consume_operator_decision, consume_operator_decision_jsonl
 from core.cage1_trend import trend_fleet_snapshots
 from core.signed_advisory_envelope import EnvelopeConfig, KeyRegistry
 
@@ -158,3 +158,65 @@ def test_cli_malformed_envelope_returns_structured_error(tmp_path):
     assert result.stdout == ""
     assert "ERROR:" in result.stderr
     assert "missing required fields" in result.stderr
+
+
+def test_jsonl_audit_retains_valid_expired_and_malformed_lines():
+    source, advisory, valid_envelope, keys = _fixture()
+    record = create_operator_decision(advisory.to_dict(), "defer", "operator-expired", decided_at=10)
+    expired = sign_operator_decision(record, "k1", b"secret", config=EnvelopeConfig(issued_at=10, expires_at=10), now=10)
+    from core.signed_advisory_envelope import envelope_to_json
+    jsonl = "\n".join([
+        envelope_to_json(valid_envelope),
+        envelope_to_json(expired),
+        "not-json",
+        "[]",
+    ])
+    audit = consume_operator_decision_jsonl(advisory, jsonl, keys, raw_source=source, now=10)
+    assert audit.report.valid is False
+    assert audit.report.status == "invalid"
+    assert audit.report.invalid_decision_count == 3
+    assert [line.status for line in audit.lines] == ["valid", "expired", "malformed_json", "malformed_record"]
+    assert audit.lines[0].envelope_digest == valid_envelope.payload_digest
+    assert audit.lines[1].decision is None
+
+
+def test_jsonl_audit_empty_lines_are_not_records():
+    source, advisory, envelope, keys = _fixture()
+    from core.signed_advisory_envelope import envelope_to_json
+    audit = consume_operator_decision_jsonl(advisory, "\n" + envelope_to_json(envelope) + "\n\n", keys, raw_source=source, now=10)
+    assert len(audit.lines) == 1
+    assert audit.report.valid is True
+
+
+def test_cli_jsonl_audit_writes_machine_readable_lines(tmp_path):
+    source, advisory, envelope, _ = _fixture()
+    from core.signed_advisory_envelope import envelope_to_json
+    advisory_path = tmp_path / "advisory.json"
+    raw_path = tmp_path / "raw.json"
+    decisions_path = tmp_path / "decisions.jsonl"
+    audit_path = tmp_path / "audit.jsonl"
+    advisory_path.write_text(advisory.to_json(), encoding="utf-8")
+    raw_path.write_text(source.to_json(), encoding="utf-8")
+    decisions_path.write_text(envelope_to_json(envelope) + "\nnot-json\n", encoding="utf-8")
+    result = subprocess.run([
+        sys.executable, "-m", "cli.cage1_consume",
+        "--advisory", str(advisory_path), "--raw-source", str(raw_path),
+        "--decisions-jsonl", str(decisions_path), "--audit-out", str(audit_path),
+        "--key-id", "k1", "--hmac-secret", "secret", "--now", "10",
+    ], capture_output=True, text=True)
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "invalid"
+    audit_lines = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert [line["status"] for line in audit_lines] == ["valid", "malformed_json"]
+    assert audit_lines[1]["line_number"] == 2
+
+
+def test_cli_requires_one_decision_input_mode(tmp_path):
+    result = subprocess.run([
+        sys.executable, "-m", "cli.cage1_consume",
+        "--advisory", str(tmp_path / "missing.json"), "--raw-source", str(tmp_path / "missing-raw.json"),
+        "--key-id", "k1", "--hmac-secret", "secret",
+    ], capture_output=True, text=True)
+    assert result.returncode == 2
+    assert "provide --envelope or --decisions-jsonl" in result.stderr

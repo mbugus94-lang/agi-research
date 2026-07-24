@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional
 
@@ -56,6 +56,43 @@ class DecisionConsumerReport:
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)
 
 
+@dataclass(frozen=True)
+class DecisionAuditLine:
+    line_number: int
+    status: str
+    reason: str
+    advisory_digest: Optional[str]
+    envelope_digest: Optional[str]
+    decision: Optional[str]
+    operator_id: Optional[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "category": "cage1_decision_audit_line",
+            "schema_version": SCHEMA_VERSION,
+            "line_number": self.line_number,
+            "status": self.status,
+            "reason": self.reason,
+            "advisory_digest": self.advisory_digest,
+            "envelope_digest": self.envelope_digest,
+            "decision": self.decision,
+            "operator_id": self.operator_id,
+        }
+
+
+@dataclass(frozen=True)
+class DecisionJSONLAudit:
+    report: DecisionConsumerReport
+    lines: list[DecisionAuditLine]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "report": self.report.to_dict(),
+            "audit_lines": [line.to_dict() for line in self.lines],
+            "line_count": len(self.lines),
+        }
+
+
 def _as_mapping(value: Any) -> Mapping[str, Any]:
     if hasattr(value, "to_dict"):
         value = value.to_dict()
@@ -79,6 +116,74 @@ def _evidence_payload(advisory: Mapping[str, Any]) -> Optional[dict[str, Any]]:
         "trend": dict(trend) if isinstance(trend, Mapping) else {},
         "fleet": dict(fleet),
     }
+
+
+def _audit_line_from_verification(line_number: int, result: Any, expected_advisory_digest: str) -> DecisionAuditLine:
+    envelope = result.envelope
+    status = result.status
+    reason = result.reason
+    if result.valid and result.advisory_digest != expected_advisory_digest:
+        status = "advisory_mismatch"
+        reason = "signed decision points to a different advisory digest"
+    return DecisionAuditLine(
+        line_number=line_number,
+        status=status,
+        reason=reason,
+        advisory_digest=result.advisory_digest,
+        envelope_digest=envelope.payload_digest,
+        decision=result.decision if result.valid and status == "valid" else None,
+        operator_id=result.operator_id if result.valid and status == "valid" else None,
+    )
+
+
+def consume_operator_decision_jsonl(
+    advisory: Mapping[str, Any] | Any,
+    jsonl: str,
+    resolver: KeyResolver,
+    *,
+    raw_source: Mapping[str, Any] | Any | None = None,
+    now: Optional[float] = None,
+) -> DecisionJSONLAudit:
+    """Verify every decision line and retain malformed lines in the audit."""
+    advisory_map = dict(_as_mapping(advisory))
+    expected_advisory_digest = _canonical_digest(advisory_map)
+    parsed: list[Mapping[str, Any]] = []
+    audit_lines: list[DecisionAuditLine] = []
+    malformed_statuses: list[str] = []
+    for line_number, raw_line in enumerate(jsonl.splitlines(), start=1):
+        if not raw_line.strip():
+            continue
+        try:
+            item = json.loads(raw_line)
+        except json.JSONDecodeError as exc:
+            malformed_statuses.append("malformed_json")
+            audit_lines.append(DecisionAuditLine(line_number, "malformed_json", f"invalid JSON: {exc.msg}", None, None, None, None))
+            continue
+        if not isinstance(item, Mapping):
+            malformed_statuses.append("malformed_record")
+            audit_lines.append(DecisionAuditLine(line_number, "malformed_record", "decision envelope must be a JSON object", None, None, None, None))
+            continue
+        parsed.append(item)
+        result = verify_operator_decision(item, resolver, now=now)
+        audit_lines.append(_audit_line_from_verification(line_number, result, expected_advisory_digest))
+
+    report = consume_operator_decision(advisory_map, parsed, resolver, raw_source=raw_source, now=now)
+    malformed_count = sum(1 for line in audit_lines if line.status in {"malformed_json", "malformed_record"})
+    if malformed_count:
+        report = replace(
+            report,
+            invalid_decision_count=report.invalid_decision_count + malformed_count,
+            invalid_statuses=list(report.invalid_statuses) + malformed_statuses,
+        )
+    failed_lines = [line for line in audit_lines if line.status != "valid"]
+    if failed_lines and report.status == "valid":
+        report = replace(report, valid=False, status="invalid", reason="one or more JSONL decision lines failed verification", decision=None)
+    return DecisionJSONLAudit(report=report, lines=audit_lines)
+
+
+def write_decision_audit_jsonl(audit: DecisionJSONLAudit | Iterable[DecisionAuditLine], path: str) -> None:
+    lines = audit.lines if isinstance(audit, DecisionJSONLAudit) else list(audit)
+    Path(path).write_text("".join(json.dumps(line.to_dict(), sort_keys=True) + "\n" for line in lines), encoding="utf-8")
 
 
 def consume_operator_decision(
@@ -158,4 +263,13 @@ def write_consumer_report(report: DecisionConsumerReport, path: str) -> None:
     Path(path).write_text(report.to_json() + "\n", encoding="utf-8")
 
 
-__all__ = ["CONSUMER_CATEGORY", "DecisionConsumerReport", "consume_operator_decision", "write_consumer_report"]
+__all__ = [
+    "CONSUMER_CATEGORY",
+    "DecisionAuditLine",
+    "DecisionConsumerReport",
+    "DecisionJSONLAudit",
+    "consume_operator_decision",
+    "consume_operator_decision_jsonl",
+    "write_consumer_report",
+    "write_decision_audit_jsonl",
+]

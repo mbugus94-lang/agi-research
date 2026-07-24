@@ -1,4 +1,15 @@
-### 2026-07-24 - Scheduled Run Follow-up: Expiry and Malformed-Envelope Fixtures
+### 2026-07-24 - Scheduled Run: Machine-Readable CAGE-1 Decision Audit Lines
+**Status**: COMPLETE - extended the verification-only CAGE-1 decision consumer with JSONL audit-line ingestion/output; 12 focused consumer tests pass, including malformed and expired records.
+
+**Build**: Added `DecisionAuditLine`, `DecisionJSONLAudit`, `consume_operator_decision_jsonl(...)`, and `write_decision_audit_jsonl(...)` to `core/cage1_decision_consumer.py`. Extended `cli/cage1_consume.py` with mutually exclusive `--decisions-jsonl` / repeated `--envelope` modes and `--audit-out`. Every nonblank line is retained with line number, status, reason, advisory/envelope digests, decision, and operator identity; malformed JSON and non-object records are explicit audit lines rather than dropped.
+
+**Safety boundary**: verification-only. Expired, malformed, conflicting, and invalid records remain visible; `decision_applied=False` and `automatic_action_taken=False` remain hard-coded. No decision, policy, evidence, code, or self-improvement state is applied or mutated.
+
+**Validation**: `python -m pytest -q experiments/test_cage1_decision_consumer.py` -> 12 passed; changed modules compile; `git diff --check` passes.
+
+**Next priority**: add a fleet-level JSONL audit summary preserving per-file and per-line provenance, then run the full CAGE-1 fleet/report regression. Keep policy and self-modification changes review-gated.
+
+### 2026-07-24 - Scheduled Run: Expiry and Malformed-Envelope Fixtures
 **Status**: COMPLETE - `cli/cage1_consume.py` now handles malformed signed-envelope errors with exit code 2; expired and malformed input coverage added; 120 focused decision/advisory/envelope tests pass.
 
 **Build**: expired decisions remain visible as `invalid` with `expired` in `invalid_statuses` and no selected decision; malformed envelopes return a structured CLI error without emitting a misleading report. The consumer remains verification-only and never applies policy or self-modification.
@@ -6598,3 +6609,14 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Research synthesis**: current work on knowledge-centric improvement, programmatic long-horizon memory, budgeted context, context-quality measurement, and synchronized memory layers reinforces evidence identity and review-gated autonomy.
 
 **Next priority**: add expiry-specific and malformed-envelope fixtures to the consumer CLI, then consider machine-readable audit-line joining without dropping invalid records. Keep policy and self-modification review-gated.
+
+### 2026-07-24 - Scheduled Run: Machine-Readable CAGE-1 Decision Audit Lines
+**Status**: COMPLETE - extended the verification-only CAGE-1 decision consumer with JSONL audit-line ingestion/output; 12 focused consumer tests pass, including malformed and expired records.
+
+**Build**: Added `DecisionAuditLine`, `DecisionJSONLAudit`, `consume_operator_decision_jsonl(...)`, and `write_decision_audit_jsonl(...)` to `core/cage1_decision_consumer.py`. Extended `cli/cage1_consume.py` with mutually exclusive `--decisions-jsonl` / repeated `--envelope` modes and `--audit-out`. Every nonblank line is retained with line number, status, reason, advisory/envelope digests, decision, and operator identity; malformed JSON and non-object records are explicit audit lines rather than dropped.
+
+**Safety boundary**: verification-only. Expired, malformed, conflicting, and invalid records remain visible; `decision_applied=False` and `automatic_action_taken=False` remain hard-coded. No decision, policy, evidence, code, or self-improvement state is applied or mutated.
+
+**Validation**: `python -m pytest -q experiments/test_cage1_decision_consumer.py` -> 12 passed; changed modules compile; `git diff --check` passes.
+
+**Next priority**: add a fleet-level JSONL audit summary preserving per-file and per-line provenance, then run the full CAGE-1 fleet/report regression. Keep policy and self-modification changes review-gated.

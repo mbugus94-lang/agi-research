@@ -2470,3 +2470,48 @@ Add a machine-readable JSONL audit-line format for joining multiple decision rev
 - https://github.com/openai/openai-agents-python/releases/tag/v0.18.3
 - https://github.com/Miguok/fable-harness
 - https://github.com/Nanako0129/pilotfish
+## 2026-07-24 - Scheduled Run: Machine-Readable CAGE-1 Decision Audit Lines
+
+**Status**: COMPLETE — extended the verification-only CAGE-1 decision consumer with JSONL audit-line ingestion and output; 12 focused consumer tests pass, including malformed and expired records.
+
+### Research findings (past two weeks)
+
+- **Operational Hallucination and Safety Drift in AI Agents** (arXiv:2607.18366) identifies a declaration-action gap and livelock caused by divergence between reasoning context and execution state. This supports retaining one audit record per decision input, including invalid inputs, rather than reducing a batch to a selected decision.
+- **PRO-LONG: Programmatic Memory Enables Long-Horizon Reasoning** (arXiv:2607.20064) reinforces explicit, bounded, inspectable state for long-horizon work. JSONL preserves line identity and can be replayed incrementally without hiding malformed records.
+- **Evaluating Scientific Memory as Budgeted Context** (arXiv:2607.16848) treats memory as a measurable context budget. The same principle applies to evidence consumption: valid, expired, malformed, and conflicting records must remain separately countable.
+- **The Autonomous Agency Scale** (arXiv:2607.17947) distinguishes observed task behavior from unsupported autonomy claims. The new consumer remains observational and verification-only; it does not apply decisions or infer action from a valid signature.
+- **Agentic ERP** (arXiv:2607.17331) uses risk-tiered human oversight and explicit separation between execution and approval, matching the repository's review-gated decision boundary.
+
+Open-source activity signals included **Miguok/fable-harness** (adversarial review and model routing), **Nanako0129/pilotfish** (planner/verifier orchestration with fresh-context checks), and **Robbyant/lingbot-world-v2** (pilot/director agent separation in a persistent interactive world model). These are architecture/activity signals, not a controlled popularity ranking.
+
+### Build: JSONL decision audit format
+
+Closed the prior run's next priority:
+
+- Added `DecisionAuditLine` and `DecisionJSONLAudit` to `core/cage1_decision_consumer.py`.
+- Added `consume_operator_decision_jsonl(...)`, which verifies every nonblank JSONL envelope and retains line number, status, reason, advisory digest, envelope digest, decision, and operator identity.
+- Malformed JSON and non-object records are retained as `malformed_json` / `malformed_record` rather than dropped; expired and invalid signatures remain visible through the existing verifier statuses.
+- Added `write_decision_audit_jsonl(...)` for one machine-readable audit object per input line.
+- Extended `cli/cage1_consume.py` with mutually exclusive `--decisions-jsonl` and repeated `--envelope` modes plus `--audit-out`.
+- The report remains verification-only: `decision_applied=False` and `automatic_action_taken=False`; no decision, policy, evidence, code, or self-improvement state is applied.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_decision_consumer.py` → **12 passed**.
+- `python -m py_compile core/cage1_decision_consumer.py cli/cage1_consume.py experiments/test_cage1_decision_consumer.py` passes.
+- `git diff --check` passes.
+
+### Next priority
+
+Add a fleet-level JSONL audit summary that combines multiple consumer reports while preserving per-file and per-line provenance, then run the full CAGE-1 fleet/report regression. Keep policy and self-modification changes review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.18366
+- https://arxiv.org/html/2607.20064v1
+- https://arxiv.org/pdf/2607.16848
+- https://arxiv.org/html/2607.17947v1
+- https://arxiv.org/html/2607.17331v1
+- https://github.com/Miguok/fable-harness
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/robbyant/lingbot-world-v2
