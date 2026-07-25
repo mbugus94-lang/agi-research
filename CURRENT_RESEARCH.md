@@ -2561,3 +2561,49 @@ Add a fleet trend/delta report over multiple fleet audit summaries, preserving s
 - https://github.com/antoinezambelli/forge
 - https://github.com/Meterless/Meterless
 - https://github.com/oleksiijko/pmb
+
+## 2026-07-25 - Scheduled Run: Fleet Audit Trend and Delta Report
+
+**Status**: COMPLETE — added a verification-only trend/delta layer over chronological CAGE-1 fleet audit summaries; focused fleet/consumer/signing suite passes **96/96**.
+
+### Research findings (past two weeks)
+
+- **Operational Hallucination and Safety Drift in AI Agents** (arXiv:2607.18366) describes safety drift and operational hallucination when reasoning context separates from execution state. The implementation consequence is to preserve every audit snapshot and expose state changes instead of reducing history to a latest verdict.
+- **Speculate with Memory: Lossless Acceleration for LLM Agents** (arXiv:2607.12236) separates predictive memory from the actor trajectory. The analogous pattern is a derived, read-only trend view over immutable fleet audit snapshots.
+- **Understanding Agent-Reactive Bugs at the Model-Harness Boundary** (arXiv:2607.15684) highlights silent failures and weak test oracles. Explicit deltas for invalid, missing, and conflicting records provide a concrete regression oracle.
+- **How Agent Skills Fail under Long Contexts** (arXiv:2607.17937) reports that structured external checklists outperform generic self-checks in a long-context code-audit task. Machine-readable trend flags and retained provenance follow the same principle.
+
+Open-source activity signals included `lysol321/world-model-oaktree` (predict-before-act ledger), `Miguok/fable-harness` (verification gate and adversarial review), and `Meterless/Meterless` H-MEM (provenance-rich memory and audited mutation). These are architecture/activity signals, not a controlled popularity ranking.
+
+### Build: one focused task
+
+Closed the previous run's next priority:
+
+- Added `core/cage1_decision_fleet_trend.py` with immutable trend points, deltas, and a fleet trend summary.
+- Added chronological loading of fleet audit JSON snapshots while retaining source and line provenance at every point.
+- Added explicit deltas and flags for invalid records, missing decisions, conflicting advisories, fleet status changes, and source-membership changes.
+- Added `cli/cage1_fleet_trend.py` with repeated `--summary`, optional snapshot IDs, JSON output, JSONL output, compact status, and non-zero exit for degraded or mixed trends.
+- Exported the trend API from `core/__init__.py`.
+- Added focused coverage for stable, degraded, improving, mixed, provenance, JSONL, and CLI behavior.
+
+**Safety boundary**: read-only reporting. The trend layer does not apply decisions, repair malformed evidence, discard invalid records, mutate snapshots, or trigger self-improvement. Reports hard-code `decision_applied=False` and `automatic_action_taken=False`.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_decision_fleet_trend.py experiments/test_cage1_decision_fleet.py experiments/test_cage1_decision_consumer.py experiments/test_cage1_decision.py experiments/test_signed_advisory_envelope.py` → **96 passed**.
+- Changed modules compile with `python -m py_compile`.
+- `git diff --check` passes.
+
+### Next priority
+
+Add malformed-summary and schema-drift fixtures to the trend CLI, then run the broader CAGE-1 fleet/report regression. Keep policy and self-modification changes review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.18366
+- https://arxiv.org/abs/2607.12236
+- https://arxiv.org/abs/2607.15684
+- https://arxiv.org/abs/2607.17937
+- https://github.com/lysol321/world-model-oaktree
+- https://github.com/Miguok/fable-harness
+- https://github.com/Meterless/Meterless

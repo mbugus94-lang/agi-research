@@ -516,3 +516,12 @@ from .cage1_evaluation import (
     load_reports_from_jsonl,
     row_to_cage1_state,
 )
+from .cage1_decision_fleet_trend import (
+    DecisionFleetAuditTrend,
+    FleetAuditTrendDelta,
+    FleetAuditTrendPoint,
+    load_fleet_audit_summary,
+    trend_fleet_audit_files,
+    trend_fleet_audits,
+    write_fleet_audit_trend_jsonl,
+)
