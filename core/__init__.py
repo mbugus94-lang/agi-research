@@ -481,6 +481,15 @@ from .cage1_fleet import (
     aggregate_fleet,
     load_fleet_snapshots,
 )
+from .cage1_decision_fleet import (
+    DecisionFleetAuditSummary,
+    FleetAuditLine,
+    FleetAuditSource,
+    aggregate_decision_audit_files,
+    aggregate_decision_audits,
+    load_decision_audit_jsonl,
+    write_fleet_audit_jsonl,
+)
 from .cage1_evaluation import (
     CAGE1Dimension,
     CAGE1Evaluation,
