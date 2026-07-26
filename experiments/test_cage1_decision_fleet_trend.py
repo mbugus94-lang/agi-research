@@ -95,3 +95,57 @@ def test_cli_outputs_summary_and_rejects_bad_snapshot_count(tmp_path):
     bad = subprocess.run([sys.executable, "-m", "cli.cage1_fleet_trend", "--summary", str(path), "--summary", str(path), "--snapshot-id", "only-one"], capture_output=True, text=True)
     assert bad.returncode == 2
     assert "once per --summary" in bad.stderr
+
+
+def test_schema_drift_is_rejected_before_trend_computation(tmp_path):
+    path = tmp_path / "schema-drift.json"
+    _summary(path)
+    value = json.loads(path.read_text(encoding="utf-8"))
+    value["schema_version"] = "9.9"
+    path.write_text(json.dumps(value), encoding="utf-8")
+    try:
+        trend_fleet_audit_files([str(path)])
+    except ValueError as exc:
+        assert "unsupported schema_version" in str(exc)
+    else:
+        raise AssertionError("schema drift must be rejected")
+
+
+def test_wrong_category_and_missing_provenance_are_rejected(tmp_path):
+    wrong_category = tmp_path / "wrong-category.json"
+    _summary(wrong_category)
+    value = json.loads(wrong_category.read_text(encoding="utf-8"))
+    value["category"] = "other"
+    wrong_category.write_text(json.dumps(value), encoding="utf-8")
+    try:
+        trend_fleet_audit_files([str(wrong_category)])
+    except ValueError as exc:
+        assert "unsupported category" in str(exc)
+    else:
+        raise AssertionError("wrong category must be rejected")
+
+    missing_lines = tmp_path / "missing-lines.json"
+    _summary(missing_lines)
+    value = json.loads(missing_lines.read_text(encoding="utf-8"))
+    del value["lines"]
+    missing_lines.write_text(json.dumps(value), encoding="utf-8")
+    try:
+        trend_fleet_audit_files([str(missing_lines)])
+    except ValueError as exc:
+        assert "missing lines" in str(exc)
+    else:
+        raise AssertionError("missing provenance must be rejected")
+
+
+def test_negative_or_boolean_count_is_rejected(tmp_path):
+    path = tmp_path / "bad-count.json"
+    _summary(path)
+    value = json.loads(path.read_text(encoding="utf-8"))
+    value["line_count"] = True
+    path.write_text(json.dumps(value), encoding="utf-8")
+    try:
+        trend_fleet_audit_files([str(path)])
+    except ValueError as exc:
+        assert "invalid line_count" in str(exc)
+    else:
+        raise AssertionError("invalid count must be rejected")

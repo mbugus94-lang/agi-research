@@ -2607,3 +2607,49 @@ Add malformed-summary and schema-drift fixtures to the trend CLI, then run the b
 - https://github.com/lysol321/world-model-oaktree
 - https://github.com/Miguok/fable-harness
 - https://github.com/Meterless/Meterless
+
+## 2026-07-26 - Scheduled Run: Schema-Drift Hardening for Fleet Audit Trend Reports
+
+**Status**: COMPLETE — hardened the verification-only CAGE-1 fleet trend loader against malformed summaries and schema drift; focused trend tests pass **8/8** and broader CAGE-1 fleet/report regression passes **115/115**.
+
+### Research findings (past two weeks)
+
+- **Native Python Object-Oriented Agents (arXiv:2607.20709)** presents agents as ordinary Python objects with typed I/O, explicit state, code-as-action, and programmable harness APIs. The relevant implementation signal is to keep agent state and contracts inspectable rather than hiding behavior behind prompt-only conventions.
+- **Knowledge-Centric Self-Improvement (arXiv:2607.19592)** keeps the durable improvement artifact in a curated knowledge base instead of silently mutating the agent. This supports the repository’s review-gated, evidence-first workflow.
+- **Operational Hallucination and Safety Drift in AI Agents (arXiv:2607.18366)** attributes multi-turn failures partly to separation between reasoning context and execution state. Preserving raw fleet summaries and rejecting incompatible schema versions prevents a similar reporting-layer split.
+- **Claw-Eval (arXiv:2604.06132v3)** reports that trajectory-opaque grading misses safety and robustness failures that execution traces and audit logs expose. The trend layer therefore retains per-snapshot source and line provenance.
+- **AEVAL (arXiv:2607.16345)** separates executor and grader to avoid self-correction bias. The trend implementation remains read-only and computes derived deltas without applying policy or altering evidence.
+
+Open-source activity signals included `openclaw/openclaw` (large active personal-agent runtime), `vouch-protocol/vouch` (agent identity/provenance standard), and `coproduct-opensource/nucleus` (enforced permissions and portable provenance envelopes). These are architecture/activity signals, not a controlled popularity ranking.
+
+### Build: one focused task
+
+Closed the previous run’s next priority by adding malformed-summary and schema-drift coverage:
+
+- Added strict fleet-summary category and `schema_version` validation before trend computation.
+- Rejected missing `lines` provenance rather than silently treating it as an empty fleet.
+- Added non-negative integer validation for counts, including explicit rejection of JSON booleans (`true`/`false`) as counts.
+- Added consistency checks that `line_count` matches retained provenance and that valid plus invalid counts equals total lines.
+- Added three adversarial tests covering schema drift, wrong category/missing provenance, and invalid counts.
+- Preserved the trend layer’s verification-only behavior: no decision, policy, evidence, code, or self-modification state is applied.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_decision_fleet_trend.py` → **8 passed**.
+- `python -m pytest -q experiments/test_cage1_decision_fleet_trend.py experiments/test_cage1_decision_fleet.py experiments/test_cage1_decision_consumer.py experiments/test_cage1_decision.py experiments/test_signed_advisory_envelope.py experiments/test_cage1_report_cli.py` → **115 passed**.
+- Changed modules compile with `py_compile`; `git diff --check` passes.
+
+### Next priority
+
+Add a review-only advisory projection for fleet/trend anomalies, preserving the raw trend envelope and requiring an explicit operator decision. Keep policy and self-modification changes review-gated.
+
+### Sources
+
+- https://arxiv.org/html/2607.20709v1
+- https://arxiv.org/html/2607.19592v1
+- https://arxiv.org/abs/2607.18366v1
+- https://arxiv.org/html/2604.06132v3
+- https://arxiv.org/html/2607.16345v1
+- https://github.com/openclaw/openclaw
+- https://github.com/vouch-protocol/vouch
+- https://github.com/coproduct-opensource/nucleus

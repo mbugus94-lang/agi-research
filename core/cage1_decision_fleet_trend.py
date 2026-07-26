@@ -9,6 +9,7 @@ from typing import Any, Iterable, Mapping, Optional, Sequence
 
 SCHEMA_VERSION = "1.0"
 TREND_CATEGORY = "cage1_decision_fleet_audit_trend"
+FLEET_CATEGORY = "cage1_decision_fleet_audit"
 _STATUS_RANK = {"valid": 0, "unverified": 1, "invalid": 2, "conflicting": 3}
 
 
@@ -18,19 +19,26 @@ def _mapping(value: Any, label: str) -> Mapping[str, Any]:
     return value
 
 
+def _validated_count(value: Any, label: str, *, default: int = 0) -> int:
+    if value is None:
+        value = default
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"invalid {label}: expected a non-negative integer")
+    return value
+
+
 def _count_map(value: Any, label: str) -> dict[str, int]:
     raw = _mapping(value or {}, label)
     result: dict[str, int] = {}
     for key, count in raw.items():
-        try:
-            result[str(key)] = int(count)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"{label} contains a non-integer count") from exc
+        result[str(key)] = _validated_count(count, f"{label}[{key!r}]")
     return dict(sorted(result.items()))
 
 
-def _provenance_list(value: Any, label: str) -> list[dict[str, Any]]:
+def _provenance_list(value: Any, label: str, *, required: bool = False) -> list[dict[str, Any]]:
     if value is None:
+        if required:
+            raise ValueError(f"missing {label}")
         return []
     if not isinstance(value, list):
         raise ValueError(f"{label} must be a JSON array")
@@ -44,6 +52,13 @@ def _delta(after: Mapping[str, int], before: Mapping[str, int]) -> dict[str, int
 
 def _missing_decisions(lines: Sequence[Mapping[str, Any]]) -> int:
     return sum(1 for line in lines if line.get("decision") is None)
+
+
+def _validate_summary_schema(summary: Mapping[str, Any], path: str) -> None:
+    if summary.get("category") != FLEET_CATEGORY:
+        raise ValueError(f"unsupported category in {path}: {summary.get('category')!r}")
+    if summary.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError(f"unsupported schema_version in {path}: {summary.get('schema_version')!r}")
 
 
 @dataclass(frozen=True)
@@ -67,20 +82,32 @@ class FleetAuditTrendPoint:
 
     @classmethod
     def from_summary(cls, summary: Mapping[str, Any], *, snapshot_id: str, summary_path: str) -> "FleetAuditTrendPoint":
-        lines = _provenance_list(summary.get("lines", []), "lines")
+        _validate_summary_schema(summary, summary_path)
+        if "lines" not in summary:
+            raise ValueError("missing lines")
+        lines = _provenance_list(summary.get("lines"), "lines", required=True)
         sources = _provenance_list(summary.get("sources", []), "sources")
         status = str(summary.get("status", "unverified"))
         if status not in _STATUS_RANK:
             raise ValueError(f"unsupported fleet status: {status}")
+        source_count = _validated_count(summary.get("source_count"), "source_count", default=len(sources))
+        report_count = _validated_count(summary.get("report_count"), "report_count")
+        line_count = _validated_count(summary.get("line_count"), "line_count", default=len(lines))
+        valid_line_count = _validated_count(summary.get("valid_line_count"), "valid_line_count")
+        invalid_line_count = _validated_count(summary.get("invalid_line_count"), "invalid_line_count")
+        if line_count != len(lines):
+            raise ValueError("line_count does not match lines provenance")
+        if valid_line_count + invalid_line_count != line_count:
+            raise ValueError("valid_line_count + invalid_line_count does not equal line_count")
         return cls(
             snapshot_id=snapshot_id,
             summary_path=summary_path,
             status=status,
-            source_count=int(summary.get("source_count", len(sources))),
-            report_count=int(summary.get("report_count", 0)),
-            line_count=int(summary.get("line_count", len(lines))),
-            valid_line_count=int(summary.get("valid_line_count", 0)),
-            invalid_line_count=int(summary.get("invalid_line_count", 0)),
+            source_count=source_count,
+            report_count=report_count,
+            line_count=line_count,
+            valid_line_count=valid_line_count,
+            invalid_line_count=invalid_line_count,
             missing_decision_count=_missing_decisions(lines),
             status_counts=_count_map(summary.get("status_counts", {}), "status_counts"),
             decision_counts=_count_map(summary.get("decision_counts", {}), "decision_counts"),
@@ -223,6 +250,7 @@ class DecisionFleetAuditTrend:
 def load_fleet_audit_summary(path: str, *, snapshot_id: Optional[str] = None) -> FleetAuditTrendPoint:
     value = json.loads(Path(path).read_text(encoding="utf-8"))
     summary = _mapping(value, f"summary in {path}")
+    _validate_summary_schema(summary, path)
     identity = snapshot_id or Path(path).stem
     return FleetAuditTrendPoint.from_summary(summary, snapshot_id=identity, summary_path=str(path))
 
@@ -258,6 +286,7 @@ def write_fleet_audit_trend_jsonl(trend: DecisionFleetAuditTrend, path: str) -> 
 
 __all__ = [
     "DecisionFleetAuditTrend",
+    "FLEET_CATEGORY",
     "FleetAuditTrendDelta",
     "FleetAuditTrendPoint",
     "load_fleet_audit_summary",

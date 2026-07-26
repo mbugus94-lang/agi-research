@@ -1,3 +1,23 @@
+### 2026-07-26 - Scheduled Run: Schema-Drift Hardening for Fleet Audit Trend Reports
+**Status**: COMPLETE - hardened `core/cage1_decision_fleet_trend.py` against malformed summaries and schema drift; 8/8 focused trend tests and 115/115 broader CAGE-1 fleet/report tests pass.
+
+**Build**:
+- Validate the fleet summary category and exact `schema_version` before computing a trend.
+- Reject missing `lines` provenance, invalid/negative/boolean counts, and inconsistent line-count partitions.
+- Added adversarial coverage in `experiments/test_cage1_decision_fleet_trend.py`.
+- The trend layer remains verification-only: it never applies decisions, repairs evidence, mutates policy, or self-modifies.
+
+**Research signal**: recent work on typed agent state, knowledge-centric improvement, execution provenance, trajectory-aware evaluation, and executor/grader separation supports strict schemas, retained provenance, and read-only derived reports.
+
+**Validation**:
+- Focused trend suite: **8 passed**.
+- Broader CAGE-1 fleet/report regression: **115 passed**.
+- Changed modules compile; `git diff --check` passes.
+
+**Next Priority**: add a review-only advisory projection for fleet/trend anomalies, preserving the raw trend envelope and requiring an explicit operator decision. Keep policy and self-modification changes review-gated.
+
+---
+
 ### 2026-07-24 - Scheduled Run: Machine-Readable CAGE-1 Decision Audit Lines
 **Status**: COMPLETE - extended the verification-only CAGE-1 decision consumer with JSONL audit-line ingestion/output; 12 focused consumer tests pass, including malformed and expired records.
 
