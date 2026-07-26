@@ -74,6 +74,8 @@ def _mapping(value: Any) -> Mapping[str, Any]:
 
 def _source_parts(source: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     payload = dict(_mapping(source))
+    if payload.get("category") == "cage1_decision_fleet_audit_trend":
+        return payload, {}
     if "fleet" in payload:
         trend = payload.get("trend")
         fleet = payload.get("fleet")
@@ -92,20 +94,42 @@ def project_review_advisory(source: Any, *, notes: str = "") -> CAGE1ReviewAdvis
     The raw envelopes are copied into the advisory for replay and review.
     """
     trend, fleet = _source_parts(source)
-    regressions = trend.get("regressions", []) if isinstance(trend.get("regressions", []), list) else []
-    anomalies = fleet.get("anomalies", []) if isinstance(fleet.get("anomalies", []), list) else []
-    anomaly_text = [str(item) for item in anomalies]
-    invalid_evidence = any("invalid " in item or "invalid_fields" in item for item in anomaly_text)
-    duplicate_digest = any("duplicate digest" in item for item in anomaly_text)
-    regression_count = len(regressions)
-    if duplicate_digest or invalid_evidence:
+    decision_trend = trend.get("category") == "cage1_decision_fleet_audit_trend"
+    if decision_trend:
+        flags = trend.get("flagged_changes", [])
+        flag_text = [str(item) for item in flags] if isinstance(flags, list) else []
+        points = trend.get("points", [])
+        point_statuses = [str(point.get("status")) for point in points if isinstance(point, Mapping) and point.get("status")]
+        current_status = point_statuses[-1] if point_statuses else ""
+        if current_status in {"invalid", "conflicting"}:
+            flag_text.append(f"current_status={current_status}")
+        if trend.get("decision_applied") is True or trend.get("automatic_action_taken") is True:
+            flag_text.append("unexpected_action_state=true")
+        regression_count = sum(item.endswith("increased") or item.endswith("degraded") for item in flag_text)
+        if trend.get("status") in {"degraded", "mixed"} and not flag_text:
+            flag_text.append(f"status={trend.get('status')}")
+            regression_count = 1
+        findings = [f"fleet trend: {item}" for item in flag_text]
+        anomaly_text = findings.copy()
+        invalid_evidence = any("invalid_records_increased" in item or "current_status=invalid" in item or "unexpected_action_state=true" in item or "invalid " in item or "invalid_fields" in item for item in flag_text)
+        duplicate_digest = False
+        conflicting_evidence = any("conflicting_advisories_increased" in item or "current_status=conflicting" in item for item in flag_text)
+    else:
+        regressions = trend.get("regressions", []) if isinstance(trend.get("regressions", []), list) else []
+        anomalies = fleet.get("anomalies", []) if isinstance(fleet.get("anomalies", []), list) else []
+        anomaly_text = [str(item) for item in anomalies]
+        invalid_evidence = any("invalid " in item or "invalid_fields" in item for item in anomaly_text)
+        duplicate_digest = any("duplicate digest" in item for item in anomaly_text)
+        conflicting_evidence = False
+        regression_count = len(regressions)
+        findings = [f"trend regression: {item.get('metric', 'unknown')} ({item.get('reason', 'regression')})" for item in regressions if isinstance(item, Mapping)]
+        findings.extend(anomaly_text)
+    if duplicate_digest or invalid_evidence or conflicting_evidence:
         severity, recommendation = "critical", "escalate"
     elif regression_count or anomaly_text:
         severity, recommendation = "high", "review"
     else:
         severity, recommendation = "none", "defer"
-    findings = [f"trend regression: {item.get('metric', 'unknown')} ({item.get('reason', 'regression')})" for item in regressions if isinstance(item, Mapping)]
-    findings.extend(anomaly_text)
     return CAGE1ReviewAdvisory(
         category="cage1_fleet_review",
         schema_version=SCHEMA_VERSION,

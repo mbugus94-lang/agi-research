@@ -17,6 +17,7 @@ def _parser() -> argparse.ArgumentParser:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--fleet-input", help="Ordered CAGE-1 snapshots as JSON array or JSONL.")
     source.add_argument("--compare-snapshot", action="append", help="Saved snapshot path; repeat at least twice.")
+    source.add_argument("--trend-input", help="Saved CAGE-1 decision fleet trend JSON.")
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
     parser.add_argument("--out", help="Write the advisory JSON to this path.")
     parser.add_argument("--notes", default="")
@@ -26,6 +27,11 @@ def _parser() -> argparse.ArgumentParser:
 def _load_source(args: argparse.Namespace) -> Any:
     if args.fleet_input:
         return aggregate_fleet(load_fleet_snapshots(args.fleet_input), notes=args.notes)
+    if args.trend_input:
+        value = json.loads(open(args.trend_input, encoding="utf-8").read())
+        if not isinstance(value, dict):
+            raise ValueError("--trend-input must contain a JSON object")
+        return value
     paths = args.compare_snapshot or []
     if len(paths) < 2:
         raise ValueError("--compare-snapshot requires at least two paths")

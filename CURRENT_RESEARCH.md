@@ -2653,3 +2653,39 @@ Add a review-only advisory projection for fleet/trend anomalies, preserving the 
 - https://github.com/openclaw/openclaw
 - https://github.com/vouch-protocol/vouch
 - https://github.com/coproduct-opensource/nucleus
+
+## 2026-07-26 - Scheduled Run: Review-Only Advisory Projection for Decision Fleet Trends
+
+### Research findings
+
+Recent research continues to favor inspectable typed state, provenance-preserving traces, programmatic memory, and independent evaluation. Native Python Object-Oriented Agents (arXiv:2607.20709) makes state and contracts explicit; Knowledge-Centric Self-Improvement (arXiv:2607.19592) keeps improvement in a curated knowledge layer; Operational Hallucination and Safety Drift (arXiv:2607.18366) highlights reasoning/execution divergence; Claw-Eval (arXiv:2604.06132v3) and AEVAL (arXiv:2607.16345) support trace-based executor/grader separation; and PRO-LONG (arXiv:2607.20064) supports compact, replayable long-horizon memory. Open-source activity signals included openclaw/openclaw, vouch-protocol/vouch, coproduct-opensource/nucleus, agentscope-ai/QwenPaw, agentscope-ai/AgentTeams, and pydantic/pydantic-ai-harness.
+
+### Build
+
+Extended the existing review-only CAGE-1 advisory projection to the decision-fleet trend substrate. `project_review_advisory(...)` now accepts `cage1_decision_fleet_audit_trend` envelopes, turns worsening flags into explicit operator findings, escalates current invalid points and unexpected action state to `critical`, and retains the raw trend envelope. `cli/cage1_review.py` now accepts `--trend-input`; the category constant is exported from `core.__init__`. Added adversarial tests for trend projections, invalid current points, action-state anomalies, and CLI input.
+
+The advisory remains non-actioning: `operator_decision_required` is explicit for non-clean evidence, `automatic_action_taken` stays false, and no policy, evidence, or self-improvement state is mutated.
+
+### Validation
+
+- Broader CAGE-1 fleet/report/evidence regression: **220 passed**.
+- Changed modules compile; `git diff --check` passes.
+
+### Next priority
+
+Add signed operator-decision verification to the fleet/trend advisory CLI while preserving immutable evidence and keeping action application review-gated.
+
+### Sources
+
+- https://arxiv.org/html/2607.20709v1
+- https://arxiv.org/html/2607.19592v1
+- https://arxiv.org/abs/2607.18366v1
+- https://arxiv.org/html/2604.06132v3
+- https://arxiv.org/html/2607.16345v1
+- https://arxiv.org/html/2607.20064v1
+- https://github.com/openclaw/openclaw
+- https://github.com/vouch-protocol/vouch
+- https://github.com/coproduct-opensource/nucleus
+- https://github.com/agentscope-ai/QwenPaw
+- https://github.com/agentscope-ai/AgentTeams
+- https://github.com/pydantic/pydantic-ai-harness

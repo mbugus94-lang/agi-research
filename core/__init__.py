@@ -518,6 +518,7 @@ from .cage1_evaluation import (
 )
 from .cage1_decision_fleet_trend import (
     DecisionFleetAuditTrend,
+    FLEET_CATEGORY as CAGE1_DECISION_FLEET_CATEGORY,
     FleetAuditTrendDelta,
     FleetAuditTrendPoint,
     load_fleet_audit_summary,

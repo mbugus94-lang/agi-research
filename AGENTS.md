@@ -14,7 +14,7 @@
 - Broader CAGE-1 fleet/report regression: **115 passed**.
 - Changed modules compile; `git diff --check` passes.
 
-**Next Priority**: add a review-only advisory projection for fleet/trend anomalies, preserving the raw trend envelope and requiring an explicit operator decision. Keep policy and self-modification changes review-gated.
+**Next Priority**: add signed operator-decision verification to the fleet/trend advisory CLI while preserving immutable evidence and keeping action application review-gated.
 
 ---
 
