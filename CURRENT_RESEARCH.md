@@ -2689,3 +2689,15 @@ Add signed operator-decision verification to the fleet/trend advisory CLI while 
 - https://github.com/agentscope-ai/QwenPaw
 - https://github.com/agentscope-ai/AgentTeams
 - https://github.com/pydantic/pydantic-ai-harness
+
+### 2026-07-27 - Scheduled Run: Signed Decision Verification in the CAGE-1 Review CLI
+
+**Status**: COMPLETE - extended `cli/cage1_review.py` with verification-only signed operator-decision inputs; 109 focused CAGE-1 tests pass.
+
+**Research synthesis**: Recent AGI/agent work emphasizes executable task construction (NexForge), explicit reasoning/execution consistency and termination (Operational Hallucination and Safety Drift), heterogeneous specialist verification (PoTRE), typed harness compilation (SIGIL), curated knowledge rather than silent self-modification (Knowledge-Centric Self-Improvement), and inspectable object-level contracts (Native Python Object-Oriented Agents). Open-source signals included AgentTeams, agent-swarm, and Agent-Reach.
+
+**Build**: the review CLI now accepts repeated `--decision-envelope` paths, verifies signed decisions against the generated advisory and raw fleet/trend evidence, supports HMAC key/expiry parameters, and optionally writes a verification report. Exit status is `0` only for a valid single-decision join, `1` for invalid/expired/conflicting/missing evidence, and `2` for malformed CLI input. No decision is applied; review-only invariants remain hard-coded.
+
+**Validation**: focused review/decision/consumer/fleet regression -> 109 passed; changed modules compile; `git diff --check` passes.
+
+**Next priority**: add fleet-level JSONL decision audit aggregation preserving per-file and per-line provenance. Keep policy and self-modification changes review-gated.

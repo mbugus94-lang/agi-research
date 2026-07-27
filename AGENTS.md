@@ -6640,3 +6640,14 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Validation**: `python -m pytest -q experiments/test_cage1_decision_consumer.py` -> 12 passed; changed modules compile; `git diff --check` passes.
 
 **Next priority**: add a fleet-level JSONL audit summary preserving per-file and per-line provenance, then run the full CAGE-1 fleet/report regression. Keep policy and self-modification changes review-gated.
+
+### 2026-07-27 - Scheduled Run: Signed Decision Verification in CAGE-1 Review CLI
+**Status**: ✅ COMPLETE - `cli/cage1_review.py` now verifies signed operator decisions against generated advisories and raw evidence; 109 focused CAGE-1 tests pass; review-only boundary preserved.
+
+**Research Summary (July 27, 2026)**: NexForge (arXiv:2607.14186) supports reproducible requirement-first executable tasks; Operational Hallucination and Safety Drift (arXiv:2607.18366) supports runtime consistency and forced termination; PoTRE (arXiv:2607.20268) supports heterogeneous verification roles; SIGIL supports typed executable harnesses; Knowledge-Centric Self-Improvement (arXiv:2607.19592) supports curated, reviewable improvement; Native Python Object-Oriented Agents (arXiv:2607.20709) supports inspectable contracts. Open-source signals: agentscope-ai/AgentTeams, desplega-ai/agent-swarm, Panniantong/Agent-Reach.
+
+**Build**: Added repeated `--decision-envelope`, HMAC credentials, optional hex secret/verification timestamp, and `--decision-report-out` to `cli/cage1_review.py`. Valid joins return 0; verification failures return 1; malformed input returns 2. No accept/reject/defer decision is applied; the consumer retains `decision_applied=False` and `automatic_action_taken=False`.
+
+**Validation**: focused CAGE-1 review/decision/consumer/fleet regression 109/109; compile and `git diff --check` pass.
+
+**Next priority**: fleet-level JSONL decision audit aggregation with per-file/per-line provenance. Self-modification and policy changes remain review-gated.
