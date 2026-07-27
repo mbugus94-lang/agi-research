@@ -119,3 +119,35 @@ def test_cli_rejects_mismatched_report_count(tmp_path):
     ], capture_output=True, text=True)
     assert result.returncode == 2
     assert "once per --audit" in result.stderr
+
+
+def test_loader_retains_malformed_json_and_non_object_lines(tmp_path):
+    path = tmp_path / "malformed.jsonl"
+    path.write_text('{"status":"valid","line_number":3,"advisory_digest":"a","decision":"defer"}\nnot-json\n[]\n', encoding="utf-8")
+    source, lines = load_decision_audit_jsonl(str(path), source_id="member-malformed")
+    assert source.line_count == 3
+    assert source.valid_line_count == 1
+    assert source.invalid_line_count == 2
+    assert [line.status for line in lines] == ["valid", "malformed_json", "malformed_record"]
+    assert [line.source_line_number for line in lines] == [3, 2, 3]
+    assert lines[1].reason.startswith("invalid JSON:")
+    assert lines[2].reason == "audit line must be a JSON object"
+
+
+def test_cli_malformed_audit_is_nonzero_but_writes_complete_jsonl(tmp_path):
+    path = tmp_path / "member.jsonl"
+    out = tmp_path / "fleet.json"
+    audit_out = tmp_path / "fleet.jsonl"
+    path.write_text('{"status":"valid","line_number":1,"advisory_digest":"a","decision":"defer"}\nbroken\n', encoding="utf-8")
+    result = subprocess.run([
+        sys.executable, "-m", "cli.cage1_fleet_audit",
+        "--audit", str(path), "--out", str(out), "--audit-out", str(audit_out), "--summary",
+    ], capture_output=True, text=True)
+    assert result.returncode == 1
+    assert "status=invalid" in result.stdout
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload["line_count"] == 2
+    assert payload["status_counts"] == {"malformed_json": 1, "valid": 1}
+    records = [json.loads(line) for line in audit_out.read_text(encoding="utf-8").splitlines()]
+    assert [record["status"] for record in records[:-1]] == ["valid", "malformed_json"]
+    assert records[-1]["record_type"] == "summary"

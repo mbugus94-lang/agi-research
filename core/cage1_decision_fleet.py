@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
-from .signed_advisory_envelope import payload_digest
-
 SCHEMA_VERSION = "1.0"
 FLEET_CATEGORY = "cage1_decision_fleet_audit"
 
@@ -46,6 +44,7 @@ class FleetAuditLine:
     envelope_digest: Optional[str]
     decision: Optional[str]
     operator_id: Optional[str]
+    reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -59,6 +58,7 @@ class FleetAuditLine:
             "envelope_digest": self.envelope_digest,
             "decision": self.decision,
             "operator_id": self.operator_id,
+            "reason": self.reason,
         }
 
 
@@ -107,37 +107,38 @@ class DecisionFleetAuditSummary:
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)
 
 
-def _read_jsonl(path: str) -> list[Mapping[str, Any]]:
-    records: list[Mapping[str, Any]] = []
-    for raw_line in Path(path).read_text(encoding="utf-8").splitlines():
-        if not raw_line.strip():
-            continue
-        value = json.loads(raw_line)
-        if not isinstance(value, Mapping):
-            raise ValueError(f"audit line in {path} must be a JSON object")
-        records.append(value)
-    return records
+def _line_from_record(identity: str, source_path: str, source_line_number: int, record: Mapping[str, Any]) -> FleetAuditLine:
+    return FleetAuditLine(
+        source_id=identity,
+        source_path=source_path,
+        source_line_number=int(record.get("line_number", source_line_number)),
+        status=str(record.get("status", "missing_status")),
+        advisory_digest=str(record["advisory_digest"]) if record.get("advisory_digest") else None,
+        envelope_digest=str(record["envelope_digest"]) if record.get("envelope_digest") else None,
+        decision=str(record["decision"]) if record.get("decision") else None,
+        operator_id=str(record["operator_id"]) if record.get("operator_id") else None,
+        reason=str(record.get("reason", "")),
+    )
 
 
 def load_decision_audit_jsonl(path: str, *, source_id: Optional[str] = None) -> tuple[FleetAuditSource, list[FleetAuditLine]]:
     source_path = str(path)
     identity = source_id or Path(path).name
-    records = _read_jsonl(path)
-    statuses = Counter(str(record.get("status", "missing_status")) for record in records)
-    advisory_digests = sorted({str(record["advisory_digest"]) for record in records if record.get("advisory_digest")})
-    lines = [
-        FleetAuditLine(
-            source_id=identity,
-            source_path=source_path,
-            source_line_number=int(record.get("line_number", index)),
-            status=str(record.get("status", "missing_status")),
-            advisory_digest=str(record["advisory_digest"]) if record.get("advisory_digest") else None,
-            envelope_digest=str(record["envelope_digest"]) if record.get("envelope_digest") else None,
-            decision=str(record["decision"]) if record.get("decision") else None,
-            operator_id=str(record["operator_id"]) if record.get("operator_id") else None,
-        )
-        for index, record in enumerate(records, start=1)
-    ]
+    lines: list[FleetAuditLine] = []
+    for physical_line_number, raw_line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), start=1):
+        if not raw_line.strip():
+            continue
+        try:
+            value = json.loads(raw_line)
+        except json.JSONDecodeError as exc:
+            lines.append(FleetAuditLine(identity, source_path, physical_line_number, "malformed_json", None, None, None, None, f"invalid JSON: {exc.msg}"))
+            continue
+        if not isinstance(value, Mapping):
+            lines.append(FleetAuditLine(identity, source_path, physical_line_number, "malformed_record", None, None, None, None, "audit line must be a JSON object"))
+            continue
+        lines.append(_line_from_record(identity, source_path, physical_line_number, value))
+    statuses = Counter(line.status for line in lines)
+    advisory_digests = sorted({line.advisory_digest for line in lines if line.advisory_digest})
     valid = statuses.get("valid", 0)
     return FleetAuditSource(identity, source_path, len(lines), valid, len(lines) - valid, dict(sorted(statuses.items())), advisory_digests), lines
 

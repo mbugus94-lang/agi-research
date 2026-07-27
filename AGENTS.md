@@ -6651,3 +6651,7 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Validation**: focused CAGE-1 review/decision/consumer/fleet regression 109/109; compile and `git diff --check` pass.
 
 **Next priority**: fleet-level JSONL decision audit aggregation with per-file/per-line provenance. Self-modification and policy changes remain review-gated.
+
+### 2026-07-27 - Scheduled Run: Preserve Malformed Fleet Decision Audit Lines
+**Status**: COMPLETE - `load_decision_audit_jsonl(...)` now retains malformed JSON and non-object lines with source/physical-line provenance and reasons; focused CAGE-1 fleet/report regression passes 127/127. `FleetAuditLine` serializes the reason; invalid input remains visible and yields non-zero CLI status. No decision, policy, action, evidence repair, or self-modification is applied.
+**Next priority**: validate audit-line status and line-number fields explicitly while preserving lossless malformed-record behavior. Keep policy and self-modification review-gated.

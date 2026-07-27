@@ -2701,3 +2701,51 @@ Add signed operator-decision verification to the fleet/trend advisory CLI while 
 **Validation**: focused review/decision/consumer/fleet regression -> 109 passed; changed modules compile; `git diff --check` passes.
 
 **Next priority**: add fleet-level JSONL decision audit aggregation preserving per-file and per-line provenance. Keep policy and self-modification changes review-gated.
+
+## 2026-07-27 - Scheduled Run: Preserve Malformed Fleet Decision Audit Lines
+
+**Status**: COMPLETE - hardened the verification-only fleet decision audit loader to retain malformed JSON and non-object JSONL lines with file/physical-line provenance; focused CAGE-1 fleet/report regression passes **127/127**.
+
+### Research findings (past two weeks)
+
+- **Operational Hallucination and Safety Drift in AI Agents** (arXiv:2607.18366v1) links multi-turn reliability failures to a split between reasoning context and execution state. For an audit layer, silently dropping malformed lines would create the same kind of state gap, so invalid evidence must remain visible and attributable.
+- **Zero Hallucination, by Construction (HALO)** (arXiv:2607.17883v1) treats trustworthy behavior as a layered system property: grounding, constrained execution, multi-signal verification, abstention, and traceability. The fleet audit remains verification-only and makes malformed input an explicit degraded status rather than an implicit clean result.
+- **PoTRE** (arXiv:2607.20268v1) separates heterogeneous reasoning roles and reconciles them through an aggregation layer. The corresponding repository lesson is to aggregate independently preserved audit records, not to collapse them before review.
+- **Building Trust in Autonomous Commerce** (arXiv:2607.19436v1) emphasizes canonical event schemas, deterministic serialization, append-only commitments, and provenance. This supports retaining both the physical JSONL line number and any embedded logical line number.
+- **Native Python Object-Oriented Agents** (arXiv:2607.20709v1) emphasizes inspectable state and typed interfaces. The fleet loader now represents malformed records in the same typed `FleetAuditLine` surface as valid records.
+
+Open-source activity signals included `Nanako0129/pilotfish` (multi-model delegation with fresh-context verification), `Miguok/fable-harness` (adversarial review and verification gates), and `Meterless/Meterless` H-MEM (provenance-rich, audited memory). These are architecture/activity signals, not a controlled popularity ranking.
+
+### Build: malformed-line retention in fleet audit aggregation
+
+Closed the previous run's next priority:
+
+- Changed `load_decision_audit_jsonl(...)` to parse line-by-line instead of failing the whole member file on the first malformed record.
+- Retained `malformed_json` and `malformed_record` lines with source ID, source path, physical line number, status, and reason.
+- Preserved embedded logical `line_number` for valid records while retaining physical provenance for malformed records.
+- Added `reason` to `FleetAuditLine` and its JSON serialization.
+- The aggregate remains conservative: any invalid line produces an `invalid` fleet status, a non-zero CLI exit, and a complete JSON/JSONL output; no decision is applied.
+- Added adversarial tests for malformed JSON, non-object records, provenance, status counts, CLI exit behavior, and complete output.
+
+**Safety boundary**: verification only. The loader never repairs, drops, or executes a decision; `decision_applied=False` and `automatic_action_taken=False` remain hard-coded.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_decision_fleet.py experiments/test_cage1_decision_fleet_trend.py experiments/test_cage1_advisory.py experiments/test_cage1_review_decision.py experiments/test_cage1_decision_consumer.py experiments/test_cage1_decision.py experiments/test_signed_advisory_envelope.py experiments/test_cage1_report_cli.py` -> **127 passed**.
+- Changed modules compile with `py_compile`.
+- `git diff --check` passes.
+
+### Next priority
+
+Add explicit audit-line schema validation for missing/invalid status and line-number fields while preserving the current lossless malformed-record behavior. Keep policy, action application, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.18366v1
+- https://arxiv.org/abs/2607.17883v1
+- https://arxiv.org/abs/2607.20268v1
+- https://arxiv.org/abs/2607.19436v1
+- https://arxiv.org/html/2607.20709v1
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/Miguok/fable-harness
+- https://github.com/Meterless/Meterless
