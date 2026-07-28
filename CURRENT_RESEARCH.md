@@ -2783,10 +2783,11 @@ Closed the previous run’s next priority:
 - `python -m pytest -q experiments/test_cage1_decision_fleet.py` → **14 passed**.
 - Broader CAGE-1 fleet/trend/advisory/decision regression → **116 passed**.
 - `python -m py_compile core/cage1_decision_fleet.py` passed; `git diff --check` passed.
+- Commit `82b98f0` pushed to `origin/main`.
 
 ### Next priority
 
-Add an explicit schema version/category check to individual fleet audit JSONL lines. Keep policy, action application, and self-modification review-gated.
+Add an explicit schema version/category check to individual fleet audit JSONL lines, then add a review-only anomaly projection for schema-invalid records. Keep policy, action application, and self-modification review-gated.
 
 ### Sources
 
