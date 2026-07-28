@@ -2749,3 +2749,54 @@ Add explicit audit-line schema validation for missing/invalid status and line-nu
 - https://github.com/Nanako0129/pilotfish
 - https://github.com/Miguok/fable-harness
 - https://github.com/Meterless/Meterless
+
+
+## 2026-07-28 - Scheduled Run: Explicit Audit-Line Schema Validation
+
+**Status**: COMPLETE — hardened the verification-only CAGE-1 fleet decision audit loader against missing/unsupported `status` values and invalid `line_number` fields; focused regression passes **14/14** and the broader CAGE-1 fleet/trend/advisory/decision suite passes **116/116**.
+
+### Research findings (past two weeks)
+
+- **Operational Hallucination and Safety Drift in AI Agents** (arXiv:2607.18366v1) identifies reasoning/execution-state decoupling as a source of multi-turn failures. Audit ingestion should therefore retain every physical line and classify malformed or incomplete records instead of silently dropping them.
+- **Harnessing LLMs for Reliable Academic Supervision** (arXiv:2607.14707v1) reports that deterministic scaffolding, schema-validated I/O, bounded verification, persistent state, and audit trails materially improve reliability over an unstructured model loop. This directly supports validating audit-line status and provenance at ingestion.
+- **Building Trust in Autonomous Commerce** (arXiv:2607.19436v1) emphasizes canonical schemas, deterministic serialization, append-only commitments, and provenance-linked evidence. The fleet loader preserves source identity and physical-line provenance while rejecting unsupported field values.
+- **How Agent Skills Fail under Long Contexts** (arXiv:2607.17937v1) recommends frozen verification against structured obligations and evidence. Explicit schema checks turn missing status/line metadata into review-visible invalid evidence.
+- **Self-Improvements in Modern Agentic Systems** (arXiv:2607.13104v1) and **Knowledge-Centric Self-Improvement** (arXiv:2607.19592v1) reinforce the project boundary: improvement artifacts and validation evidence should be curated and reviewable; this run changes the parser and tests only, never policy or runtime action.
+
+Open-source activity signals included `pydantic/pydantic-ai-harness` (typed harnesses, skills, task tracking, and cost/safety hooks), `NousResearch/hermes-agent` (active self-improving agent runtime), `affaan-m/ECC` (skills, memory, security scanning, and research-first harness tooling), and `AgentMemoryWorld/Awesome-Agent-Memory` (rapidly updated memory-system index). These are activity signals, not a controlled popularity ranking.
+
+### Build: explicit audit-line schema validation
+
+Closed the previous run’s next priority:
+
+- Added a supported-status allowlist for decision audit lines: verification outcomes from the signed-envelope layer plus `advisory_mismatch` and `invalid_decision_record`.
+- Missing `status` is retained as `missing_status`; unknown or empty status is retained as `invalid_status`.
+- Missing, boolean, non-integer, or non-positive `line_number` values are retained as invalid evidence with the physical JSONL line number as the fallback provenance anchor.
+- Multiple field defects are classified as `invalid_record`; no malformed object is discarded.
+- Invalid field records clear decision/operator fields so downstream aggregation cannot count unverified decisions.
+- Added adversarial coverage for missing status, unknown status, boolean line numbers, zero line numbers, and provenance retention.
+
+**Safety boundary**: verification only. The loader never repairs, drops, executes, or promotes a decision. `decision_applied=False` and `automatic_action_taken=False` remain hard-coded.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_decision_fleet.py` → **14 passed**.
+- Broader CAGE-1 fleet/trend/advisory/decision regression → **116 passed**.
+- `python -m py_compile core/cage1_decision_fleet.py` passed; `git diff --check` passed.
+
+### Next priority
+
+Add an explicit schema version/category check to individual fleet audit JSONL lines. Keep policy, action application, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.18366v1
+- https://arxiv.org/abs/2607.14707v1
+- https://arxiv.org/abs/2607.19436v1
+- https://arxiv.org/abs/2607.17937v1
+- https://arxiv.org/html/2607.13104v1
+- https://arxiv.org/html/2607.19592v1
+- https://github.com/pydantic/pydantic-ai-harness
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/affaan-m/ECC
+- https://github.com/AgentMemoryWorld/Awesome-Agent-Memory

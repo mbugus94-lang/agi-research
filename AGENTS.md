@@ -1,3 +1,10 @@
+### 2026-07-28 - Scheduled Run: Explicit Audit-Line Schema Validation
+**Status**: COMPLETE — implemented and tested explicit field validation for CAGE-1 fleet decision audit JSONL lines. The parser remains lossless and verification-only: malformed/incomplete records stay visible with source and physical-line provenance; no decision, policy, action, or self-modification state is applied. Research and build details are appended to `CURRENT_RESEARCH.md`. Focused regression: 14/14; broader CAGE-1 fleet/trend/advisory/decision regression: 116/116.
+
+**Scope**: validate the decision audit line `status` against the signed-envelope verification vocabulary plus `advisory_mismatch` and `invalid_decision_record`; classify missing/unknown values without dropping records; validate positive integer `line_number` without treating booleans as integers; clear decision/operator fields for invalid records; add adversarial tests; run focused and broader CAGE-1 regressions before commit.
+
+**Safety**: changes to policy, action application, and self-modification remain review-gated.
+
 ### 2026-07-26 - Scheduled Run: Schema-Drift Hardening for Fleet Audit Trend Reports
 **Status**: COMPLETE - hardened `core/cage1_decision_fleet_trend.py` against malformed summaries and schema drift; 8/8 focused trend tests and 115/115 broader CAGE-1 fleet/report tests pass.
 

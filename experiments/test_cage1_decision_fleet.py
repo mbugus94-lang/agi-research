@@ -151,3 +151,74 @@ def test_cli_malformed_audit_is_nonzero_but_writes_complete_jsonl(tmp_path):
     records = [json.loads(line) for line in audit_out.read_text(encoding="utf-8").splitlines()]
     assert [record["status"] for record in records[:-1]] == ["valid", "malformed_json"]
     assert records[-1]["record_type"] == "summary"
+
+
+def test_loader_marks_missing_status_as_invalid_and_retains_physical_line(tmp_path):
+    path = tmp_path / "missing-status.jsonl"
+    path.write_text('{"line_number": 8, "decision": "defer"}\n', encoding="utf-8")
+    source, lines = load_decision_audit_jsonl(str(path))
+    assert source.invalid_line_count == 1
+    assert lines[0].status == "missing_status"
+    assert lines[0].source_line_number == 8
+    assert "missing" in lines[0].reason and "status" in lines[0].reason
+
+
+def test_loader_rejects_unknown_status_and_bad_line_number(tmp_path):
+    path = tmp_path / "invalid-fields.jsonl"
+    path.write_text(
+        '{"status":"made_up","line_number":true}\n'
+        '{"status":"valid","line_number":0}\n',
+        encoding="utf-8",
+    )
+    source, lines = load_decision_audit_jsonl(str(path))
+    assert source.invalid_line_count == 2
+    assert [line.status for line in lines] == ["invalid_record", "invalid_line_number"]
+    assert lines[0].source_line_number == 1
+    assert "positive integer" in lines[0].reason
+    assert lines[1].source_line_number == 2
+    assert "positive integer" in lines[1].reason
+
+
+def test_loader_rejects_missing_or_unknown_status_without_dropping_the_line(tmp_path):
+    path = tmp_path / "status-schema.jsonl"
+    path.write_text(
+        '{"line_number":1,"advisory_digest":"a","decision":"defer"}\n'
+        '{"line_number":2,"status":"made_up","advisory_digest":"b"}\n',
+        encoding="utf-8",
+    )
+    source, lines = load_decision_audit_jsonl(str(path))
+    assert source.line_count == 2
+    assert source.invalid_line_count == 2
+    assert [line.status for line in lines] == ["missing_status", "invalid_status"]
+    assert "missing" in lines[0].reason and "status" in lines[0].reason
+    assert "supported string" in lines[1].reason
+    assert all(line.decision is None for line in lines)
+
+
+def test_loader_rejects_missing_and_invalid_line_numbers(tmp_path):
+    path = tmp_path / "line-number-schema.jsonl"
+    path.write_text(
+        '{"status":"valid","advisory_digest":"a","decision":"defer"}\n'
+        '{"status":"valid","line_number":true,"advisory_digest":"b","decision":"accept"}\n'
+        '{"status":"valid","line_number":0,"advisory_digest":"c","decision":"reject"}\n',
+        encoding="utf-8",
+    )
+    source, lines = load_decision_audit_jsonl(str(path))
+    assert source.line_count == 3
+    assert [line.status for line in lines] == ["missing_line_number", "invalid_line_number", "invalid_line_number"]
+    assert [line.source_line_number for line in lines] == [1, 2, 3]
+    assert all("line_number" in line.reason for line in lines)
+    assert all(line.decision is None for line in lines)
+
+
+def test_loader_preserves_valid_status_and_line_number_contract(tmp_path):
+    path = tmp_path / "valid-schema.jsonl"
+    path.write_text(
+        '{"status":"valid","line_number":7,"advisory_digest":"a","decision":"defer"}\n',
+        encoding="utf-8",
+    )
+    source, lines = load_decision_audit_jsonl(str(path))
+    assert source.valid_line_count == 1
+    assert lines[0].status == "valid"
+    assert lines[0].source_line_number == 7
+    assert lines[0].decision == "defer"

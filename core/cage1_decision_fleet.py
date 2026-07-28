@@ -107,17 +107,72 @@ class DecisionFleetAuditSummary:
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)
 
 
+_AUDIT_LINE_STATUSES = frozenset({
+    "valid",
+    "invalid_signature",
+    "expired",
+    "not_yet_valid",
+    "unknown_key",
+    "unknown_algorithm",
+    "malformed_envelope",
+    "payload_mismatch",
+    "invalid_decision_record",
+    "advisory_mismatch",
+    "malformed_json",
+    "malformed_record",
+})
+_MISSING = object()
+
+
 def _line_from_record(identity: str, source_path: str, source_line_number: int, record: Mapping[str, Any]) -> FleetAuditLine:
+    raw_status = record.get("status", _MISSING)
+    raw_line_number = record.get("line_number", _MISSING)
+    issues: list[str] = []
+
+    if raw_status is _MISSING:
+        status = "missing_status"
+        issues.append("missing required field: status")
+    elif not isinstance(raw_status, str) or not raw_status.strip() or raw_status not in _AUDIT_LINE_STATUSES:
+        status = "invalid_status"
+        issues.append("status must be a non-empty supported string")
+    else:
+        status = raw_status
+
+    if raw_line_number is _MISSING:
+        line_number = source_line_number
+        line_status = "missing_line_number"
+        issues.append("missing required field: line_number")
+    elif isinstance(raw_line_number, bool) or not isinstance(raw_line_number, int) or raw_line_number < 1:
+        line_number = source_line_number
+        line_status = "invalid_line_number"
+        issues.append("line_number must be a positive integer")
+    else:
+        line_number = raw_line_number
+        line_status = ""
+
+    if issues:
+        if len(issues) > 1:
+            status = "invalid_record"
+        elif line_status:
+            status = line_status
+        reason = "; ".join(issues)
+        decision = None
+        operator_id = None
+    else:
+        reason = str(record.get("reason", ""))
+        decision = str(record["decision"]) if record.get("decision") else None
+        operator_id = str(record["operator_id"]) if record.get("operator_id") else None
+
     return FleetAuditLine(
         source_id=identity,
         source_path=source_path,
-        source_line_number=int(record.get("line_number", source_line_number)),
-        status=str(record.get("status", "missing_status")),
+        source_line_number=line_number,
+        status=status,
         advisory_digest=str(record["advisory_digest"]) if record.get("advisory_digest") else None,
         envelope_digest=str(record["envelope_digest"]) if record.get("envelope_digest") else None,
-        decision=str(record["decision"]) if record.get("decision") else None,
-        operator_id=str(record["operator_id"]) if record.get("operator_id") else None,
-        reason=str(record.get("reason", "")),
+        decision=decision,
+        operator_id=operator_id,
+        reason=reason,
     )
 
 
