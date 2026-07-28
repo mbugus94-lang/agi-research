@@ -6662,3 +6662,8 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 ### 2026-07-27 - Scheduled Run: Preserve Malformed Fleet Decision Audit Lines
 **Status**: COMPLETE - `load_decision_audit_jsonl(...)` now retains malformed JSON and non-object lines with source/physical-line provenance and reasons; focused CAGE-1 fleet/report regression passes 127/127. `FleetAuditLine` serializes the reason; invalid input remains visible and yields non-zero CLI status. No decision, policy, action, evidence repair, or self-modification is applied.
 **Next priority**: validate audit-line status and line-number fields explicitly while preserving lossless malformed-record behavior. Keep policy and self-modification review-gated.
+
+### 2026-07-28 - Scheduled Run: Individual Audit-Line Schema Validation
+**Status**: COMPLETE — added exact `category`/`schema_version` validation to individual CAGE-1 fleet decision audit lines. Schema-invalid records remain lossless with source/physical-line provenance and force invalid aggregate status; 17 focused fleet tests and 135 broader CAGE-1 tests pass. No decision, policy, action, evidence repair, or self-modification is applied.
+
+**Next priority**: add a review-only advisory projection for `invalid_schema` lines while preserving raw provenance. Keep policy, action application, and self-modification review-gated.

@@ -2801,3 +2801,47 @@ Add an explicit schema version/category check to individual fleet audit JSONL li
 - https://github.com/NousResearch/hermes-agent
 - https://github.com/affaan-m/ECC
 - https://github.com/AgentMemoryWorld/Awesome-Agent-Memory
+
+## 2026-07-28 - Scheduled Run: Individual Audit-Line Schema Validation
+
+### Research findings (past two weeks)
+
+- **Harness Handbook: Making Evolving Agent Systems Reliable** (arXiv:2607.13285v1) treats the harness—not the model alone—as the layer responsible for state, prompts, tool execution, lifecycle, and controlled evolution. This supports rejecting schema drift at the audit boundary before derived trend computation.
+- **Programmatic Memory Enables Long-Horizon Reasoning / PRO-LONG** (arXiv:2607.20064v1) shows why interactive agents need explicit, inspectable state and replayable context rather than only a larger prompt. Lossless audit-line retention gives the fleet layer the same property for execution evidence.
+- **The Hidden Footprint** (arXiv:2607.11149v2) makes persistence/storage an evaluation dimension across agent frameworks. Audit schemas should therefore identify the record type and version explicitly so storage artifacts remain interpretable across implementations.
+- **From Cognitive Architectures to Language Agents** (arXiv:2607.23942v1) emphasizes that memory, planning, reflection, and tool use have different control semantics and failure paths. An explicit line category prevents a fleet summary or trend record from being mistaken for an individual decision event.
+- **Operational Hallucination and Safety Drift in AI Agents** (arXiv:2607.18366v1) reinforces the need to keep reasoning and execution state aligned. The loader retains malformed/schema-invalid lines with physical provenance rather than silently dropping the evidence.
+
+Open-source activity signals included `pydantic/pydantic-ai-harness` (typed harnesses and safety/cost hooks), `NousResearch/hermes-agent` (active self-improving runtime), `affaan-m/ECC` (skills, memory, and security scanning), and `AgentMemoryWorld/Awesome-Agent-Memory` (rapidly updated memory-system index). These are activity signals, not a controlled popularity ranking.
+
+### Build
+
+Closed the previous run's next priority by extending the verification-only fleet audit loader with an explicit individual-line schema contract:
+
+- Added `LINE_CATEGORY = "cage1_decision_audit_line"` and require every JSON object to carry that exact category and `schema_version == "1.0"`.
+- Classified category/version defects as `invalid_schema` when they are the only defect, or `invalid_record` when combined with status/line-number defects.
+- Preserved physical source provenance and reasons for every invalid line; invalid records cannot contribute decisions or operator identities.
+- Updated the JSONL writer and fixtures to emit/expect the individual-line category, while the fleet summary retains its separate `cage1_decision_fleet_audit` category.
+- Kept the safety boundary unchanged: no evidence repair, policy mutation, decision application, or self-modification occurs.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_decision_fleet.py` -> **17 passed**.
+- Broader CAGE-1 fleet/trend/advisory/decision regression -> **135 passed**.
+- Changed module compilation and `git diff --check` pass.
+
+### Next priority
+
+Add a review-only advisory projection for `invalid_schema` lines so schema drift is explicit in operator findings while raw line provenance remains intact. Keep policy, action application, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/html/2607.13285v1
+- https://arxiv.org/html/2607.20064v1
+- https://arxiv.org/html/2607.11149v2
+- https://arxiv.org/html/2607.23942v1
+- https://arxiv.org/abs/2607.18366v1
+- https://github.com/pydantic/pydantic-ai-harness
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/affaan-m/ECC
+- https://github.com/AgentMemoryWorld/Awesome-Agent-Memory

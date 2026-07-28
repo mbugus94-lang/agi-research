@@ -10,6 +10,7 @@ from typing import Any, Iterable, Mapping, Optional, Sequence
 
 SCHEMA_VERSION = "1.0"
 FLEET_CATEGORY = "cage1_decision_fleet_audit"
+LINE_CATEGORY = "cage1_decision_audit_line"
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,7 @@ class FleetAuditLine:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "category": "cage1_decision_fleet_audit_line",
+            "category": LINE_CATEGORY,
             "schema_version": SCHEMA_VERSION,
             "source_id": self.source_id,
             "source_path": self.source_path,
@@ -120,6 +121,7 @@ _AUDIT_LINE_STATUSES = frozenset({
     "advisory_mismatch",
     "malformed_json",
     "malformed_record",
+    "invalid_schema",
 })
 _MISSING = object()
 
@@ -128,6 +130,18 @@ def _line_from_record(identity: str, source_path: str, source_line_number: int, 
     raw_status = record.get("status", _MISSING)
     raw_line_number = record.get("line_number", _MISSING)
     issues: list[str] = []
+
+    raw_category = record.get("category", _MISSING)
+    raw_schema_version = record.get("schema_version", _MISSING)
+
+    if raw_category is _MISSING:
+        issues.append("missing required field: category")
+    elif raw_category != LINE_CATEGORY:
+        issues.append(f"category must be exactly {LINE_CATEGORY!r}")
+    if raw_schema_version is _MISSING:
+        issues.append("missing required field: schema_version")
+    elif raw_schema_version != SCHEMA_VERSION:
+        issues.append(f"schema_version must be exactly {SCHEMA_VERSION!r}")
 
     if raw_status is _MISSING:
         status = "missing_status"
@@ -151,7 +165,11 @@ def _line_from_record(identity: str, source_path: str, source_line_number: int, 
         line_status = ""
 
     if issues:
-        if len(issues) > 1:
+        schema_issues = [issue for issue in issues if "category" in issue or "schema_version" in issue]
+        field_issues = [issue for issue in issues if issue not in schema_issues]
+        if schema_issues:
+            status = "invalid_schema" if not field_issues else "invalid_record"
+        elif len(field_issues) > 1:
             status = "invalid_record"
         elif line_status:
             status = line_status

@@ -88,7 +88,7 @@ def test_write_jsonl_has_lines_then_summary(tmp_path):
     summary = aggregate_decision_audit_files([str(path)])
     write_fleet_audit_jsonl(summary, str(out))
     records = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
-    assert records[0]["category"] == "cage1_decision_fleet_audit_line"
+    assert records[0]["category"] == "cage1_decision_audit_line"
     assert records[-1]["record_type"] == "summary"
     assert records[-1]["status"] == "valid"
 
@@ -123,7 +123,7 @@ def test_cli_rejects_mismatched_report_count(tmp_path):
 
 def test_loader_retains_malformed_json_and_non_object_lines(tmp_path):
     path = tmp_path / "malformed.jsonl"
-    path.write_text('{"status":"valid","line_number":3,"advisory_digest":"a","decision":"defer"}\nnot-json\n[]\n', encoding="utf-8")
+    path.write_text('{"category":"cage1_decision_audit_line","schema_version":"1.0","status":"valid","line_number":3,"advisory_digest":"a","decision":"defer"}\nnot-json\n[]\n', encoding="utf-8")
     source, lines = load_decision_audit_jsonl(str(path), source_id="member-malformed")
     assert source.line_count == 3
     assert source.valid_line_count == 1
@@ -138,7 +138,7 @@ def test_cli_malformed_audit_is_nonzero_but_writes_complete_jsonl(tmp_path):
     path = tmp_path / "member.jsonl"
     out = tmp_path / "fleet.json"
     audit_out = tmp_path / "fleet.jsonl"
-    path.write_text('{"status":"valid","line_number":1,"advisory_digest":"a","decision":"defer"}\nbroken\n', encoding="utf-8")
+    path.write_text('{"category":"cage1_decision_audit_line","schema_version":"1.0","status":"valid","line_number":1,"advisory_digest":"a","decision":"defer"}\nbroken\n', encoding="utf-8")
     result = subprocess.run([
         sys.executable, "-m", "cli.cage1_fleet_audit",
         "--audit", str(path), "--out", str(out), "--audit-out", str(audit_out), "--summary",
@@ -155,7 +155,7 @@ def test_cli_malformed_audit_is_nonzero_but_writes_complete_jsonl(tmp_path):
 
 def test_loader_marks_missing_status_as_invalid_and_retains_physical_line(tmp_path):
     path = tmp_path / "missing-status.jsonl"
-    path.write_text('{"line_number": 8, "decision": "defer"}\n', encoding="utf-8")
+    path.write_text('{"category":"cage1_decision_audit_line","schema_version":"1.0","line_number": 8, "decision": "defer"}\n', encoding="utf-8")
     source, lines = load_decision_audit_jsonl(str(path))
     assert source.invalid_line_count == 1
     assert lines[0].status == "missing_status"
@@ -166,8 +166,8 @@ def test_loader_marks_missing_status_as_invalid_and_retains_physical_line(tmp_pa
 def test_loader_rejects_unknown_status_and_bad_line_number(tmp_path):
     path = tmp_path / "invalid-fields.jsonl"
     path.write_text(
-        '{"status":"made_up","line_number":true}\n'
-        '{"status":"valid","line_number":0}\n',
+        '{"category":"cage1_decision_audit_line","schema_version":"1.0","status":"made_up","line_number":true}\n'
+        '{"category":"cage1_decision_audit_line","schema_version":"1.0","status":"valid","line_number":0}\n',
         encoding="utf-8",
     )
     source, lines = load_decision_audit_jsonl(str(path))
@@ -182,8 +182,8 @@ def test_loader_rejects_unknown_status_and_bad_line_number(tmp_path):
 def test_loader_rejects_missing_or_unknown_status_without_dropping_the_line(tmp_path):
     path = tmp_path / "status-schema.jsonl"
     path.write_text(
-        '{"line_number":1,"advisory_digest":"a","decision":"defer"}\n'
-        '{"line_number":2,"status":"made_up","advisory_digest":"b"}\n',
+        '{"category":"cage1_decision_audit_line","schema_version":"1.0","line_number":1,"advisory_digest":"a","decision":"defer"}\n'
+        '{"category":"cage1_decision_audit_line","schema_version":"1.0","line_number":2,"status":"made_up","advisory_digest":"b"}\n',
         encoding="utf-8",
     )
     source, lines = load_decision_audit_jsonl(str(path))
@@ -198,9 +198,9 @@ def test_loader_rejects_missing_or_unknown_status_without_dropping_the_line(tmp_
 def test_loader_rejects_missing_and_invalid_line_numbers(tmp_path):
     path = tmp_path / "line-number-schema.jsonl"
     path.write_text(
-        '{"status":"valid","advisory_digest":"a","decision":"defer"}\n'
-        '{"status":"valid","line_number":true,"advisory_digest":"b","decision":"accept"}\n'
-        '{"status":"valid","line_number":0,"advisory_digest":"c","decision":"reject"}\n',
+        '{"category":"cage1_decision_audit_line","schema_version":"1.0","status":"valid","advisory_digest":"a","decision":"defer"}\n'
+        '{"category":"cage1_decision_audit_line","schema_version":"1.0","status":"valid","line_number":true,"advisory_digest":"b","decision":"accept"}\n'
+        '{"category":"cage1_decision_audit_line","schema_version":"1.0","status":"valid","line_number":0,"advisory_digest":"c","decision":"reject"}\n',
         encoding="utf-8",
     )
     source, lines = load_decision_audit_jsonl(str(path))
@@ -214,7 +214,7 @@ def test_loader_rejects_missing_and_invalid_line_numbers(tmp_path):
 def test_loader_preserves_valid_status_and_line_number_contract(tmp_path):
     path = tmp_path / "valid-schema.jsonl"
     path.write_text(
-        '{"status":"valid","line_number":7,"advisory_digest":"a","decision":"defer"}\n',
+        '{"category":"cage1_decision_audit_line","schema_version":"1.0","status":"valid","line_number":7,"advisory_digest":"a","decision":"defer"}\n',
         encoding="utf-8",
     )
     source, lines = load_decision_audit_jsonl(str(path))
@@ -222,3 +222,43 @@ def test_loader_preserves_valid_status_and_line_number_contract(tmp_path):
     assert lines[0].status == "valid"
     assert lines[0].source_line_number == 7
     assert lines[0].decision == "defer"
+
+
+def test_loader_rejects_missing_line_category_without_dropping_record(tmp_path):
+    path = tmp_path / "missing-category.jsonl"
+    path.write_text(
+        '{"schema_version":"1.0","status":"valid","line_number":1,"decision":"defer"}\n',
+        encoding="utf-8",
+    )
+    source, lines = load_decision_audit_jsonl(str(path))
+    assert source.invalid_line_count == 1
+    assert lines[0].status == "invalid_schema"
+    assert lines[0].decision is None
+    assert "missing required field: category" in lines[0].reason
+
+
+def test_loader_rejects_wrong_line_category_and_schema_version(tmp_path):
+    path = tmp_path / "drifted-line-schema.jsonl"
+    path.write_text(
+        '{"category":"other","schema_version":"1.0","status":"valid","line_number":1,"decision":"defer"}\n'
+        '{"category":"cage1_decision_audit_line","schema_version":"9.9","status":"valid","line_number":2,"decision":"accept"}\n',
+        encoding="utf-8",
+    )
+    source, lines = load_decision_audit_jsonl(str(path))
+    assert source.line_count == 2
+    assert source.invalid_line_count == 2
+    assert [line.status for line in lines] == ["invalid_schema", "invalid_schema"]
+    assert all(line.decision is None for line in lines)
+    assert "category must be exactly" in lines[0].reason
+    assert "schema_version must be exactly" in lines[1].reason
+
+
+def test_writer_emits_supported_individual_line_schema(tmp_path):
+    path = tmp_path / "member.jsonl"
+    out = tmp_path / "fleet.jsonl"
+    _write(path, [_line(1)])
+    summary = aggregate_decision_audit_files([str(path)])
+    write_fleet_audit_jsonl(summary, str(out))
+    line = json.loads(out.read_text(encoding="utf-8").splitlines()[0])
+    assert line["category"] == "cage1_decision_audit_line"
+    assert line["schema_version"] == "1.0"
