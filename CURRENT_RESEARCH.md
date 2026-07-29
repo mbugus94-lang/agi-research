@@ -2893,3 +2893,49 @@ Add a review-only CLI fixture/report mode that exposes schema-invalid findings i
 - https://github.com/Miguok/fable-harness
 - https://github.com/Meterless/Meterless
 - https://github.com/NousResearch/hermes-agent
+
+## 2026-07-29 - Scheduled Run: Review-Only Schema-Invalid CLI Fixture
+
+### Research findings (past two weeks)
+
+- **AgentOmnia** (arXiv:2607.23124v1) frames agent improvement as a loop across task/environment synthesis, verifiers, evaluation, rollback, and product-level evolution. The practical implication for this repository is to make operator-facing validation reproducible without turning reports into execution authority.
+- **Operational Hallucination and Safety Drift in AI Agents** (arXiv:2607.18366v1) attributes failures partly to a reasoning/execution-state gap. A deterministic fixture tests the report boundary itself and keeps malformed evidence tied to its physical source line.
+- **When Do Agent Loops Mistake Stagnation for Progress?** (arXiv:2607.25152v1) finds that self-reported or in-band evaluation can accept regressions; the fixture therefore validates externally visible JSON/Markdown output and does not let the advisory auto-apply a decision.
+- **CORVUS** (arXiv:2607.22711v1) emphasizes synchronized state over stale snapshots. The fixture preserves the schema-invalid line and its provenance instead of normalizing it away.
+- **SIGIL** (Zenodo 21499104) reports stronger procedural compliance from typed, executable harnesses than prose-only skills. This build keeps the CLI contract narrow and deterministic: one named fixture, two output formats, stable critical finding, no side effects.
+
+Open-source activity signals included `antoinezambelli/forge` (self-hosted tool-calling workflow runner with guardrails), `oleksiijko/pmb` (local-first SQLite memory for coding agents), `NVIDIA/SkillSpector` (static/semantic skill security scanner), `NVIDIA-NeMo/labs-OO-Agents` (isolated ARC-AGI-3 agent with memory and IPC), and `openai/openai-agents-python` v0.18.3 (session, tracing, concurrency, and sandbox fixes). These are activity signals from current repository pages, not a controlled popularity ranking.
+
+### Build: deterministic schema-invalid review fixture
+
+Closed the previous run’s next priority:
+
+- Added `--fixture schema-invalid` to `cli/cage1_review.py`.
+- The fixture contains one explicit `invalid_schema` audit line with source ID, physical line, and parser reason.
+- JSON mode emits the advisory and `--format markdown` emits the operator report; `--out` writes the same advisory without mutating fixture data.
+- Added CLI tests for Markdown provenance and JSON persistence.
+- Signed operator-decision verification, raw evidence, policy, action application, and self-modification remain unchanged and review-gated.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_review_decision.py experiments/test_cage1_advisory.py` → **14 passed**.
+- Broader CAGE-1 fleet/trend/advisory/decision/report regression → **158 passed**.
+- `python -m py_compile cli/cage1_review.py core/cage1_advisory.py` passed.
+- `git diff --check` passed.
+
+### Next priority
+
+Add a deterministic mixed-fleet fixture/report mode containing both clean and schema-invalid lines, then verify that the output preserves both ordinary evidence and critical provenance. Keep the signed-decision boundary and action application review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.23124v1
+- https://arxiv.org/abs/2607.18366v1
+- https://arxiv.org/abs/2607.25152v1
+- https://arxiv.org/abs/2607.22711v1
+- https://zenodo.org/records/21499104
+- https://github.com/antoinezambelli/forge
+- https://github.com/oleksiijko/pmb
+- https://github.com/NVIDIA/SkillSpector
+- https://github.com/NVIDIA-NeMo/labs-OO-Agents
+- https://github.com/openai/openai-agents-python/releases/tag/v0.18.3

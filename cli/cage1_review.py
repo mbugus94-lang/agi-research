@@ -20,6 +20,7 @@ def _parser() -> argparse.ArgumentParser:
     source.add_argument("--fleet-input", help="Ordered CAGE-1 snapshots as JSON array or JSONL.")
     source.add_argument("--compare-snapshot", action="append", help="Saved snapshot path; repeat at least twice.")
     source.add_argument("--trend-input", help="Saved CAGE-1 decision fleet trend JSON.")
+    source.add_argument("--fixture", choices=("schema-invalid",), help="Run a deterministic review-only fixture.")
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
     parser.add_argument("--out", help="Write the advisory JSON to this path.")
     parser.add_argument("--decision-envelope", action="append", help="Signed operator decision envelope; repeat to verify multiple decisions.")
@@ -32,7 +33,39 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _schema_invalid_fixture() -> dict[str, Any]:
+    return {
+        "category": "cage1_decision_fleet_audit",
+        "schema_version": "1.0",
+        "status": "invalid",
+        "source_count": 1,
+        "report_count": 1,
+        "line_count": 1,
+        "valid_line_count": 0,
+        "invalid_line_count": 1,
+        "status_counts": {"invalid_schema": 1},
+        "decision_counts": {},
+        "advisory_counts": {},
+        "conflicting_advisories": [],
+        "sources": [{"source_id": "fixture-member.jsonl"}],
+        "lines": [{
+            "category": "cage1_decision_audit_line",
+            "schema_version": "9.9",
+            "source_id": "fixture-member.jsonl",
+            "source_line_number": 7,
+            "status": "invalid_schema",
+            "reason": "schema_version must be exactly '1.0'",
+            "decision": None,
+        }],
+        "report_status_counts": {"invalid": 1},
+        "decision_applied": False,
+        "automatic_action_taken": False,
+    }
+
+
 def _load_source(args: argparse.Namespace) -> Any:
+    if args.fixture:
+        return _schema_invalid_fixture()
     if args.fleet_input:
         return aggregate_fleet(load_fleet_snapshots(args.fleet_input), notes=args.notes)
     if args.trend_input:

@@ -1,3 +1,12 @@
+### 2026-07-29 - Scheduled Run: Review-Only Schema-Invalid CLI Fixture
+**Status**: COMPLETE — added a deterministic `cli.cage1_review --fixture schema-invalid` mode with JSON/Markdown output; focused review/advisory regression: 14/14, broader CAGE-1 regression: 158/158.
+
+**Build**: The fixture projects one malformed individual audit line into a critical/escalate advisory while retaining source ID, physical line, parser reason, raw evidence, and `automatic_action_taken=False`. It is report-only: no decision, policy, action, evidence repair, or self-modification is applied.
+
+**Safety**: Signed operator-decision verification remains unchanged and review-gated. The fixture is intended for reproducible operator/report testing, not production evidence generation.
+
+**Next priority**: add a review-only CLI input fixture/report mode for a small mixed fleet (clean + schema-invalid) so JSON and Markdown can be checked against both ordinary and critical findings without changing signed-decision verification or action application.
+
 ### 2026-07-28 - Scheduled Run: Explicit Audit-Line Schema Validation
 **Status**: COMPLETE — implemented and tested explicit field validation for CAGE-1 fleet decision audit JSONL lines. The parser remains lossless and verification-only: malformed/incomplete records stay visible with source and physical-line provenance; no decision, policy, action, or self-modification state is applied. Research and build details are appended to `CURRENT_RESEARCH.md`. Focused regression: 14/14; broader CAGE-1 fleet/trend/advisory/decision regression: 116/116.
 

@@ -117,3 +117,32 @@ def test_review_cli_requires_verification_credentials(tmp_path):
     )
     assert result.returncode == 2
     assert "decision-key-id" in result.stderr
+
+
+def test_review_cli_schema_invalid_fixture_exposes_markdown_finding():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "schema-invalid", "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "schema-invalid audit line" in result.stdout
+    assert "fixture-member.jsonl" in result.stdout
+    assert "physical_line=7" in result.stdout
+    assert "Automatic action taken: **no**" in result.stdout
+
+
+def test_review_cli_schema_invalid_fixture_writes_json_without_mutating_source(tmp_path):
+    out = tmp_path / "advisory.json"
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "schema-invalid", "--out", str(out)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["severity"] == "critical"
+    assert payload["recommendation"] == "escalate"
+    assert payload["automatic_action_taken"] is False
+    saved = json.loads(out.read_text(encoding="utf-8"))
+    assert saved["raw_fleet"]["lines"][0]["status"] == "invalid_schema"
