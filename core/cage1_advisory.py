@@ -72,6 +72,24 @@ def _mapping(value: Any) -> Mapping[str, Any]:
     return value
 
 
+def _schema_invalid_findings(payload: Mapping[str, Any], *, label: str) -> list[str]:
+    raw_lines = payload.get("lines", payload.get("line_provenance", []))
+    if not isinstance(raw_lines, list):
+        return []
+    findings: list[str] = []
+    for line in raw_lines:
+        if not isinstance(line, Mapping) or line.get("status") != "invalid_schema":
+            continue
+        source_id = line.get("source_id", "unknown")
+        physical_line = line.get("source_line_number", line.get("line_number", "unknown"))
+        reason = str(line.get("reason", "")).strip()
+        finding = f"{label} schema-invalid audit line: source={source_id}, physical_line={physical_line}"
+        if reason:
+            finding += f" ({reason})"
+        findings.append(finding)
+    return findings
+
+
 def _source_parts(source: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     payload = dict(_mapping(source))
     if payload.get("category") == "cage1_decision_fleet_audit_trend":
@@ -110,15 +128,23 @@ def project_review_advisory(source: Any, *, notes: str = "") -> CAGE1ReviewAdvis
             flag_text.append(f"status={trend.get('status')}")
             regression_count = 1
         findings = [f"fleet trend: {item}" for item in flag_text]
+        schema_findings = [
+            finding
+            for point in trend.get("points", [])
+            if isinstance(point, Mapping)
+            for finding in _schema_invalid_findings(point, label=f"snapshot={point.get('snapshot_id', 'unknown')}")
+        ]
+        findings.extend(schema_findings)
         anomaly_text = findings.copy()
-        invalid_evidence = any("invalid_records_increased" in item or "current_status=invalid" in item or "unexpected_action_state=true" in item or "invalid " in item or "invalid_fields" in item for item in flag_text)
+        invalid_evidence = bool(schema_findings) or any("invalid_records_increased" in item or "current_status=invalid" in item or "unexpected_action_state=true" in item or "invalid " in item or "invalid_fields" in item for item in flag_text)
         duplicate_digest = False
         conflicting_evidence = any("conflicting_advisories_increased" in item or "current_status=conflicting" in item for item in flag_text)
     else:
         regressions = trend.get("regressions", []) if isinstance(trend.get("regressions", []), list) else []
         anomalies = fleet.get("anomalies", []) if isinstance(fleet.get("anomalies", []), list) else []
-        anomaly_text = [str(item) for item in anomalies]
-        invalid_evidence = any("invalid " in item or "invalid_fields" in item for item in anomaly_text)
+        schema_findings = _schema_invalid_findings(fleet, label="fleet")
+        anomaly_text = [str(item) for item in anomalies] + schema_findings
+        invalid_evidence = bool(schema_findings) or any("invalid " in item or "invalid_fields" in item for item in anomaly_text)
         duplicate_digest = any("duplicate digest" in item for item in anomaly_text)
         conflicting_evidence = False
         regression_count = len(regressions)

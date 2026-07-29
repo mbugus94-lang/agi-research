@@ -107,3 +107,56 @@ def test_current_invalid_point_is_critical_and_action_state_is_visible():
     assert any("current_status=invalid" in item for item in advisory.anomalies)
     assert any("unexpected_action_state=true" in item for item in advisory.anomalies)
     assert advisory.automatic_action_taken is False
+
+
+def test_invalid_schema_line_is_projected_as_critical_review_finding():
+    source = {
+        "category": "cage1_decision_fleet_audit",
+        "schema_version": "1.0",
+        "status": "invalid",
+        "lines": [{
+            "source_id": "member-a.jsonl",
+            "source_line_number": 7,
+            "status": "invalid_schema",
+            "reason": "schema_version must be exactly '1.0'",
+            "decision": None,
+        }],
+        "anomalies": [],
+    }
+    advisory = project_review_advisory(source)
+    assert advisory.severity == "critical"
+    assert advisory.recommendation == "escalate"
+    assert advisory.operator_decision_required is True
+    assert advisory.automatic_action_taken is False
+    assert len(advisory.anomalies) == 1
+    assert "schema-invalid audit line" in advisory.anomalies[0]
+    assert "member-a.jsonl" in advisory.anomalies[0]
+    assert "physical_line=7" in advisory.anomalies[0]
+    assert "schema_version" in advisory.anomalies[0]
+
+
+def test_trend_projection_retains_schema_invalid_provenance_in_findings():
+    source = {
+        "category": "cage1_decision_fleet_audit_trend",
+        "schema_version": "1.0",
+        "status": "stable",
+        "points": [{
+            "snapshot_id": "t2",
+            "status": "invalid",
+            "line_provenance": [{
+                "source_id": "member-b.jsonl",
+                "source_line_number": 11,
+                "status": "invalid_schema",
+                "reason": "missing required field: category",
+            }],
+        }],
+        "flagged_changes": [],
+        "decision_applied": False,
+        "automatic_action_taken": False,
+    }
+    advisory = project_review_advisory(source)
+    assert advisory.severity == "critical"
+    assert advisory.recommendation == "escalate"
+    assert any("snapshot=t2" in item for item in advisory.anomalies)
+    assert any("physical_line=11" in item for item in advisory.anomalies)
+    assert advisory.raw_trend == source

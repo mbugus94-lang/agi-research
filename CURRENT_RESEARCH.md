@@ -2845,3 +2845,51 @@ Add a review-only advisory projection for `invalid_schema` lines so schema drift
 - https://github.com/NousResearch/hermes-agent
 - https://github.com/affaan-m/ECC
 - https://github.com/AgentMemoryWorld/Awesome-Agent-Memory
+
+
+## 2026-07-29 - Scheduled Run: Review-Only Projection for Schema-Invalid Audit Lines
+
+**Status**: COMPLETE — extended the verification-only CAGE-1 advisory layer to make `invalid_schema` evidence explicit to operators; focused CAGE-1 regression passes **131/131**.
+
+### Research findings (past two weeks)
+
+- **Operational Hallucination and Safety Drift in AI Agents** (arXiv:2607.18366v1) identifies reasoning/execution-state decoupling as a multi-turn failure source. The practical analogue here is silently losing schema-invalid execution evidence; the advisory must preserve the physical source and line anchor.
+- **How Agent Skills Fail under Long Contexts** (arXiv:2607.17937v1) shows that requirements can be lost during long workflows and recommends explicit external checks. Treating schema drift as a first-class finding rather than a generic invalid count follows that principle.
+- **Defining AI-Native Systems: Autonomy as Revision Authority** (arXiv:2607.21659v1) separates who decides from who may revise the decider. The CAGE-1 projection keeps that boundary intact: it emits an advisory, but never applies a decision or changes policy.
+- **Separating Capability from Permission: A Governance Framework for Agentic AI Autonomy Levels** (arXiv:2607.23438v1) distinguishes what an agent can do from what it is permitted to do. This supports retaining a critical review recommendation without granting the advisory any execution authority.
+- **CORVUS** (arXiv:2607.22711v1) argues for synchronized, current context instead of stale snapshots. The fleet advisory now carries schema-invalid line provenance into the operator-facing finding, keeping the derived claim tied to current evidence.
+- **Speculate with Memory** (arXiv:2607.12236v1) uses explicit episodic and error-tracking memory to suppress recurring mistakes without changing the final trajectory. This run similarly adds a review projection without mutating the underlying fleet evidence.
+
+Open-source activity signals included `Nanako0129/pilotfish` (role-based delegation plus independent verification), `Miguok/fable-harness` (evidence-first adversarial review), `Meterless/Meterless` H-MEM (provenance/trust-ledger memory), and `NousResearch/hermes-agent` (actively maintained self-improving runtime). These are activity signals, not a controlled popularity ranking.
+
+### Build: schema-invalid advisory projection
+
+Closed the previous run’s next priority:
+
+- Added a review-only projection that scans individual fleet `lines` and trend-point `line_provenance` for `status == "invalid_schema"`.
+- Emits source ID, physical line number, and parser reason in the advisory finding.
+- Escalates schema-invalid evidence to `critical` / `escalate` and requires an operator decision, while preserving raw fleet/trend envelopes.
+- Kept `automatic_action_taken=False`; no decision, policy, evidence repair, or self-modification is performed.
+- Added adversarial direct-fleet and trend-provenance tests.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_advisory.py experiments/test_cage1_decision_fleet.py experiments/test_cage1_decision_fleet_trend.py experiments/test_cage1_review_decision.py experiments/test_cage1_decision_consumer.py experiments/test_signed_advisory_envelope.py experiments/test_cage1_report_cli.py` → **131 passed**.
+- Changed modules compile; `git diff --check` passes.
+
+### Next priority
+
+Add a review-only CLI fixture/report mode that exposes schema-invalid findings in JSON and Markdown without changing the current signed-decision verification boundary. Keep policy, action application, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.18366v1
+- https://arxiv.org/abs/2607.17937v1
+- https://arxiv.org/html/2607.21659v1
+- https://arxiv.org/abs/2607.23438v1
+- https://arxiv.org/abs/2607.22711v1
+- https://arxiv.org/abs/2607.12236v1
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/Miguok/fable-harness
+- https://github.com/Meterless/Meterless
+- https://github.com/NousResearch/hermes-agent
