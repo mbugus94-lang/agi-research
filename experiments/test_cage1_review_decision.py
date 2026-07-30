@@ -166,3 +166,33 @@ def test_review_cli_mixed_fleet_fixture_preserves_clean_and_schema_invalid_evide
     assert [line["status"] for line in raw_lines] == ["valid", "invalid_schema"]
     assert raw_lines[0]["decision"] == "defer"
     assert raw_lines[1]["decision"] is None
+
+
+def test_review_cli_multi_schema_invalid_fixture_preserves_order_and_provenance(tmp_path):
+    out = tmp_path / "multi-schema-advisory.json"
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "multi-schema-invalid", "--out", str(out)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["severity"] == "critical"
+    assert payload["recommendation"] == "escalate"
+    assert payload["anomaly_count"] == 3
+    assert [
+        ("member-z.jsonl", "physical_line=12"),
+        ("member-a.jsonl", "physical_line=4"),
+        ("member-m.jsonl", "physical_line=19"),
+    ] == [
+        (next(source for source in ("member-z.jsonl", "member-a.jsonl", "member-m.jsonl") if source in item), next(marker for marker in ("physical_line=12", "physical_line=4", "physical_line=19") if marker in item))
+        for item in payload["anomalies"]
+    ]
+    raw_lines = json.loads(out.read_text(encoding="utf-8"))["raw_fleet"]["lines"]
+    assert [(line["source_id"], line["source_line_number"]) for line in raw_lines] == [
+        ("member-z.jsonl", 12),
+        ("member-a.jsonl", 4),
+        ("member-m.jsonl", 19),
+    ]
+    assert all(line["status"] == "invalid_schema" for line in raw_lines)
+    assert json.loads(out.read_text(encoding="utf-8"))["automatic_action_taken"] is False

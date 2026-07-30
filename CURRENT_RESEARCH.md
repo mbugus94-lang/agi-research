@@ -2989,3 +2989,50 @@ Add a review-only CLI fixture/report mode for multiple schema-invalid lines acro
 - https://github.com/agentscope-ai/AgentTeams
 - https://github.com/NVIDIA/SkillSpector
 - https://github.com/openai/openai-agents-python/releases/tag/v0.18.3
+
+## 2026-07-30 - Scheduled Run: Multi-Schema-Invalid Review Fixture
+
+**Status**: COMPLETE — added a deterministic review-only fixture containing schema-invalid audit lines from three distinct fleet members; focused CAGE-1 review/advisory regression passes **16/16** and the broader CAGE-1 suite passes below.
+
+### Research findings (past two weeks)
+
+- **Native Python Object-Oriented Agents (NOOA)** (arXiv:2607.20709v1, July 22) reports that an inspectable Python-native harness can materially change agent performance on interactive tasks. The repository analogue is to keep review contracts and provenance in ordinary, testable code rather than hiding them in an autonomous meta-layer.
+- **A Control System, a Dataset, and a Recipe for Making Frozen LLM Agents Learn a Domain** (arXiv:2607.25415v1, July 29) frames the harness as a closed-loop controller and warns that unconstrained self-rewriting is difficult to audit. This run keeps the fixture/report path deterministic and review-only; it does not modify policy or executable behavior.
+- **From Memory to Skills: Evidence-Grounded Co-Evolution Governance** (arXiv:2607.16621v1, July 18) separates factual and experiential memory and emphasizes evidence-grounded skill evolution. Preserving every malformed line with its member and physical line number is the corresponding evidence boundary here.
+- **Beyond Memory Leaderboards: Evaluating Scientific Memory as Budgeted Context Restoration** (arXiv:2607.16848v1, July 18) treats context restoration as a budgeted evaluation problem. A fleet review must likewise retain the complete, ordered input record instead of collapsing multiple failures into one count.
+- **From Cognitive Architectures to Language Agents** (arXiv:2607.23942v1) argues that memory, planning, reflection, and scheduling differ by control semantics: state, transition triggers, persistence, failure, and resource governance. The fixture makes failure state and transition evidence explicit while leaving action authority outside the report layer.
+- **Draining the Energy Commons** (arXiv:2607.22188v1) models coordination failure when agents repeatedly consume a shared resource. This reinforces the value of bounded, review-gated fleet operations and explicit anomaly accounting.
+
+Open-source activity signals included `NousResearch/hermes-agent` (active long-horizon/self-improving runtime), `HKUDS/OpenSpace` (skill management with trace-backed quality evidence), and `agentscope-ai/AgentTeams` (multi-agent control-plane/runtime integrations). These are current activity signals from repository pages, not a controlled popularity ranking.
+
+### Build: deterministic multi-schema-invalid fixture
+
+Closed the previous run’s next priority:
+
+- Added `--fixture multi-schema-invalid` to `cli/cage1_review.py`.
+- The fixture contains three `invalid_schema` lines from distinct members, with intentionally different schema/category failures and physical line numbers.
+- Advisory output remains deterministic and preserves the input order, source IDs, parser reasons, and physical-line provenance for every finding.
+- JSON output retains all raw lines and keeps `automatic_action_taken=False`; the review layer does not repair evidence, apply policy, execute decisions, or self-modify.
+- Added regression coverage for critical escalation, complete finding count, finding order, raw-line order, and the hard safety boundary.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_review_decision.py experiments/test_cage1_advisory.py` → **16 passed**.
+- `python -m py_compile cli/cage1_review.py experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passes.
+
+### Next priority
+
+Add a review-only Markdown assertion/report fixture for multiple schema-invalid members so operators can inspect deterministic ordering and complete provenance without parsing JSON. Keep policy, action application, evidence repair, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.20709v1
+- https://arxiv.org/abs/2607.25415v1
+- https://arxiv.org/abs/2607.16621v1
+- https://arxiv.org/abs/2607.16848v1
+- https://arxiv.org/abs/2607.23942v1
+- https://arxiv.org/abs/2607.22188v1
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/HKUDS/OpenSpace
+- https://github.com/agentscope-ai/AgentTeams

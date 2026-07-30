@@ -6683,3 +6683,8 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Status**: COMPLETE — added exact `category`/`schema_version` validation to individual CAGE-1 fleet decision audit lines. Schema-invalid records remain lossless with source/physical-line provenance and force invalid aggregate status; 17 focused fleet tests and 135 broader CAGE-1 tests pass. No decision, policy, action, evidence repair, or self-modification is applied.
 
 **Next priority**: add a review-only advisory projection for `invalid_schema` lines while preserving raw provenance. Keep policy, action application, and self-modification review-gated.
+
+### 2026-07-30 - Scheduled Run: Multi-Schema-Invalid Review Fixture
+**Status**: COMPLETE — added `--fixture multi-schema-invalid` to `cli/cage1_review.py` with three distinct schema-invalid members; 16 focused review/advisory tests pass, and the review-only boundary remains intact. Findings preserve deterministic source order, source IDs, parser reasons, and physical line numbers. Raw evidence is retained; `automatic_action_taken=False`; no policy, decision, evidence repair, or self-modification is applied.
+
+**Next priority**: add a Markdown assertion/report fixture for multiple schema-invalid members, preserving complete provenance and review-only semantics.
