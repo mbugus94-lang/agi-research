@@ -146,3 +146,23 @@ def test_review_cli_schema_invalid_fixture_writes_json_without_mutating_source(t
     assert payload["automatic_action_taken"] is False
     saved = json.loads(out.read_text(encoding="utf-8"))
     assert saved["raw_fleet"]["lines"][0]["status"] == "invalid_schema"
+
+
+def test_review_cli_mixed_fleet_fixture_preserves_clean_and_schema_invalid_evidence(tmp_path):
+    out = tmp_path / "mixed-advisory.json"
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "mixed-fleet", "--out", str(out)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["severity"] == "critical"
+    assert payload["recommendation"] == "escalate"
+    assert payload["anomaly_count"] == 1
+    assert "drifted-member.jsonl" in payload["anomalies"][0]
+    assert "physical_line=8" in payload["anomalies"][0]
+    raw_lines = json.loads(out.read_text(encoding="utf-8"))["raw_fleet"]["lines"]
+    assert [line["status"] for line in raw_lines] == ["valid", "invalid_schema"]
+    assert raw_lines[0]["decision"] == "defer"
+    assert raw_lines[1]["decision"] is None

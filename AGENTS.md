@@ -1,3 +1,10 @@
+### 2026-07-30 - Scheduled Run: Mixed-Fleet Review Fixture
+**Status**: COMPLETE — added `cli.cage1_review --fixture mixed-fleet`; one clean and one schema-invalid audit line remain visible together; focused review/advisory/fleet regression: 134/134.
+
+**Build**: JSON/Markdown output preserves clean decision evidence, invalid schema status, member IDs, physical line, parser reason, and raw order. The advisory is critical/escalate for schema-invalid evidence, but remains review-only with `automatic_action_taken=False`; no policy, action, evidence repair, or self-modification is applied.
+
+**Next priority**: add a multi-invalid-member review fixture and verify deterministic finding ordering and complete provenance. Keep policy, action application, and self-modification review-gated.
+
 ### 2026-07-29 - Scheduled Run: Review-Only Schema-Invalid CLI Fixture
 **Status**: COMPLETE — added a deterministic `cli.cage1_review --fixture schema-invalid` mode with JSON/Markdown output; focused review/advisory regression: 14/14, broader CAGE-1 regression: 158/158.
 

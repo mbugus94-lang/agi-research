@@ -2939,3 +2939,53 @@ Add a deterministic mixed-fleet fixture/report mode containing both clean and sc
 - https://github.com/NVIDIA/SkillSpector
 - https://github.com/NVIDIA-NeMo/labs-OO-Agents
 - https://github.com/openai/openai-agents-python/releases/tag/v0.18.3
+
+## 2026-07-30 - Scheduled Run: Mixed-Fleet Review Fixture
+
+**Status**: COMPLETE — added a deterministic mixed-fleet fixture to the review-only CAGE-1 advisory CLI; focused CAGE-1 review/advisory/fleet regression passes **134/134**.
+
+### Research findings (past two weeks)
+
+- **Operational Hallucination and Safety Drift in AI Agents** (arXiv:2607.18366v1) identifies a reasoning/execution-state gap in multi-turn agents and motivates preserving both ordinary and anomalous execution evidence in review artifacts.
+- **Recursive Harness Self-Improvement** (arXiv:2607.15524v1) treats the harness as an object of iterative improvement and emphasizes trace quality; this run improves the reproducibility of the review/report boundary without granting self-modification authority.
+- **CORVUS** (arXiv:2607.22711v1) keeps agent context synchronized with current state rather than stale snapshots. The mixed fixture retains the clean audit line beside the schema-invalid line, so the report cannot hide the valid baseline while surfacing drift.
+- **Agent Team Work Zone** (arXiv:2607.22917v1) treats durable workspace state and recovery evidence as first-class concerns for long-lived agent teams. The fixture provides a small deterministic recovery/review case for persisted audit provenance.
+- **SciExplore** (arXiv:2607.20926v1) finds that autonomous scientific systems struggle with conflicting evidence distributed across long documents. The practical analogue here is a report that must preserve valid and invalid records together instead of collapsing the fleet to a single unqualified claim.
+- **PoTRE** (arXiv:2607.20268v1) uses heterogeneous reasoning roles and an aggregation layer for verification. This supports keeping the advisory projection separate from the raw evidence and requiring an operator decision for critical findings.
+
+Open-source activity signals included `NousResearch/hermes-agent` (active self-improving runtime with persistent tool-loop changes), `HKUDS/nanobot` (durable personal agent with helpers/model switching), `valkor-ai/loom` (state-machine workflow with declared inputs and validation), `agentscope-ai/AgentTeams` (Kubernetes-native multi-agent control plane), `NVIDIA/SkillSpector` (skill security scanning), and `openai/openai-agents-python` v0.18.3 (session/tracing/concurrency/sandbox updates). These are current activity signals, not a controlled popularity ranking.
+
+### Build: mixed-fleet review-only fixture
+
+Closed the previous run’s next priority:
+
+- Added `--fixture mixed-fleet` to `cli/cage1_review.py`.
+- The fixture contains one valid `defer` record and one `invalid_schema` record from separate members.
+- JSON and Markdown review output preserve the clean decision, invalid schema status, source IDs, physical line, parser reason, and raw line ordering.
+- The advisory remains `critical` / `escalate` because schema-invalid evidence is present, while `automatic_action_taken=False` and signed operator-decision verification remain unchanged.
+- Added a CLI regression test covering both ordinary evidence and critical provenance.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_review_decision.py experiments/test_cage1_advisory.py experiments/test_cage1_decision_fleet.py experiments/test_cage1_decision_fleet_trend.py experiments/test_cage1_decision_consumer.py experiments/test_signed_advisory_envelope.py experiments/test_cage1_report_cli.py` → **134 passed**.
+- `python -m cli.cage1_review --fixture mixed-fleet --format markdown` emits the expected critical finding and preserves the clean/invalid distinction.
+- Changed modules compile; `git diff --check` passes.
+
+### Next priority
+
+Add a review-only CLI fixture/report mode for multiple schema-invalid lines across distinct members, then verify deterministic finding ordering and complete provenance. Keep policy, action application, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.18366v1
+- https://arxiv.org/abs/2607.15524v1
+- https://arxiv.org/abs/2607.22711v1
+- https://arxiv.org/abs/2607.22917v1
+- https://arxiv.org/abs/2607.20926v1
+- https://arxiv.org/abs/2607.20268v1
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/HKUDS/nanobot
+- https://github.com/valkor-ai/loom
+- https://github.com/agentscope-ai/AgentTeams
+- https://github.com/NVIDIA/SkillSpector
+- https://github.com/openai/openai-agents-python/releases/tag/v0.18.3
