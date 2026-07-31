@@ -196,3 +196,28 @@ def test_review_cli_multi_schema_invalid_fixture_preserves_order_and_provenance(
     ]
     assert all(line["status"] == "invalid_schema" for line in raw_lines)
     assert json.loads(out.read_text(encoding="utf-8"))["automatic_action_taken"] is False
+
+
+def test_review_cli_multi_schema_invalid_fixture_markdown_preserves_complete_provenance():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "multi-schema-invalid", "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    markdown = result.stdout
+    assert markdown.startswith("# CAGE-1 Review Advisory")
+    assert "- Severity: **critical**" in markdown
+    assert "- Recommendation: **escalate**" in markdown
+    assert "- Operator decision required: **yes**" in markdown
+    assert "- Automatic action taken: **no**" in markdown
+    findings = [
+        "source=member-z.jsonl, physical_line=12",
+        "source=member-a.jsonl, physical_line=4",
+        "source=member-m.jsonl, physical_line=19",
+    ]
+    positions = [markdown.index(finding) for finding in findings]
+    assert positions == sorted(positions)
+    assert "schema_version must be exactly '1.0'" in markdown
+    assert "category must be exactly 'cage1_decision_audit_line'" in markdown
+    assert "No automatic remediation was performed." in markdown

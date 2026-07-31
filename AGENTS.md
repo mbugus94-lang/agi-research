@@ -6688,3 +6688,10 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Status**: COMPLETE — added `--fixture multi-schema-invalid` to `cli/cage1_review.py` with three distinct schema-invalid members; 16 focused review/advisory tests pass, and the review-only boundary remains intact. Findings preserve deterministic source order, source IDs, parser reasons, and physical line numbers. Raw evidence is retained; `automatic_action_taken=False`; no policy, decision, evidence repair, or self-modification is applied.
 
 **Next priority**: add a Markdown assertion/report fixture for multiple schema-invalid members, preserving complete provenance and review-only semantics.
+
+### 2026-07-31 - Scheduled Run: Multi-Schema-Invalid Markdown Review Assertion
+**Status**: COMPLETE — added a deterministic Markdown regression for `cli.cage1_review --fixture multi-schema-invalid`; all three schema-invalid members, parser reasons, physical lines, severity/escalation, and the review-only boundary remain visible in input order. Focused review/advisory regression: 17/17.
+
+**Safety**: test-only. No policy, action application, signed-decision verification, evidence repair, or self-modification behavior changed; `automatic_action_taken=False` remains asserted.
+
+**Next priority**: add a review-only Markdown assertion for the mixed-fleet fixture so valid decision evidence and schema-invalid evidence remain distinguishable in one report. Keep policy, action application, evidence repair, and self-modification review-gated.

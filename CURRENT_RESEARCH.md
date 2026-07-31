@@ -3036,3 +3036,47 @@ Add a review-only Markdown assertion/report fixture for multiple schema-invalid 
 - https://github.com/NousResearch/hermes-agent
 - https://github.com/HKUDS/OpenSpace
 - https://github.com/agentscope-ai/AgentTeams
+
+## 2026-07-31 - Scheduled Run: Multi-Schema-Invalid Markdown Review Assertion
+
+### Research findings (past two weeks)
+
+- **ACM: Agentic Context Management for Long Horizon Tasks** (arXiv:2607.23809v1, July 26) treats context as a managed, lossless, agent-initialized artifact rather than a disposable prompt. The review analogue is to keep every schema-invalid line visible in the operator report, in input order, with its physical provenance.
+- **Falsifiable Commitment Planning for Self-Correcting Web Agents** (arXiv:2607.24167v1, July 25) argues that long-horizon reliability requires checking whether the active plan remains valid, not merely whether an individual action succeeded. A Markdown assertion over the complete fixture checks the report contract itself, not just the JSON projection.
+- **Keep It InMind** (arXiv:2607.24368v1, July 27) highlights implicit-association failures in persistent agent memory. Explicit source IDs, physical line numbers, and parser reasons prevent the review layer from losing the association between an anomaly and its originating evidence.
+- **StateAct** (arXiv:2607.22798v1, July 24) reports gains from explicit program state, fresh-context delegation, compaction, and externalized plans. The fixture's deterministic Markdown surface is a small externalized state/report boundary for human review.
+- **Safety in Self-Evolving LLM Agent Systems** (arXiv:2606.23075, updated in the current window) reinforces that self-evolving systems need explicit safety controls. This run remains projection-only: it does not repair evidence, apply policy, execute decisions, or self-modify.
+
+Open-source activity signals included `pydantic/pydantic-ai-harness`, `NousResearch/hermes-agent`, `NVIDIA/SkillSpector`, `agentscope-ai/AgentTeams`, and `openai/openai-agents-python`; these are current ecosystem signals, not a controlled popularity ranking. The high-signal pattern is typed harnesses, sandboxed/tool-governed execution, inspectable memory, and explicit lifecycle controls.
+
+### Build: deterministic Markdown assertion for multiple schema-invalid members
+
+Closed the previous run's next priority:
+
+- Added a CLI regression asserting `--fixture multi-schema-invalid --format markdown` preserves all three findings in deterministic input order.
+- The assertion checks severity/recommendation, operator-review requirement, `automatic_action_taken=False`, each member's physical line, both parser reasons, and the explicit no-remediation statement.
+- No production policy, evidence repair, signed-decision verification, action application, or self-modification behavior changed.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_review_decision.py experiments/test_cage1_advisory.py` -> **17 passed**.
+- `python -m py_compile cli/cage1_review.py core/cage1_advisory.py experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passed.
+- Manual `python -m cli.cage1_review --fixture multi-schema-invalid --format markdown` emitted all three findings in source order.
+
+### Next priority
+
+Add a review-only Markdown report assertion for the mixed-fleet fixture, verifying that valid decision evidence and schema-invalid evidence remain distinguishable in the same report. Keep policy, action application, evidence repair, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/html/2607.23809v1
+- https://arxiv.org/html/2607.24167v1
+- https://arxiv.org/abs/2607.24368v1
+- https://arxiv.org/html/2607.22798v1
+- https://arxiv.org/abs/2606.23075
+- https://github.com/pydantic/pydantic-ai-harness
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/NVIDIA/SkillSpector
+- https://github.com/agentscope-ai/AgentTeams
+- https://github.com/openai/openai-agents-python
