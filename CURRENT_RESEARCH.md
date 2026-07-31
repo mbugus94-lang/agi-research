@@ -3111,7 +3111,7 @@ Closed the previous run's next priority:
 
 ### Next priority
 
-Add a compact review-only summary for mixed-fleet evidence-status counts if the operator surface needs it. Keep policy, action application, evidence repair, and self-modification review-gated.
+The compact evidence-status summary is now implemented in the Markdown projection. Next, keep the JSON/Markdown parity check as the priority so evidence-status counts cannot diverge between operator surfaces; policy, action application, evidence repair, and self-modification remain review-gated.
 
 ### Sources
 

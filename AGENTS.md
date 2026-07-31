@@ -4462,7 +4462,7 @@ Core Insight: While enhanced_memory.py and tiered_memory.py provide advanced fea
 - NVIDIA Vera Rubin with Groq dataflow coprocessor announced at GTC 2026
 - Arm's first AGI processor for agentic AI workloads
 
-**Industry Data Points (Datadog State of AI Engineering 2026):**
+**Industry Data Points (Datadog State of AI Engineering 2026)**:
 - 69% of LLM tokens are system prompts (scaffolding expansion)
 - Only 28% of calls use cached context
 - Rate limit errors = 30% of all LLM failures
