@@ -3080,3 +3080,48 @@ Add a review-only Markdown report assertion for the mixed-fleet fixture, verifyi
 - https://github.com/NVIDIA/SkillSpector
 - https://github.com/agentscope-ai/AgentTeams
 - https://github.com/openai/openai-agents-python
+
+
+## 2026-07-31 - Scheduled Run: Mixed-Fleet Markdown Evidence Assertion
+
+### Research findings (past two weeks)
+
+- **Can AI agents conduct open-ended AI research? Early evidence from two case studies** (arXiv:2607.27191v1) finds that agents can complete substantial engineering work but still struggle with research judgment, creative recovery after design gaps, backtracking, resource awareness, and instruction drift. This supports keeping this repository's build loop incremental, test-backed, and explicit about what was and was not changed.
+- **Frontis-MA1 / OpenMLE** (arXiv:2607.28568v1) reports gains from execution-grounded program evolution and long-horizon search. The relevant local lesson is to optimize the harness/report contract through executable tests, not through unreviewed self-rewriting.
+- **When Do Agent Loops Mistake Stagnation for Progress?** (arXiv:2607.25152v1) shows that self-evaluations can claim progress while externally measured outcomes stagnate or regress. A report must therefore expose raw evidence status and provenance rather than presenting only a high-level recommendation.
+- **Operational Hallucination and Safety Drift in AI Agents** (arXiv:2607.18366v1) attributes failures partly to a gap between reasoning context and execution state. The mixed-fleet Markdown surface keeps valid and schema-invalid execution evidence visible together, making that boundary inspectable.
+- **Stress-testing large language model agents in a robotic chemistry laboratory** (arXiv:2607.23045v1) reports that physical long-horizon execution and workflow-level replanning remain difficult. This reinforces the repository's preference for bounded, review-only projections over claims of autonomous success.
+
+Open-source activity signals included `Nanako0129/pilotfish` (multi-model orchestration and independent verification), `microHarnesses` (policy-driven runtime with sessions, approvals, and deterministic subagents), `Pinperepette/context-kernel` (task-focused context projection), `voly-codes/voly` / Headroom (reversible context compression and cross-agent memory), and `openai/openai-agents-python` v0.18.3 (session, sandbox, concurrency, and identity maintenance). These are activity signals rather than a controlled popularity ranking. The common direction is explicit runtime state, context discipline, verification, and policy seams.
+
+### Build: mixed-fleet Markdown evidence assertion
+
+Closed the previous run's next priority:
+
+- Added a CLI regression for `--fixture mixed-fleet --format markdown`.
+- The assertion checks the evidence-status section, counts one valid and one schema-invalid line, preserves source IDs and physical lines, retains the valid `defer` decision, verifies input ordering, and confirms the no-remediation statement.
+- No production policy, evidence repair, signed-decision verification, action application, or self-modification behavior changed.
+
+### Validation
+
+- `python -m pytest -q experiments/test_cage1_review_decision.py experiments/test_cage1_advisory.py` -> **19 passed**.
+- `python -m py_compile core/cage1_advisory.py cli/cage1_review.py experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passed.
+- Manual `python -m cli.cage1_review --fixture mixed-fleet --format markdown` confirmed the valid and schema-invalid evidence lines are distinct and ordered.
+
+### Next priority
+
+Add a compact review-only summary for mixed-fleet evidence-status counts if the operator surface needs it. Keep policy, action application, evidence repair, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.27191v1
+- https://arxiv.org/abs/2607.28568v1
+- https://arxiv.org/abs/2607.25152v1
+- https://arxiv.org/abs/2607.18366v1
+- https://arxiv.org/abs/2607.23045v1
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/PaperBackPear3/microHarnesses
+- https://github.com/Pinperepette/context-kernel
+- https://github.com/voly-codes/voly
+- https://github.com/openai/openai-agents-python/releases/tag/v0.18.3

@@ -221,3 +221,67 @@ def test_review_cli_multi_schema_invalid_fixture_markdown_preserves_complete_pro
     assert "schema_version must be exactly '1.0'" in markdown
     assert "category must be exactly 'cage1_decision_audit_line'" in markdown
     assert "No automatic remediation was performed." in markdown
+
+
+def test_review_cli_mixed_fleet_fixture_markdown_distinguishes_valid_and_invalid_evidence():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "mixed-fleet", "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    markdown = result.stdout
+    assert "## Evidence status" in markdown
+    assert "- Valid audit lines: **1**" in markdown
+    assert "- Schema-invalid audit lines: **1**" in markdown
+    valid_finding = "- `valid`: source=clean-member.jsonl, physical_line=3, decision=defer"
+    invalid_finding = "- `invalid_schema`: source=drifted-member.jsonl, physical_line=8"
+    assert valid_finding in markdown
+    assert invalid_finding in markdown
+    assert markdown.index(valid_finding) < markdown.index(invalid_finding)
+    assert "Automatic action taken: **no**" in markdown
+    assert "No automatic remediation was performed." in markdown
+
+
+def test_review_cli_mixed_fleet_markdown_preserves_valid_and_invalid_evidence():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "mixed-fleet", "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    markdown = result.stdout
+    assert "## Evidence status" in markdown
+    assert "Valid audit lines: **1**" in markdown
+    assert "Schema-invalid audit lines: **1**" in markdown
+    valid = "`valid`: source=clean-member.jsonl, physical_line=3, decision=defer"
+    invalid = "`invalid_schema`: source=drifted-member.jsonl, physical_line=8"
+    assert valid in markdown
+    assert invalid in markdown
+    assert markdown.index(valid) < markdown.index(invalid)
+    assert "No automatic remediation was performed." in markdown
+
+
+def test_review_cli_mixed_fleet_markdown_preserves_valid_and_invalid_evidence():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "mixed-fleet", "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    markdown = result.stdout
+    assert markdown.startswith("# CAGE-1 Review Advisory")
+    assert "- Severity: **critical**" in markdown
+    assert "- Recommendation: **escalate**" in markdown
+    assert "- Operator decision required: **yes**" in markdown
+    assert "- Automatic action taken: **no**" in markdown
+    assert "## Evidence status" in markdown
+    assert "- Valid audit lines: **1**" in markdown
+    assert "- Schema-invalid audit lines: **1**" in markdown
+    valid = "- `valid`: source=clean-member.jsonl, physical_line=3, decision=defer"
+    invalid = "- `invalid_schema`: source=drifted-member.jsonl, physical_line=8"
+    assert valid in markdown
+    assert invalid in markdown
+    assert markdown.index(valid) < markdown.index(invalid)
+    assert "The raw fleet and trend envelopes are preserved for operator review." in markdown
+    assert "No automatic remediation was performed." in markdown

@@ -1,3 +1,12 @@
+### 2026-07-31 - Scheduled Run: Mixed-Fleet Markdown Evidence Assertion
+**Status**: COMPLETE — added a deterministic Markdown regression assertion proving that a mixed fleet's valid decision evidence and schema-invalid evidence remain distinguishable and ordered; focused review/advisory regression: 19/19.
+
+**Build**: The existing review-only Markdown output now has direct coverage for the evidence-status section, valid/schema-invalid counts, source IDs, physical lines, decision value, source order, and the no-remediation boundary. No production policy, evidence repair, action application, or self-modification behavior changed.
+
+**Safety**: The assertion exercises reporting only. Critical findings still require operator review; `automatic_action_taken=False` remains explicit.
+
+**Next priority**: add a compact review-only summary for the mixed-fleet evidence-status counts if the operator surface needs it. Keep policy, action application, evidence repair, and self-modification review-gated.
+
 ### 2026-07-30 - Scheduled Run: Mixed-Fleet Review Fixture
 **Status**: COMPLETE — added `cli.cage1_review --fixture mixed-fleet`; one clean and one schema-invalid audit line remain visible together; focused review/advisory/fleet regression: 134/134.
 

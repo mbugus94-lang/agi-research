@@ -54,6 +54,25 @@ class CAGE1ReviewAdvisory:
             lines.extend(f"- {item}" for item in self.anomalies)
         else:
             lines.append("- No fleet or trend anomalies were observed.")
+        raw_lines = self.raw_fleet.get("lines", [])
+        if isinstance(raw_lines, list) and raw_lines:
+            valid_lines = [line for line in raw_lines if isinstance(line, Mapping) and line.get("status") == "valid"]
+            invalid_lines = [line for line in raw_lines if isinstance(line, Mapping) and line.get("status") == "invalid_schema"]
+            lines.extend([
+                "",
+                "## Evidence status",
+                "",
+                f"- Valid audit lines: **{len(valid_lines)}**",
+                f"- Schema-invalid audit lines: **{len(invalid_lines)}**",
+            ])
+            for line in raw_lines:
+                if not isinstance(line, Mapping) or line.get("status") not in {"valid", "invalid_schema"}:
+                    continue
+                status = str(line.get("status"))
+                source_id = line.get("source_id", "unknown")
+                physical_line = line.get("source_line_number", line.get("line_number", "unknown"))
+                detail = f", decision={line.get('decision')}" if status == "valid" else ""
+                lines.append(f"- `{status}`: source={source_id}, physical_line={physical_line}{detail}")
         if self.notes:
             lines.extend(["", "## Notes", "", self.notes])
         lines.extend([
