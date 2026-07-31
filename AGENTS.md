@@ -5,7 +5,7 @@
 
 **Safety**: The assertion exercises reporting only. Critical findings still require operator review; `automatic_action_taken=False` remains explicit.
 
-**Next priority**: add a compact review-only summary for the mixed-fleet evidence-status counts if the operator surface needs it. Keep policy, action application, evidence repair, and self-modification review-gated.
+**Next priority**: run and record the broader CAGE-1 fleet/report regression, then add a JSON/Markdown parity check so evidence-status counts cannot diverge between operator surfaces. Keep policy, action application, evidence repair, and self-modification review-gated.
 
 ### 2026-07-30 - Scheduled Run: Mixed-Fleet Review Fixture
 **Status**: COMPLETE — added `cli.cage1_review --fixture mixed-fleet`; one clean and one schema-invalid audit line remain visible together; focused review/advisory/fleet regression: 134/134.
@@ -4462,7 +4462,7 @@ Core Insight: While enhanced_memory.py and tiered_memory.py provide advanced fea
 - NVIDIA Vera Rubin with Groq dataflow coprocessor announced at GTC 2026
 - Arm's first AGI processor for agentic AI workloads
 
-**Industry Data Points (Datadog State of AI Engineering 2026)**:
+**Industry Data Points (Datadog State of AI Engineering 2026):**
 - 69% of LLM tokens are system prompts (scaffolding expansion)
 - Only 28% of calls use cached context
 - Rate limit errors = 30% of all LLM failures
