@@ -307,3 +307,45 @@ def test_review_cli_mixed_fleet_json_and_markdown_share_evidence_counts():
     assert f"- Valid audit lines: **{evidence['valid']}**" in markdown
     assert f"- Schema-invalid audit lines: **{evidence['invalid_schema']}**" in markdown
     assert f"- Other-status audit lines: **{evidence['other']}**" in markdown
+
+
+def test_review_cli_trend_input_projects_line_provenance_into_evidence_status_and_markdown(tmp_path):
+    source = {
+        "category": "cage1_decision_fleet_audit_trend",
+        "schema_version": "1.0",
+        "status": "stable",
+        "points": [{
+            "snapshot_id": "t1",
+            "status": "invalid",
+            "line_provenance": [{
+                "source_id": "trend-member.jsonl",
+                "source_line_number": 17,
+                "status": "invalid_schema",
+                "reason": "missing required field: category",
+            }],
+        }],
+        "flagged_changes": [],
+        "decision_applied": False,
+        "automatic_action_taken": False,
+    }
+    source_path = tmp_path / "trend.json"
+    source_path.write_text(json.dumps(source), encoding="utf-8")
+    json_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--trend-input", str(source_path)],
+        capture_output=True,
+        text=True,
+    )
+    markdown_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--trend-input", str(source_path), "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert json_result.returncode == 0, json_result.stderr
+    assert markdown_result.returncode == 0, markdown_result.stderr
+    payload = json.loads(json_result.stdout)
+    assert payload["evidence_status"] == {"total": 1, "valid": 0, "invalid_schema": 1, "other": 0}
+    markdown = markdown_result.stdout
+    assert "- Total audit lines: **1**" in markdown
+    assert "- Schema-invalid audit lines: **1**" in markdown
+    assert "source=trend-member.jsonl, physical_line=17, snapshot=t1" in markdown
+    assert "missing required field: category" not in markdown or "snapshot=t1" in markdown

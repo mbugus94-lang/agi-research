@@ -1,3 +1,10 @@
+### 2026-08-01 - Scheduled Run: Trend Evidence-Status Parity
+**Status**: COMPLETE — trend review inputs now project `points[].line_provenance` into the same JSON/Markdown evidence-status surface used by fleet inputs; CAGE-1 review/advisory/fleet/trend/report regression: 81/81.
+
+**Build**: Added a shared evidence-line projection with fleet-lines-first fallback to trend provenance, retained snapshot IDs in Markdown, and added a CLI parity regression. Reporting-only; raw evidence remains visible, `automatic_action_taken=False`, and no policy, signed decision, action application, evidence repair, or self-modification is performed.
+
+**Next priority**: add mixed valid/schema-invalid trend provenance across multiple snapshots and assert deterministic snapshot/source order across JSON and Markdown. Keep policy, action application, evidence repair, and self-modification review-gated.
+
 ### 2026-07-31 - Scheduled Run: Mixed-Fleet Markdown Evidence Assertion
 **Status**: COMPLETE — added a deterministic Markdown regression assertion proving that a mixed fleet's valid decision evidence and schema-invalid evidence remain distinguishable and ordered; focused review/advisory regression: 19/19.
 

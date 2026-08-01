@@ -55,7 +55,7 @@ class CAGE1ReviewAdvisory:
             lines.extend(f"- {item}" for item in self.anomalies)
         else:
             lines.append("- No fleet or trend anomalies were observed.")
-        raw_lines = self.raw_fleet.get("lines", [])
+        evidence_lines = _evidence_lines(self.raw_fleet, self.raw_trend)
         if self.evidence_status["total"]:
             lines.extend([
                 "",
@@ -66,14 +66,15 @@ class CAGE1ReviewAdvisory:
                 f"- Schema-invalid audit lines: **{self.evidence_status['invalid_schema']}**",
                 f"- Other-status audit lines: **{self.evidence_status['other']}**",
             ])
-            for line in raw_lines:
-                if not isinstance(line, Mapping) or line.get("status") not in {"valid", "invalid_schema"}:
+            for line in evidence_lines:
+                if line.get("status") not in {"valid", "invalid_schema"}:
                     continue
                 status = str(line.get("status"))
                 source_id = line.get("source_id", "unknown")
                 physical_line = line.get("source_line_number", line.get("line_number", "unknown"))
                 detail = f", decision={line.get('decision')}" if status == "valid" else ""
-                lines.append(f"- `{status}`: source={source_id}, physical_line={physical_line}{detail}")
+                snapshot = f", snapshot={line['_snapshot_id']}" if line.get("_snapshot_id") is not None else ""
+                lines.append(f"- `{status}`: source={source_id}, physical_line={physical_line}{snapshot}{detail}")
         if self.notes:
             lines.extend(["", "## Notes", "", self.notes])
         lines.extend([
@@ -84,11 +85,33 @@ class CAGE1ReviewAdvisory:
         return "\n".join(lines)
 
 
-def _evidence_status(raw_fleet: Mapping[str, Any]) -> dict[str, int]:
-    raw_lines = raw_fleet.get("lines", [])
-    if not isinstance(raw_lines, list):
-        return {"total": 0, "valid": 0, "invalid_schema": 0, "other": 0}
-    statuses = [line.get("status") for line in raw_lines if isinstance(line, Mapping)]
+def _evidence_lines(raw_fleet: Mapping[str, Any], raw_trend: Optional[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    raw_lines = raw_fleet.get("lines")
+    if isinstance(raw_lines, list):
+        return [dict(line) for line in raw_lines if isinstance(line, Mapping)]
+    if not isinstance(raw_trend, Mapping):
+        return []
+    records: list[dict[str, Any]] = []
+    points = raw_trend.get("points", [])
+    if not isinstance(points, list):
+        return records
+    for point in points:
+        if not isinstance(point, Mapping):
+            continue
+        provenance = point.get("line_provenance", [])
+        if not isinstance(provenance, list):
+            continue
+        for line in provenance:
+            if not isinstance(line, Mapping):
+                continue
+            record = dict(line)
+            record["_snapshot_id"] = point.get("snapshot_id", "unknown")
+            records.append(record)
+    return records
+
+
+def _evidence_status(raw_fleet: Mapping[str, Any], raw_trend: Optional[Mapping[str, Any]] = None) -> dict[str, int]:
+    statuses = [line.get("status") for line in _evidence_lines(raw_fleet, raw_trend)]
     valid = sum(status == "valid" for status in statuses)
     invalid_schema = sum(status == "invalid_schema" for status in statuses)
     return {
@@ -202,7 +225,7 @@ def project_review_advisory(source: Any, *, notes: str = "") -> CAGE1ReviewAdvis
         anomaly_count=len(anomaly_text),
         anomalies=findings,
         notes=notes or str(fleet.get("notes", "") or trend.get("notes", "") or ""),
-        evidence_status=_evidence_status(fleet),
+        evidence_status=_evidence_status(fleet, trend),
         raw_trend=trend or None,
         raw_fleet=fleet,
     )
