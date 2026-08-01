@@ -3125,3 +3125,49 @@ The compact evidence-status summary is now implemented in the Markdown projectio
 - https://github.com/Pinperepette/context-kernel
 - https://github.com/voly-codes/voly
 - https://github.com/openai/openai-agents-python/releases/tag/v0.18.3
+
+## 2026-08-01 - Scheduled Run: JSON/Markdown Evidence-Status Parity
+
+### Research findings (past two weeks)
+
+- **AgentOmnia** (arXiv:2607.23124v1) treats agent improvement as an explicit loop over environment/task synthesis, verifiers, evaluation, rollback, and targeted product requirements. The local implication is to keep review artifacts deterministic and separate from execution authority.
+- **Memory Decoder at Scale** (arXiv:2607.27919v1) reports that independently scalable long-term memory can improve parameter efficiency across benchmarks. This reinforces the repository's existing separation of persistent evidence/state from the reasoning core.
+- **Σ-Mem** (arXiv:2607.27958v1) stores reliability evidence about peers and peer relationships, rather than only conversation content. That supports making fleet-level evidence counts and provenance first-class review data.
+- **Operational Hallucination and Safety Drift** (arXiv:2607.18366v1) identifies a reasoning/execution-state gap and proposes intent-action checks, runtime state tracking, and forced termination. The CAGE-1 review layer remains a bounded projection: it exposes state but does not execute remediation.
+- **When Do Agent Loops Mistake Stagnation for Progress?** (arXiv:2607.25152v1) shows that in-band self-evaluation can accept regressions; this run therefore adds an externally checked JSON/Markdown parity assertion rather than trusting either presentation alone.
+
+Open-source activity signals included `agentscope-ai/AgentTeams` (persistent shared files and controller observability), `PaperBackPear3/microHarnesses` (policy, approvals, session state, and deterministic subagents), `voly-codes/voly` / Headroom (reversible context compression and cross-agent memory), `Nanako0129/pilotfish` (multi-model orchestration with independent verification), and `openai/openai-agents-python` v0.18.3 (session, concurrency, sandbox, and tracing reliability fixes). These are activity signals, not a controlled popularity ranking.
+
+### Build: JSON/Markdown evidence-status parity
+
+Closed the previous run's next priority:
+
+- Added the machine-readable `evidence_status` projection to `CAGE1ReviewAdvisory`, with total, valid, schema-invalid, and other-status line counts.
+- Updated Markdown rendering to consume that same projection instead of recounting raw lines independently.
+- Added a CLI regression that runs the mixed-fleet fixture in both JSON and Markdown modes and asserts identical evidence counts.
+- Preserved raw evidence, source order, operator-review requirements, and `automatic_action_taken=False`; no policy, action application, evidence repair, or self-modification occurs.
+
+### Validation
+
+- Focused review/advisory regression: **20 passed**.
+- Broader CAGE-1 fleet/trend/advisory/decision/report regression: **158 passed**.
+- `python -m py_compile core/cage1_advisory.py experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passed.
+- Manual mixed-fleet output confirmed JSON and Markdown both report total=2, valid=1, schema-invalid=1, other=0.
+
+### Next priority
+
+Add parity coverage for trend inputs whose schema-invalid evidence is stored under `points[].line_provenance`, ensuring the same machine-readable counts and Markdown presentation across both fleet and trend review surfaces. Keep policy, action application, evidence repair, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.23124v1
+- https://arxiv.org/abs/2607.27919v1
+- https://arxiv.org/abs/2607.27958v1
+- https://arxiv.org/abs/2607.18366v1
+- https://arxiv.org/abs/2607.25152v1
+- https://github.com/agentscope-ai/AgentTeams
+- https://github.com/PaperBackPear3/microHarnesses
+- https://github.com/voly-codes/voly
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/openai/openai-agents-python/releases/tag/v0.18.3

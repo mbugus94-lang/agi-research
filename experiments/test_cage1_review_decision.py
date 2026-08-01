@@ -285,3 +285,25 @@ def test_review_cli_mixed_fleet_markdown_preserves_valid_and_invalid_evidence():
     assert markdown.index(valid) < markdown.index(invalid)
     assert "The raw fleet and trend envelopes are preserved for operator review." in markdown
     assert "No automatic remediation was performed." in markdown
+
+
+def test_review_cli_mixed_fleet_json_and_markdown_share_evidence_counts():
+    json_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "mixed-fleet"],
+        capture_output=True,
+        text=True,
+    )
+    markdown_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "mixed-fleet", "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert json_result.returncode == 0, json_result.stderr
+    assert markdown_result.returncode == 0, markdown_result.stderr
+    evidence = json.loads(json_result.stdout)["evidence_status"]
+    assert evidence == {"total": 2, "valid": 1, "invalid_schema": 1, "other": 0}
+    markdown = markdown_result.stdout
+    assert f"- Total audit lines: **{evidence['total']}**" in markdown
+    assert f"- Valid audit lines: **{evidence['valid']}**" in markdown
+    assert f"- Schema-invalid audit lines: **{evidence['invalid_schema']}**" in markdown
+    assert f"- Other-status audit lines: **{evidence['other']}**" in markdown

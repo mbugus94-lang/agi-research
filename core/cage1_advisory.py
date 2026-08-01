@@ -28,6 +28,7 @@ class CAGE1ReviewAdvisory:
     anomaly_count: int
     anomalies: list[str]
     notes: str
+    evidence_status: dict[str, int]
     raw_trend: Optional[dict[str, Any]]
     raw_fleet: dict[str, Any]
 
@@ -55,15 +56,15 @@ class CAGE1ReviewAdvisory:
         else:
             lines.append("- No fleet or trend anomalies were observed.")
         raw_lines = self.raw_fleet.get("lines", [])
-        if isinstance(raw_lines, list) and raw_lines:
-            valid_lines = [line for line in raw_lines if isinstance(line, Mapping) and line.get("status") == "valid"]
-            invalid_lines = [line for line in raw_lines if isinstance(line, Mapping) and line.get("status") == "invalid_schema"]
+        if self.evidence_status["total"]:
             lines.extend([
                 "",
                 "## Evidence status",
                 "",
-                f"- Valid audit lines: **{len(valid_lines)}**",
-                f"- Schema-invalid audit lines: **{len(invalid_lines)}**",
+                f"- Total audit lines: **{self.evidence_status['total']}**",
+                f"- Valid audit lines: **{self.evidence_status['valid']}**",
+                f"- Schema-invalid audit lines: **{self.evidence_status['invalid_schema']}**",
+                f"- Other-status audit lines: **{self.evidence_status['other']}**",
             ])
             for line in raw_lines:
                 if not isinstance(line, Mapping) or line.get("status") not in {"valid", "invalid_schema"}:
@@ -81,6 +82,21 @@ class CAGE1ReviewAdvisory:
             "",
         ])
         return "\n".join(lines)
+
+
+def _evidence_status(raw_fleet: Mapping[str, Any]) -> dict[str, int]:
+    raw_lines = raw_fleet.get("lines", [])
+    if not isinstance(raw_lines, list):
+        return {"total": 0, "valid": 0, "invalid_schema": 0, "other": 0}
+    statuses = [line.get("status") for line in raw_lines if isinstance(line, Mapping)]
+    valid = sum(status == "valid" for status in statuses)
+    invalid_schema = sum(status == "invalid_schema" for status in statuses)
+    return {
+        "total": len(statuses),
+        "valid": valid,
+        "invalid_schema": invalid_schema,
+        "other": len(statuses) - valid - invalid_schema,
+    }
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
@@ -186,6 +202,7 @@ def project_review_advisory(source: Any, *, notes: str = "") -> CAGE1ReviewAdvis
         anomaly_count=len(anomaly_text),
         anomalies=findings,
         notes=notes or str(fleet.get("notes", "") or trend.get("notes", "") or ""),
+        evidence_status=_evidence_status(fleet),
         raw_trend=trend or None,
         raw_fleet=fleet,
     )
