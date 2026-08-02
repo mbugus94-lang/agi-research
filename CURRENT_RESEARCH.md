@@ -3263,3 +3263,49 @@ Add a reusable trend-provenance projection helper or contract test shared by the
 - https://github.com/Nanako0129/pilotfish
 - https://github.com/Miguok/fable-harness
 - https://github.com/openai/openai-agents-python/releases/tag/v0.18.3
+
+## 2026-08-02 - Scheduled Run: Reusable Evidence-Projection Contract
+
+### Research findings (past two weeks)
+
+- **AgentOmnia** (arXiv:2607.23124v1) treats agent improvement as an explicit loop over task synthesis, verifiers, evaluation, rollback, and targeted requirements. The local implication is to keep review artifacts deterministic and separate from execution authority.
+- **Memory Decoder at Scale** (arXiv:2607.27919v1) reports gains from independently scalable long-term memory, reinforcing the repository's separation of persistent state/evidence from the reasoning core.
+- **Σ-Mem** (arXiv:2607.27958v1) stores peer reliability and relationship evidence, supporting first-class provenance rather than a single aggregate score.
+- **Operational Hallucination and Safety Drift in AI Agents** (arXiv:2607.18366v1) identifies the reasoning/execution-state gap and motivates explicit runtime-state and intent/action checks.
+- **Stress-testing large language model agents in a robotic chemistry laboratory** (arXiv:2607.23045v1) reports that executable, constraint-respecting long-horizon workflows remain rare, reinforcing bounded review surfaces.
+
+Open-source activity signals included `Aeon` (aaronjmars/aeon), `microHarnesses` (PaperBackPear3/microHarnesses), `Meterless`/H-MEM (Meterless/Meterless), `pilotfish` (Nanako0129/pilotfish), and `fable-harness` (Miguok/fable-harness). These are activity signals rather than a controlled popularity ranking. The common direction is typed orchestration, persistent/provenance-aware memory, policy seams, and independent verification.
+
+### Build: reusable trend-provenance projection
+
+Closed the previous run's next priority:
+
+- Added `project_evidence_lines(source)` to normalize ordered evidence from either a fleet envelope (`lines`) or a trend envelope (`points[].line_provenance`), preserving snapshot IDs for trend records.
+- Added `project_evidence_status(source)` so JSON and Markdown surfaces can consume the same evidence-status contract.
+- Updated the advisory Markdown renderer and JSON advisory construction to use the shared projection path.
+- Added contract tests for direct fleet/trend inputs and the normalized `{"fleet": ..., "trend": ...}` envelope shape.
+- Kept the path review-only: no policy changes, evidence repair, action application, or self-modification.
+
+### Validation
+
+- Focused CAGE-1 review/advisory regression: **24 passed**.
+- `python -m py_compile core/cage1_advisory.py experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passed.
+- Smoke-tested fleet and trend normalization; trend status counts preserve valid/invalid-schema/other distinctions.
+
+### Next priority
+
+Use the shared evidence projection in the remaining CLI/advisory boundary tests and add a deterministic parity assertion for a trend containing multiple snapshots with mixed valid, invalid-schema, and other-status lines. Keep policy, action application, evidence repair, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.23124v1
+- https://arxiv.org/abs/2607.27919v1
+- https://arxiv.org/abs/2607.27958v1
+- https://arxiv.org/abs/2607.18366v1
+- https://arxiv.org/abs/2607.23045v1
+- https://github.com/aaronjmars/aeon
+- https://github.com/PaperBackPear3/microHarnesses
+- https://github.com/Meterless/Meterless
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/Miguok/fable-harness

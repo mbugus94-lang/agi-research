@@ -309,6 +309,64 @@ def test_review_cli_mixed_fleet_json_and_markdown_share_evidence_counts():
     assert f"- Other-status audit lines: **{evidence['other']}**" in markdown
 
 
+def test_evidence_projection_contract_matches_fleet_and_trend_sources():
+    from core.cage1_advisory import project_evidence_lines, project_evidence_status
+
+    fleet = {
+        "category": "cage1_decision_fleet_audit",
+        "lines": [
+            {"source_id": "fleet-a.jsonl", "source_line_number": 2, "status": "valid", "decision": "defer"},
+            {"source_id": "fleet-b.jsonl", "source_line_number": 9, "status": "invalid_schema"},
+        ],
+    }
+    trend = {
+        "category": "cage1_decision_fleet_audit_trend",
+        "points": [{
+            "snapshot_id": "snapshot-1",
+            "line_provenance": [
+                {"source_id": "trend-a.jsonl", "source_line_number": 4, "status": "valid", "decision": "accept"},
+                {"source_id": "trend-b.jsonl", "source_line_number": 12, "status": "invalid_schema"},
+            ],
+        }],
+    }
+    assert project_evidence_lines(fleet) == fleet["lines"]
+    assert project_evidence_lines(trend) == [
+        {**trend["points"][0]["line_provenance"][0], "_snapshot_id": "snapshot-1"},
+        {**trend["points"][0]["line_provenance"][1], "_snapshot_id": "snapshot-1"},
+    ]
+    assert project_evidence_status(fleet) == {"total": 2, "valid": 1, "invalid_schema": 1, "other": 0}
+    assert project_evidence_status(trend) == {"total": 2, "valid": 1, "invalid_schema": 1, "other": 0}
+
+
+def test_evidence_projection_contract_normalizes_fleet_and_trend_shapes():
+    from core.cage1_advisory import project_evidence_lines, project_evidence_status
+
+    fleet = {
+        "lines": [
+            {"source_id": "fleet-a", "status": "valid"},
+            {"source_id": "fleet-b", "status": "invalid_schema"},
+        ]
+    }
+    trend = {
+        "points": [
+            {
+                "snapshot_id": "snapshot-one",
+                "line_provenance": [
+                    {"source_id": "trend-a", "status": "valid"},
+                    {"source_id": "trend-b", "status": "other"},
+                ],
+            }
+        ]
+    }
+
+    assert project_evidence_lines(fleet) == fleet["lines"]
+    assert project_evidence_status(fleet) == {"total": 2, "valid": 1, "invalid_schema": 1, "other": 0}
+    trend_lines = project_evidence_lines(trend)
+    assert [line["source_id"] for line in trend_lines] == ["trend-a", "trend-b"]
+    assert all(line["_snapshot_id"] == "snapshot-one" for line in trend_lines)
+    assert project_evidence_status(trend) == {"total": 2, "valid": 1, "invalid_schema": 0, "other": 1}
+
+
 def test_review_cli_trend_input_projects_line_provenance_into_evidence_status_and_markdown(tmp_path):
     source = {
         "category": "cage1_decision_fleet_audit_trend",

@@ -55,7 +55,7 @@ class CAGE1ReviewAdvisory:
             lines.extend(f"- {item}" for item in self.anomalies)
         else:
             lines.append("- No fleet or trend anomalies were observed.")
-        evidence_lines = _evidence_lines(self.raw_fleet, self.raw_trend)
+        evidence_lines = project_evidence_lines({"fleet": self.raw_fleet, "trend": self.raw_trend})
         if self.evidence_status["total"]:
             lines.extend([
                 "",
@@ -161,6 +161,33 @@ def _source_parts(source: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     return {}, payload
 
 
+def project_evidence_lines(source: Any) -> list[dict[str, Any]]:
+    """Normalize fleet and trend sources into ordered evidence provenance."""
+    if isinstance(source, Mapping):
+        if isinstance(source.get("fleet"), Mapping):
+            fleet = source["fleet"]
+            trend = source.get("trend") if isinstance(source.get("trend"), Mapping) else None
+            return _evidence_lines(fleet, trend)
+        if source.get("category") == "cage1_decision_fleet_audit_trend" or "points" in source:
+            return _evidence_lines({}, source)
+        return _evidence_lines(source, None)
+    trend, fleet = _source_parts(source)
+    return _evidence_lines(fleet, trend or None)
+
+
+def project_evidence_status(source: Any) -> dict[str, int]:
+    """Count evidence statuses from the same normalized provenance projection."""
+    statuses = [line.get("status") for line in project_evidence_lines(source)]
+    valid = sum(status == "valid" for status in statuses)
+    invalid_schema = sum(status == "invalid_schema" for status in statuses)
+    return {
+        "total": len(statuses),
+        "valid": valid,
+        "invalid_schema": invalid_schema,
+        "other": len(statuses) - valid - invalid_schema,
+    }
+
+
 def project_review_advisory(source: Any, *, notes: str = "") -> CAGE1ReviewAdvisory:
     """Project CAGE-1 evidence into a review-only advisory.
 
@@ -225,7 +252,7 @@ def project_review_advisory(source: Any, *, notes: str = "") -> CAGE1ReviewAdvis
         anomaly_count=len(anomaly_text),
         anomalies=findings,
         notes=notes or str(fleet.get("notes", "") or trend.get("notes", "") or ""),
-        evidence_status=_evidence_status(fleet, trend),
+        evidence_status=project_evidence_status({"fleet": fleet, "trend": trend}),
         raw_trend=trend or None,
         raw_fleet=fleet,
     )
@@ -238,6 +265,8 @@ def write_review_advisory(advisory: CAGE1ReviewAdvisory, path: str) -> None:
 __all__ = [
     "CAGE1ReviewAdvisory",
     "SCHEMA_VERSION",
+    "project_evidence_lines",
+    "project_evidence_status",
     "project_review_advisory",
     "write_review_advisory",
 ]
