@@ -3219,3 +3219,47 @@ Add parity coverage for trend inputs whose schema-invalid evidence is stored und
 - https://github.com/voly-codes/voly
 - https://github.com/Nanako0129/pilotfish
 - https://github.com/openai/openai-agents-python/releases/tag/v0.18.3
+
+## 2026-08-02 - Scheduled Run: Mixed Trend Provenance Parity
+
+### Research findings (past two weeks)
+
+- **OpenSkillRisk** (arXiv:2607.20121v2) reports unsafe actions in roughly 17% of risky third-party-skill cases even under the safest tested configurations. The distinct failure modes—missed recognition, no intervention, and over-following instructions—support keeping evidence, policy, and action layers separate.
+- **When Do Agent Loops Mistake Stagnation for Progress?** (arXiv:2607.25152v1) finds that in-band self-evaluation can accept regressions; externally grounded verification is therefore more trustworthy than a polished self-report.
+- **Σ-Mem** (arXiv:2607.27958v1) treats peer competence and peer relationships as updateable reliability memory. The local analogue is retaining source- and snapshot-level provenance rather than collapsing a fleet into one score.
+- **Stress-testing large language model agents in a robotic chemistry laboratory** (arXiv:2607.23045v1) shows a substantial gap between plans and executable, constraint-respecting workflows, reinforcing bounded, review-only projections.
+- **Can AI agents conduct open-ended AI research?** (arXiv:2607.27191v1) finds persistent weaknesses in judgment, backtracking, resource awareness, and instruction drift despite strong engineering execution.
+
+Open-source activity signals included `robbyant/lingbot-world-v2` (long-horizon interactive world modeling), `Nanako0129/pilotfish` (bounded multi-model orchestration with verification), `Miguok/fable-harness` (cost-aware routing and adversarial review), and `openai/openai-agents-python` v0.18.3 (session, sandbox, and reliability maintenance). These are activity signals rather than a controlled popularity ranking.
+
+### Build: mixed valid/schema-invalid trend provenance parity
+
+Verified the existing uncommitted regression in `experiments/test_cage1_review_decision.py` as this run's one incremental build. The new test sends two ordered trend snapshots through the review CLI, each containing one valid and one schema-invalid audit line, and checks both JSON and Markdown projections.
+
+- Evidence counts remain identical across surfaces: `total=4`, `valid=2`, `invalid_schema=2`, `other=0`.
+- Raw snapshot order, source IDs, physical line numbers, valid decisions, and schema-invalid records remain lossless.
+- Markdown preserves deterministic snapshot/source order and distinguishes valid from invalid evidence.
+- The path remains review-only: no policy change, signed-decision verification change, action application, evidence repair, or self-modification.
+
+### Validation
+
+- Focused new regression: **1 passed**.
+- Broader CAGE-1 review/advisory/fleet/trend/report regression: **97 passed**.
+- `python -m py_compile core/cage1_advisory.py cli/cage1_review.py experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passed.
+
+### Next priority
+
+Add a reusable trend-provenance projection helper or contract test shared by the CLI and advisory layers. Continue retaining raw evidence and keeping policy, action application, evidence repair, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.20121v2
+- https://arxiv.org/abs/2607.25152v1
+- https://arxiv.org/abs/2607.27958v1
+- https://arxiv.org/abs/2607.23045v1
+- https://arxiv.org/abs/2607.27191v1
+- https://github.com/robbyant/lingbot-world-v2
+- https://github.com/Nanako0129/pilotfish
+- https://github.com/Miguok/fable-harness
+- https://github.com/openai/openai-agents-python/releases/tag/v0.18.3

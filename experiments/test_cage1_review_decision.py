@@ -349,3 +349,84 @@ def test_review_cli_trend_input_projects_line_provenance_into_evidence_status_an
     assert "- Schema-invalid audit lines: **1**" in markdown
     assert "source=trend-member.jsonl, physical_line=17, snapshot=t1" in markdown
     assert "missing required field: category" not in markdown or "snapshot=t1" in markdown
+
+
+def test_review_cli_mixed_trend_provenance_is_ordered_and_parity_preserving(tmp_path):
+    source = {
+        "category": "cage1_decision_fleet_audit_trend",
+        "schema_version": "1.0",
+        "status": "invalid",
+        "points": [
+            {
+                "snapshot_id": "snapshot-one",
+                "status": "invalid",
+                "line_provenance": [
+                    {
+                        "source_id": "member-a.jsonl",
+                        "source_line_number": 3,
+                        "status": "valid",
+                        "decision": "defer",
+                    },
+                    {
+                        "source_id": "member-z.jsonl",
+                        "source_line_number": 8,
+                        "status": "invalid_schema",
+                        "reason": "schema_version must be exactly '1.0'",
+                    },
+                ],
+            },
+            {
+                "snapshot_id": "snapshot-two",
+                "status": "invalid",
+                "line_provenance": [
+                    {
+                        "source_id": "member-b.jsonl",
+                        "source_line_number": 4,
+                        "status": "valid",
+                        "decision": "accept",
+                    },
+                    {
+                        "source_id": "member-y.jsonl",
+                        "source_line_number": 11,
+                        "status": "invalid_schema",
+                        "reason": "category must be exactly 'cage1_decision_audit_line'",
+                    },
+                ],
+            },
+        ],
+        "flagged_changes": [],
+        "decision_applied": False,
+        "automatic_action_taken": False,
+    }
+    source_path = tmp_path / "mixed-trend.json"
+    source_path.write_text(json.dumps(source), encoding="utf-8")
+    json_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--trend-input", str(source_path)],
+        capture_output=True,
+        text=True,
+    )
+    markdown_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--trend-input", str(source_path), "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert json_result.returncode == 0, json_result.stderr
+    assert markdown_result.returncode == 0, markdown_result.stderr
+    payload = json.loads(json_result.stdout)
+    assert payload["evidence_status"] == {"total": 4, "valid": 2, "invalid_schema": 2, "other": 0}
+    assert [point["snapshot_id"] for point in payload["raw_trend"]["points"]] == ["snapshot-one", "snapshot-two"]
+    assert [line["source_id"] for point in payload["raw_trend"]["points"] for line in point["line_provenance"]] == [
+        "member-a.jsonl",
+        "member-z.jsonl",
+        "member-b.jsonl",
+        "member-y.jsonl",
+    ]
+    markdown = markdown_result.stdout
+    markers = [
+        "source=member-a.jsonl, physical_line=3, snapshot=snapshot-one, decision=defer",
+        "source=member-z.jsonl, physical_line=8, snapshot=snapshot-one",
+        "source=member-b.jsonl, physical_line=4, snapshot=snapshot-two, decision=accept",
+        "source=member-y.jsonl, physical_line=11, snapshot=snapshot-two",
+    ]
+    assert all(marker in markdown for marker in markers)
+    assert [markdown.index(marker) for marker in markers] == sorted(markdown.index(marker) for marker in markers)

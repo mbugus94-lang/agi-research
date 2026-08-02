@@ -1,3 +1,10 @@
+### 2026-08-02 - Scheduled Run: Mixed Trend Provenance Parity
+**Status**: COMPLETE — verified mixed valid/schema-invalid trend provenance across two snapshots; JSON/Markdown evidence counts and deterministic snapshot/source order agree; focused regression 1/1 and broader CAGE-1 regression 97/97.
+
+**Build**: Retained the review-only regression in `experiments/test_cage1_review_decision.py`. It preserves raw trend provenance, distinguishes valid decisions from schema-invalid lines, and keeps policy, action application, evidence repair, signed decisions, and self-modification review-gated.
+
+**Next priority**: add a reusable trend-provenance projection helper or contract test shared by the CLI and advisory layers.
+
 ### 2026-08-01 - Scheduled Run: Trend Evidence-Status Parity
 **Status**: COMPLETE — trend review inputs now project `points[].line_provenance` into the same JSON/Markdown evidence-status surface used by fleet inputs; CAGE-1 review/advisory/fleet/trend/report regression: 81/81.
 
