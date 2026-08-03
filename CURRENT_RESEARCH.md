@@ -3309,3 +3309,53 @@ Use the shared evidence projection in the remaining CLI/advisory boundary tests 
 - https://github.com/Meterless/Meterless
 - https://github.com/Nanako0129/pilotfish
 - https://github.com/Miguok/fable-harness
+
+## 2026-08-03 - Scheduled Run: Advisory Projection Contract Coverage
+
+### Research findings (past two weeks)
+
+- **AgentOmnia** (arXiv:2607.23124v1) combines task-space definition, environment/tool synthesis, verifiers, evaluation, rollback curricula, and PRD-guided improvement. The local implication is to keep iteration evidence-backed and rollback-aware rather than trusting self-reported progress.
+- **Σ-Mem** (arXiv:2607.27958v1) makes peer competence and peer relationships updateable reliability memory. This supports retaining source, snapshot, and line provenance rather than collapsing a fleet into one score.
+- **Skill Self-Play** (arXiv:2607.22529v1) co-evolves tasks, solvers, and skills with execution feedback. Capability growth remains safest when tied to verifiable outcomes.
+- **SearchArt** (arXiv:2607.24850v1) trains long-horizon search with synthetic but verified tasks and evidence-aware trajectory checks. The local analogue is deterministic, replayable review evidence.
+- **Agent Team Work Zone** (arXiv:2607.22917v1) treats persistent filesystem state as recovery infrastructure for long-lived agent teams. This aligns with preserving raw audit envelopes for replay after compaction or handoff.
+- **CORVUS** (arXiv:2607.22711v1) reduces stale context by synchronizing current file state instead of replaying obsolete observations. The same principle applies here: JSON and Markdown should consume one current evidence projection, not duplicate counting logic.
+- **Stress-testing LLM agents in a robotic chemistry laboratory** (arXiv:2607.23045v1) reports a large gap between plausible plans and executable workflows, reinforcing the repository's bounded, review-only posture.
+
+Open-source activity signals included `NousResearch/hermes-agent`, `NVIDIA-NeMo/labs-OO-Agents`, `MunasheChitima/findandseek-engine`, and `Wiseair-srl/orpc-agent`. Their common direction is modular orchestration, persistent/local memory, sandboxing, typed capabilities, approvals, and auditability. These are activity signals rather than a controlled popularity ranking.
+
+### Build: advisory projection contract coverage
+
+Closed the previous run's next priority with one deterministic regression in `experiments/test_cage1_review_decision.py`:
+
+- two ordered trend snapshots contain valid, schema-invalid, and other-status evidence;
+- `project_evidence_status(...)` reports `total=4`, `valid=2`, `invalid_schema=1`, `other=1`;
+- `project_review_advisory(...)` carries the exact same status contract;
+- Markdown reports matching counts and preserves snapshot IDs, source IDs, physical lines, decisions, and deterministic order.
+
+The change is reporting-only. It does not repair evidence, change policy, verify or apply operator decisions, execute remediation, or self-modify.
+
+### Validation
+
+- Focused review/advisory regression: **25 passed**.
+- Broader CAGE-1 fleet/trend/advisory/report regression: **185 passed**.
+- `python -m py_compile core/cage1_advisory.py cli/cage1_review.py experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passed.
+
+### Next priority
+
+Run the broader CAGE-1 fleet/trend/report regression against this contract, then add any remaining CLI/advisory boundary parity coverage. Keep policy, action application, evidence repair, signed-decision consumption, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.23124v1
+- https://arxiv.org/abs/2607.27958v1
+- https://arxiv.org/abs/2607.22529v1
+- https://arxiv.org/abs/2607.24850v1
+- https://arxiv.org/abs/2607.22917v1
+- https://arxiv.org/abs/2607.22711v1
+- https://arxiv.org/abs/2607.23045v1
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/NVIDIA-NeMo/labs-OO-Agents
+- https://github.com/MunasheChitima/findandseek-engine
+- https://github.com/Wiseair-srl/orpc-agent

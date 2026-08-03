@@ -488,3 +488,52 @@ def test_review_cli_mixed_trend_provenance_is_ordered_and_parity_preserving(tmp_
     ]
     assert all(marker in markdown for marker in markers)
     assert [markdown.index(marker) for marker in markers] == sorted(markdown.index(marker) for marker in markers)
+
+
+def test_advisory_projection_matches_shared_evidence_contract_for_mixed_trend():
+    from core.cage1_advisory import project_evidence_status, project_review_advisory
+
+    source = {
+        "category": "cage1_decision_fleet_audit_trend",
+        "schema_version": "1.0",
+        "status": "mixed",
+        "points": [
+            {
+                "snapshot_id": "snapshot-one",
+                "status": "mixed",
+                "line_provenance": [
+                    {"source_id": "member-a.jsonl", "source_line_number": 3, "status": "valid", "decision": "defer"},
+                    {"source_id": "member-z.jsonl", "source_line_number": 8, "status": "invalid_schema"},
+                ],
+            },
+            {
+                "snapshot_id": "snapshot-two",
+                "status": "mixed",
+                "line_provenance": [
+                    {"source_id": "member-b.jsonl", "source_line_number": 4, "status": "other"},
+                    {"source_id": "member-y.jsonl", "source_line_number": 11, "status": "valid", "decision": "accept"},
+                ],
+            },
+        ],
+        "flagged_changes": [],
+        "decision_applied": False,
+        "automatic_action_taken": False,
+    }
+
+    advisory = project_review_advisory(source)
+    expected = project_evidence_status(source)
+    assert expected == {"total": 4, "valid": 2, "invalid_schema": 1, "other": 1}
+    assert advisory.evidence_status == expected
+
+    markdown = advisory.to_markdown()
+    assert "- Total audit lines: **4**" in markdown
+    assert "- Valid audit lines: **2**" in markdown
+    assert "- Schema-invalid audit lines: **1**" in markdown
+    assert "- Other-status audit lines: **1**" in markdown
+    markers = [
+        "source=member-a.jsonl, physical_line=3, snapshot=snapshot-one, decision=defer",
+        "source=member-z.jsonl, physical_line=8, snapshot=snapshot-one",
+        "source=member-y.jsonl, physical_line=11, snapshot=snapshot-two, decision=accept",
+    ]
+    assert all(marker in markdown for marker in markers)
+    assert [markdown.index(marker) for marker in markers] == sorted(markdown.index(marker) for marker in markers)

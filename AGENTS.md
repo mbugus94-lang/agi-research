@@ -1,3 +1,10 @@
+### 2026-08-03 - Scheduled Run: Advisory Projection Contract Coverage
+**Status**: COMPLETE — added a deterministic advisory-boundary regression for mixed valid/schema-invalid/other evidence across two ordered trend snapshots; focused review/advisory regression: 25/25; broader CAGE-1 fleet/trend/advisory/report regression: 185/185.
+
+**Build**: `experiments/test_cage1_review_decision.py` now proves `project_review_advisory(...)` carries the exact `project_evidence_status(...)` contract (`total=4`, `valid=2`, `invalid_schema=1`, `other=1`) and that Markdown preserves counts, snapshot/source/line/decision provenance, and deterministic order. Reporting-only; no policy change, evidence repair, signed-decision application, remediation, or self-modification.
+
+**Next priority**: run the broader CAGE-1 fleet/trend/report regression against this contract, then add any remaining CLI/advisory boundary parity coverage. Keep policy, action application, evidence repair, signed-decision consumption, and self-modification review-gated.
+
 ### 2026-08-02 - Scheduled Run: Mixed Trend Provenance Parity
 **Status**: COMPLETE — verified mixed valid/schema-invalid trend provenance across two snapshots; JSON/Markdown evidence counts and deterministic snapshot/source order agree; focused regression 1/1 and broader CAGE-1 regression 97/97.
 
@@ -4608,11 +4615,11 @@ Tests validate A2A protocol patterns inspired by:
 - **[2604.02434v1] Compositional Neuro-Symbolic Reasoning**: DSL + perception + neural priors + symbolic filtering for ARC-AGI-2 (16% → 30.8%)
 
 **Trending Open-Source AI Agent Repos (April 2026):**
-- **Ouroboros (razzant/ouroboros)**: Self-modifying AI with BIBLE.md constitution, 9 principles, multi-model review, 30+ evolution cycles/day
-- **Pincer (pincerhq/pincer)**: 150+ tools, security-first (AST scanning, skill signing), sandboxed subprocesses
-- **AgentGram (agentgram/agentgram)**: AI agent social network with Ed25519 auth, reputation/AXP-based permissions
-- **OpenCrow (gokhantos/opencrow)**: 100+ tools, 16 scrapers, vector memory, real-time Binance streaming
-- **Holon (holon-run/holon)**: Headless coding agents, agent_home persistence, PR-ready patches
+- **Ouroboros** (razzant/ouroboros): Self-modifying AI with BIBLE.md constitution, 9 principles, multi-model review, 30+ evolution cycles/day
+- **Pincer** (pincerhq/pincer): 150+ tools, security-first (AST scanning, skill signing), sandboxed subprocesses
+- **AgentGram** (agentgram/agentgram): AI agent social network with Ed25519 auth, reputation/AXP-based permissions
+- **OpenCrow** (gokhantos/opencrow): 100+ tools, 16 scrapers, vector memory, real-time Binance streaming
+- **Holon** (holon-run/holon): Headless coding agents, agent_home persistence, PR-ready patches
 
 **Build Task**: Created `core/constitutional_governance.py` - Constitutional Governance Framework (Ouroboros-inspired)
 
