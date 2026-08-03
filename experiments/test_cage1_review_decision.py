@@ -537,3 +537,60 @@ def test_advisory_projection_matches_shared_evidence_contract_for_mixed_trend():
     ]
     assert all(marker in markdown for marker in markers)
     assert [markdown.index(marker) for marker in markers] == sorted(markdown.index(marker) for marker in markers)
+
+
+def test_review_cli_mixed_trend_json_markdown_preserve_evidence_contract(tmp_path):
+    source = {
+        "category": "cage1_decision_fleet_audit_trend",
+        "schema_version": "1.0",
+        "status": "mixed",
+        "points": [
+            {
+                "snapshot_id": "snapshot-alpha",
+                "status": "mixed",
+                "line_provenance": [
+                    {"source_id": "alpha-valid.jsonl", "source_line_number": 2, "status": "valid", "decision": "defer"},
+                    {"source_id": "alpha-invalid.jsonl", "source_line_number": 7, "status": "invalid_schema"},
+                ],
+            },
+            {
+                "snapshot_id": "snapshot-beta",
+                "status": "mixed",
+                "line_provenance": [
+                    {"source_id": "beta-other.jsonl", "source_line_number": 5, "status": "other"},
+                    {"source_id": "beta-valid.jsonl", "source_line_number": 9, "status": "valid", "decision": "accept"},
+                ],
+            },
+        ],
+        "flagged_changes": [],
+        "decision_applied": False,
+        "automatic_action_taken": False,
+    }
+    source_path = tmp_path / "mixed-trend-contract.json"
+    source_path.write_text(json.dumps(source), encoding="utf-8")
+    json_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--trend-input", str(source_path)],
+        capture_output=True,
+        text=True,
+    )
+    markdown_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--trend-input", str(source_path), "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert json_result.returncode == 0, json_result.stderr
+    assert markdown_result.returncode == 0, markdown_result.stderr
+    payload = json.loads(json_result.stdout)
+    assert payload["evidence_status"] == {"total": 4, "valid": 2, "invalid_schema": 1, "other": 1}
+    markdown = markdown_result.stdout
+    assert "- Total audit lines: **4**" in markdown
+    assert "- Valid audit lines: **2**" in markdown
+    assert "- Schema-invalid audit lines: **1**" in markdown
+    assert "- Other-status audit lines: **1**" in markdown
+    markers = [
+        "source=alpha-valid.jsonl, physical_line=2, snapshot=snapshot-alpha, decision=defer",
+        "source=alpha-invalid.jsonl, physical_line=7, snapshot=snapshot-alpha",
+        "source=beta-valid.jsonl, physical_line=9, snapshot=snapshot-beta, decision=accept",
+    ]
+    assert all(marker in markdown for marker in markers)
+    assert [markdown.index(marker) for marker in markers] == sorted(markdown.index(marker) for marker in markers)

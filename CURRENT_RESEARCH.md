@@ -3359,3 +3359,42 @@ Run the broader CAGE-1 fleet/trend/report regression against this contract, then
 - https://github.com/NVIDIA-NeMo/labs-OO-Agents
 - https://github.com/MunasheChitima/findandseek-engine
 - https://github.com/Wiseair-srl/orpc-agent
+
+## 2026-08-03 - Scheduled Run: Mixed Trend Evidence Boundary Parity
+
+### Research findings (past two weeks)
+
+- **MemHarness** (arXiv:2607.28272v1, 30 Jul 2026) argues that retrieved experience should be reconstructed against the current state rather than replayed verbatim. Its state-conditioned reconstruction plus explicit source observations is directly relevant to this repository's evidence projection: derived reports should preserve source context and avoid silently treating stale summaries as current truth.
+- **AdaMM** (arXiv:2607.29440v1, 31 Jul 2026) complements retrieval memory with provenance-linked analytic memory and a planner that progressively instantiates typed operations. The design reinforces separating deterministic evidence projection from presentation and planning, while retaining provenance for replay.
+- **MemTX** (arXiv:2607.23929v2, 28 Jul 2026) treats memory writes as tentative until validation and commit, gates irreversible actions on action-safe state, and repairs derived records after retraction. Its central lesson maps cleanly onto CAGE-1: review/advisory output may expose evidence, but must not apply decisions or remediation automatically.
+
+Open-source activity signals included `NousResearch/hermes-agent` (large self-improving agent with persistent memory, skills, scheduling, and subagent parallelization), `NVIDIA-NeMo/labs-OO-Agents` (typed Python object-oriented agents with tracing and sandbox guidance), and `Wiseair-srl/orpc-agent` (typed capabilities with deny-by-default exposure, deterministic policies, approvals, redaction, and audit). These are activity signals rather than a controlled popularity ranking; the common direction is modular capability surfaces with explicit execution boundaries.
+
+### Build: mixed trend evidence boundary parity
+
+Closed the previous run's next priority with one deterministic CLI regression in `experiments/test_cage1_review_decision.py`:
+
+- two ordered trend snapshots contain valid, schema-invalid, and other-status evidence;
+- JSON and Markdown both expose the same evidence-status contract: `total=4`, `valid=2`, `invalid_schema=1`, `other=1`;
+- Markdown preserves snapshot/source/physical-line/decision provenance in deterministic order;
+- the test confirms the presentation boundary remains review-only, with no policy change, evidence repair, signed-decision application, remediation, or self-modification.
+
+### Validation
+
+- Focused review/advisory regression: **17 passed**.
+- Broader CAGE-1 fleet/trend/advisory/decision/report regression: **170 passed**.
+- `python -m py_compile core/cage1_advisory.py cli/cage1_review.py experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passed.
+
+### Next priority
+
+Run the complete CAGE-1 fleet/trend/report regression against this committed boundary, then add any remaining CLI/advisory parity coverage only where it closes a real contract gap. Keep policy, action application, evidence repair, signed-decision consumption, and self-modification review-gated.
+
+### Sources
+
+- https://arxiv.org/abs/2607.28272v1
+- https://arxiv.org/abs/2607.29440v1
+- https://arxiv.org/abs/2607.23929v2
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/NVIDIA-NeMo/labs-OO-Agents
+- https://github.com/Wiseair-srl/orpc-agent
