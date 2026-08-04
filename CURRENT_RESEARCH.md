@@ -3398,3 +3398,49 @@ Run the complete CAGE-1 fleet/trend/report regression against this committed bou
 - https://github.com/NousResearch/hermes-agent
 - https://github.com/NVIDIA-NeMo/labs-OO-Agents
 - https://github.com/Wiseair-srl/orpc-agent
+
+## 2026-08-04 - Scheduled Run: Read-Only Evidence Projection Mutation Boundary
+
+### Research findings (past two weeks)
+
+- **UEmbed** (arXiv:2608.02583v1, 3 Aug 2026) unifies sparse and dense multimodal embeddings and reports agentic retrieval use cases. The practical signal for this repository is that retrieval infrastructure is becoming a first-class agent substrate; evidence still needs explicit provenance and validation before it can influence a decision.
+- **AtumAI** (arXiv:2608.02569v1, 3 Aug 2026) compiles natural-language datacenter requests into machine-checkable objectives, constraints, variables, and evaluation methods, then searches beyond the LLM with evolutionary and surrogate components. This supports keeping policy constraints and evaluation gates explicit rather than hidden in prose prompts.
+- **PRECOG / SMC** (arXiv:2608.02560v1, 3 Aug 2026) uses structured SSM state injection for persistent memory and claims O(1) session initialization. The relevant architectural lesson is separation of compact persistent state from retrieved source context; derived state should not erase its evidence lineage.
+- **ACIA taxonomy** (arXiv:2608.02553v1, 3 Aug 2026) organizes cognitive capability gaps around persistent state, goal autonomy, self-monitoring, environment interaction, and adaptation. It reinforces this project's emphasis on self-monitoring and bounded action over claims of autonomous self-improvement.
+- **Memory Provenance Laundering** (arXiv:2607.29167v1) describes source-authority loss during memory consolidation and proposes provenance-preserving action gates. This is directly aligned with CAGE-1's evidence projection and review-only posture.
+- **Externally grounded verification for long-running agent loops** (arXiv:2607.25152v1) reports that internal self-evaluation frequently mistakes stagnation or regressions for progress, while out-of-band world-state checks reduce the gap. CAGE-1 should therefore keep raw fleet/trend evidence available to operators instead of treating an advisory as ground truth.
+
+Open-source activity signals included `nklisch/pi-extensions` (all-in-one Pi agent harness with policy review, subagents, background tasks, research access, and indexed search), `Wiseair-srl/orpc-agent` (typed capability runtime with validation, permissions, approvals, redaction, and audit), and `erichll/pi-packages` (sandboxed subagent execution plus a boundary-approval broker). These are activity signals, not a controlled popularity ranking; the common direction is modular orchestration with explicit permission and audit boundaries.
+
+### Build: read-only evidence projection mutation boundary
+
+Closed the previous run's next priority with one focused regression in `experiments/test_cage1_review_decision.py`:
+
+- both fleet and trend evidence inputs are deep-copied before review projection;
+- advisory JSON/Markdown generation is verified not to mutate the source envelope or its provenance records;
+- schema-invalid evidence remains visible as a review finding;
+- `automatic_action_taken` remains false for every fixture.
+
+No policy, action application, evidence repair, signed-decision consumption, or self-modification was added.
+
+### Validation
+
+- Focused review/advisory regression: **18 passed**.
+- Complete CAGE-1 fleet/trend/advisory/decision/report regression: **176 passed**.
+- `git diff --check` passed.
+
+### Next priority
+
+Add a compact CLI parity test for malformed or incomplete trend provenance only if it exposes a currently untested boundary. Otherwise preserve the current contract and prioritize a review-gated advisory fixture for conflicting valid decisions; do not auto-apply policy or remediation.
+
+### Sources
+
+- https://arxiv.org/abs/2608.02583v1
+- https://arxiv.org/abs/2608.02569v1
+- https://arxiv.org/abs/2608.02560v1
+- https://arxiv.org/abs/2608.02553v1
+- https://arxiv.org/abs/2607.29167v1
+- https://arxiv.org/abs/2607.25152v1
+- https://github.com/nklisch/pi-extensions
+- https://github.com/Wiseair-srl/orpc-agent
+- https://github.com/erichll/pi-packages

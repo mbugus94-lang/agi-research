@@ -594,3 +594,51 @@ def test_review_cli_mixed_trend_json_markdown_preserve_evidence_contract(tmp_pat
     ]
     assert all(marker in markdown for marker in markers)
     assert [markdown.index(marker) for marker in markers] == sorted(markdown.index(marker) for marker in markers)
+
+
+def test_advisory_markdown_projection_does_not_mutate_fleet_or_trend_evidence():
+    from core.cage1_advisory import project_review_advisory
+
+    sources = [
+        {
+            "category": "cage1_decision_fleet_audit",
+            "schema_version": "1.0",
+            "status": "invalid",
+            "lines": [{
+                "source_id": "fleet-member.jsonl",
+                "source_line_number": 5,
+                "status": "invalid_schema",
+                "reason": "missing required field: category",
+            }],
+        },
+        {
+            "category": "cage1_decision_fleet_audit_trend",
+            "schema_version": "1.0",
+            "status": "stable",
+            "points": [{
+                "snapshot_id": "snapshot-one",
+                "status": "invalid",
+                "line_provenance": [{
+                    "source_id": "trend-member.jsonl",
+                    "source_line_number": 9,
+                    "status": "invalid_schema",
+                    "reason": "schema_version must be exactly '1.0'",
+                }],
+            }],
+            "flagged_changes": [],
+            "decision_applied": False,
+            "automatic_action_taken": False,
+        },
+    ]
+
+    for source in sources:
+        before = json.loads(json.dumps(source))
+        advisory = project_review_advisory(source)
+        markdown = advisory.to_markdown()
+        assert source == before
+        if source["category"].endswith("trend"):
+            assert advisory.raw_trend == source
+        else:
+            assert advisory.raw_fleet == source
+        assert "schema-invalid audit line" in markdown
+        assert advisory.automatic_action_taken is False
