@@ -309,6 +309,63 @@ def test_review_cli_mixed_fleet_json_and_markdown_share_evidence_counts():
     assert f"- Other-status audit lines: **{evidence['other']}**" in markdown
 
 
+def test_review_cli_conflicting_decisions_is_critical_and_review_only():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "conflicting-decisions"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["severity"] == "critical"
+    assert payload["recommendation"] == "escalate"
+    assert payload["operator_decision_required"] is True
+    assert payload["automatic_action_taken"] is False
+    assert "conflicting valid decisions for advisory=advisory-conflict" in payload["anomalies"]
+    assert payload["evidence_status"] == {"total": 2, "valid": 2, "invalid_schema": 0, "other": 0}
+
+
+def test_review_cli_conflicting_decisions_markdown_preserves_both_decisions():
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "conflicting-decisions", "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Severity: **critical**" in result.stdout
+    assert "conflicting valid decisions for advisory=advisory-conflict" in result.stdout
+    assert "source=operator-one.jsonl, physical_line=3, decision=accept" in result.stdout
+    assert "source=operator-two.jsonl, physical_line=4, decision=reject" in result.stdout
+    assert "Automatic action taken: **no**" in result.stdout
+
+
+def test_conflicting_decisions_fixture_is_critical_and_review_only():
+    json_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "conflicting-decisions"],
+        capture_output=True,
+        text=True,
+    )
+    markdown_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--fixture", "conflicting-decisions", "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert json_result.returncode == 0, json_result.stderr
+    assert markdown_result.returncode == 0, markdown_result.stderr
+    payload = json.loads(json_result.stdout)
+    assert payload["severity"] == "critical"
+    assert payload["recommendation"] == "escalate"
+    assert payload["operator_decision_required"] is True
+    assert payload["automatic_action_taken"] is False
+    assert payload["raw_fleet"]["conflicting_advisories"] == ["advisory-conflict"]
+    assert payload["evidence_status"] == {"total": 2, "valid": 2, "invalid_schema": 0, "other": 0}
+    markdown = markdown_result.stdout
+    assert "conflicting valid decisions for advisory=advisory-conflict" in markdown
+    assert "decision=accept" in markdown
+    assert "decision=reject" in markdown
+    assert "Automatic action taken: **no**" in markdown
+
+
 def test_evidence_projection_contract_matches_fleet_and_trend_sources():
     from core.cage1_advisory import project_evidence_lines, project_evidence_status
 

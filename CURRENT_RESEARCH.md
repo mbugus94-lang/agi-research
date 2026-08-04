@@ -3444,3 +3444,46 @@ Add a compact CLI parity test for malformed or incomplete trend provenance only 
 - https://github.com/nklisch/pi-extensions
 - https://github.com/Wiseair-srl/orpc-agent
 - https://github.com/erichll/pi-packages
+## 2026-08-04 - Scheduled Run: Review-Gated Conflicting-Decision Fixture
+
+### Research findings (past two weeks)
+
+- **Agentic Context Management** (arXiv:2607.21503v1) frames disciplined context selection as a production bottleneck; the local implication is to retain compact summaries without discarding source evidence.
+- **PRO-LONG** (arXiv:2607.20064v2) links programmatic memory to long-horizon reasoning and interactive state; this reinforces separating reusable derived state from its underlying observations.
+- **ConsistencyGate** (arXiv:2607.22962v1) treats memory admission as a factual-support gate rather than a retrieval problem; contradictory or unsupported records should not silently become trusted state.
+- **GAMER** (arXiv:2607.27415v1) uses action-centric graphs and value estimates to make reasoning procedures reusable; the safety analogue here is preserving action provenance and review boundaries.
+- **Agents in the Wild** (arXiv:2607.19336v1) surveys modular reasoning, planning, execution, memory, and multi-agent coordination, supporting explicit seams between advisory output and action authority.
+
+Open-source activity signals from GitHub included `elder-plinius/T3MP3ST` (5,413 stars; autonomous multi-agent red-teaming meta-harness), `synthetic-sciences/openscience` (3,074 stars; open scientific-research workbench), and `VictorTaelin/OptMem` (1,111 stars; compact permanent agent memory), all observed 2026-08-04. These are activity signals from public metadata, not a controlled popularity ranking. Their common direction is specialized agent loops, research tooling, and persistent context.
+
+### Build: review-gated conflicting-decision fixture
+
+Closed the prior run's next priority by adding a deterministic `cli.cage1_review --fixture conflicting-decisions` mode and JSON/Markdown regression coverage:
+
+- two valid audit lines for the same advisory carry opposing `accept` and `reject` decisions;
+- the advisory explicitly reports `critical` / `escalate`, preserves both source IDs, physical lines, decisions, and operator identities, and requires operator review;
+- `automatic_action_taken=False` remains explicit; no decision is selected, applied, repaired, or used to mutate policy;
+- the fixture is isolated to review/report testing and does not alter signed-decision verification or action application.
+
+### Validation
+
+- Focused CAGE-1 review/advisory/fleet/trend/consumer regression: **67 passed**.
+- Broader CAGE-1 fleet/trend/advisory/decision/report regression: **120 passed**.
+- `python -m py_compile cli/cage1_review.py core/cage1_advisory.py experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passed.
+- Manual JSON and Markdown smoke test confirmed `severity=critical`, `recommendation=escalate`, and `automatic_action_taken=false`.
+
+### Next priority
+
+Preserve contradictory valid decisions as review evidence; never auto-select or apply one.
+
+### Sources
+
+- https://arxiv.org/abs/2607.21503v1
+- https://arxiv.org/abs/2607.20064v2
+- https://arxiv.org/abs/2607.22962v1
+- https://arxiv.org/abs/2607.27415v1
+- https://arxiv.org/abs/2607.19336v1
+- https://github.com/elder-plinius/T3MP3ST
+- https://github.com/synthetic-sciences/openscience
+- https://github.com/VictorTaelin/OptMem

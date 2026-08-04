@@ -1,3 +1,15 @@
+### 2026-08-04 - Scheduled Run: Review-Gated Conflicting-Decision Fixture
+**Status**: COMPLETE — added a deterministic `cli.cage1_review --fixture conflicting-decisions` fleet fixture; conflicting valid decisions now produce a critical/escalate advisory; focused CAGE-1 review/advisory/fleet/trend/consumer regression: 67/67; broader CAGE-1 regression: 120/120; no automatic action.
+
+**Build**:
+- `cli/cage1_review.py` adds two valid audit lines for one advisory, with opposing `accept` and `reject` decisions, preserved source/line/operator provenance, and `automatic_action_taken=False`.
+- `core/cage1_advisory.py` projects `conflicting_advisories` into an explicit critical finding rather than treating valid-but-conflicting evidence as clean.
+- `experiments/test_cage1_review_decision.py` verifies JSON and Markdown severity, recommendation, evidence counts, decision visibility, provenance, and review-only action state.
+
+**Safety**: The fixture does not select, verify, apply, repair, or mutate any decision, policy, evidence, or self-modification state. Contradictory valid decisions remain operator-review evidence.
+
+**Next priority**: preserve contradictory valid decisions as review evidence; never auto-select or apply one.
+
 ### 2026-08-03 - Scheduled Run: Advisory Projection Contract Coverage
 **Status**: COMPLETE — added a deterministic advisory-boundary regression for mixed valid/schema-invalid/other evidence across two ordered trend snapshots; focused review/advisory regression: 25/25; broader CAGE-1 fleet/trend/advisory/report regression: 185/185.
 
@@ -4925,7 +4937,7 @@ manifest = registry.export_mcp_manifest()
   - XYZ-curve framework for embodied intelligence trajectory
   - 2026 marked as transition from development to deployment phase
 
-**Trending Open-Source AI Agent Repos:**
+**Trending Open-Source AI Agent Repos**:
 - **Microsoft Agent Framework**: 71 releases, graph-based workflows, Python + .NET
 - **OpenAI Agents Python SDK**: 250+ contributors, provider-agnostic, sandbox agents
 - **CrewAI**: 48k+ stars, enterprise multi-agent orchestration, 290+ contributors

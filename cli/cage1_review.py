@@ -20,7 +20,7 @@ def _parser() -> argparse.ArgumentParser:
     source.add_argument("--fleet-input", help="Ordered CAGE-1 snapshots as JSON array or JSONL.")
     source.add_argument("--compare-snapshot", action="append", help="Saved snapshot path; repeat at least twice.")
     source.add_argument("--trend-input", help="Saved CAGE-1 decision fleet trend JSON.")
-    source.add_argument("--fixture", choices=("schema-invalid", "mixed-fleet", "multi-schema-invalid"), help="Run a deterministic review-only fixture.")
+    source.add_argument("--fixture", choices=("schema-invalid", "mixed-fleet", "multi-schema-invalid", "conflicting-decisions"), help="Run a deterministic review-only fixture.")
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
     parser.add_argument("--out", help="Write the advisory JSON to this path.")
     parser.add_argument("--decision-envelope", action="append", help="Signed operator decision envelope; repeat to verify multiple decisions.")
@@ -161,6 +161,31 @@ def _multi_schema_invalid_fixture() -> dict[str, Any]:
     }
 
 
+def _conflicting_decisions_fixture() -> dict[str, Any]:
+    return {
+        "category": "cage1_decision_fleet_audit",
+        "schema_version": "1.0",
+        "status": "conflicting",
+        "source_count": 2,
+        "report_count": 2,
+        "line_count": 2,
+        "valid_line_count": 2,
+        "invalid_line_count": 0,
+        "status_counts": {"valid": 2},
+        "decision_counts": {"accept": 1, "reject": 1},
+        "advisory_counts": {"advisory-conflict": 2},
+        "conflicting_advisories": ["advisory-conflict"],
+        "sources": [{"source_id": "operator-one.jsonl"}, {"source_id": "operator-two.jsonl"}],
+        "lines": [
+            {"category": "cage1_decision_audit_line", "schema_version": "1.0", "source_id": "operator-one.jsonl", "source_line_number": 3, "status": "valid", "advisory_digest": "advisory-conflict", "decision": "accept", "operator_id": "operator-one", "reason": "verified"},
+            {"category": "cage1_decision_audit_line", "schema_version": "1.0", "source_id": "operator-two.jsonl", "source_line_number": 4, "status": "valid", "advisory_digest": "advisory-conflict", "decision": "reject", "operator_id": "operator-two", "reason": "verified"},
+        ],
+        "report_status_counts": {"valid": 2},
+        "decision_applied": False,
+        "automatic_action_taken": False,
+    }
+
+
 def _load_source(args: argparse.Namespace) -> Any:
     if args.fixture:
         if args.fixture == "schema-invalid":
@@ -169,6 +194,8 @@ def _load_source(args: argparse.Namespace) -> Any:
             return _mixed_fleet_fixture()
         if args.fixture == "multi-schema-invalid":
             return _multi_schema_invalid_fixture()
+        if args.fixture == "conflicting-decisions":
+            return _conflicting_decisions_fixture()
     if args.fleet_input:
         return aggregate_fleet(load_fleet_snapshots(args.fleet_input), notes=args.notes)
     if args.trend_input:

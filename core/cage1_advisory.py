@@ -228,10 +228,12 @@ def project_review_advisory(source: Any, *, notes: str = "") -> CAGE1ReviewAdvis
         regressions = trend.get("regressions", []) if isinstance(trend.get("regressions", []), list) else []
         anomalies = fleet.get("anomalies", []) if isinstance(fleet.get("anomalies", []), list) else []
         schema_findings = _schema_invalid_findings(fleet, label="fleet")
-        anomaly_text = [str(item) for item in anomalies] + schema_findings
+        conflicts = fleet.get("conflicting_advisories", [])
+        conflict_findings = [f"conflicting valid decisions for advisory={item}" for item in conflicts] if isinstance(conflicts, list) else []
+        anomaly_text = [str(item) for item in anomalies] + schema_findings + conflict_findings
         invalid_evidence = bool(schema_findings) or any("invalid " in item or "invalid_fields" in item for item in anomaly_text)
         duplicate_digest = any("duplicate digest" in item for item in anomaly_text)
-        conflicting_evidence = False
+        conflicting_evidence = bool(conflict_findings)
         regression_count = len(regressions)
         findings = [f"trend regression: {item.get('metric', 'unknown')} ({item.get('reason', 'regression')})" for item in regressions if isinstance(item, Mapping)]
         findings.extend(anomaly_text)
