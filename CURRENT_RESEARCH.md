@@ -3536,3 +3536,49 @@ Add a CLI regression for same-decision ambiguity only if the operator-facing CLI
 - https://github.com/Panniantong/Agent-Reach
 - https://github.com/HKUDS/nanobot
 - https://github.com/microsoft/agent-framework
+
+
+## 2026-08-05 - Scheduled Run: CLI Same-Decision Ambiguity Boundary
+
+### Research findings (past two weeks)
+
+- **Programmatic Memory Enables Long-Horizon Reasoning / PRO-LONG** (arXiv:2607.20064v2, Jul 23) treats agent memory as explicit read/write operations over externally stored information. The practical implication for this repository is to keep provenance and decision authority explicit instead of hiding them inside a consolidated state.
+- **Model or Harness?** (arXiv:2607.28802v1) argues that planning, reflection, and action selection should be evaluated as part of the model policy while persistent memory, tools, users, and environments remain distinct system components. This supports testing the CAGE-1 consumer and CLI boundary separately from the advisory producer.
+- **Beyond Component Testing: Validating Agentic AI Systems** (arXiv:2607.29405v1) surveys trajectory-level assurance: persistent state, environment-coupled action, and behavior over time require more than one-shot component tests. The new CLI test covers a multi-envelope trajectory boundary: valid inputs can still require review when aggregation is non-unique.
+- **The Autonomous Agency Scale** (arXiv:2607.17947v1) emphasizes evidence depth and distinguishes documentation-based provisional claims from longitudinal evaluation. This is a useful warning not to treat agreement between two signed operators as automatic authority.
+- **Programmatic world models for ARC-AGI-3 / Tycho** (arXiv:2607.28287v1) couples observation, memory, tools, action protocols, verification, and recovery; it reinforces keeping the execution protocol visible alongside capability claims.
+
+Current public GitHub API activity (Aug 5, 2026) surfaced **NousResearch/hermes-agent** (225,955 stars; pushed Aug 5), **Panniantong/Agent-Reach** (66,875; pushed Aug 5), and **HKUDS/nanobot** (46,669; pushed Aug 5) as active open-source agent projects. Their descriptions signal three recurring directions: persistent personal memory, broad web/tool access, and lightweight self-hosted harnesses. Star counts are snapshots, not a controlled popularity ranking.
+
+### Build: CLI coverage for duplicate valid decisions
+
+Added `test_review_cli_keeps_same_decisions_ambiguous_and_review_only` to `experiments/test_cage1_review_decision.py`. The test invokes `cli.cage1_review` with two independently signed `defer` envelopes for the same advisory and verifies:
+
+- the process returns exit code 1 because the decision verification is not valid;
+- the machine-readable report is `status="ambiguous"` with `valid=false`;
+- both operator IDs are preserved in order;
+- no decision is selected, applied, or automatically acted upon.
+
+This is one incremental build task: it extends validation only. No production policy or action path was changed.
+
+### Validation
+
+- Focused review/consumer regression: **36 passed**.
+- Complete CAGE-1 regression: **192 passed**.
+- `python -m compileall -q core cli experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passed.
+
+### Safety and next priority
+
+The CLI remains review-only. Duplicate or conflicting valid decisions are preserved as evidence and never auto-selected. Next priority: continue evidence-boundary parity testing, especially JSONL audit output for the review CLI, before any production behavior change.
+
+### Sources
+
+- https://arxiv.org/abs/2607.20064v2
+- https://arxiv.org/abs/2607.28802v1
+- https://arxiv.org/abs/2607.29405v1
+- https://arxiv.org/abs/2607.17947v1
+- https://arxiv.org/abs/2607.28287v1
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/Panniantong/Agent-Reach
+- https://github.com/HKUDS/nanobot

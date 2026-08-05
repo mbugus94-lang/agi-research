@@ -68,6 +68,51 @@ def test_review_cli_verifies_signed_decision_without_applying_it(tmp_path):
     assert payload["decision_verification"]["automatic_action_taken"] is False
 
 
+def test_review_cli_keeps_same_decisions_ambiguous_and_review_only(tmp_path):
+    source_path, first_path = _fixture(tmp_path)
+    source = trend_fleet_snapshots([_snapshot("s1", "one")], notes="fixture")
+    advisory = project_review_advisory(source)
+    second = sign_operator_decision(
+        create_operator_decision(advisory.to_dict(), "defer", "operator-2", decided_at=10),
+        "k1",
+        b"secret",
+        config=EnvelopeConfig(issued_at=10),
+        now=10,
+    )
+    second_path = tmp_path / "decision-two.json"
+    second_path.write_text(envelope_to_json(second), encoding="utf-8")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "cli.cage1_review",
+            "--trend-input",
+            str(source_path),
+            "--decision-envelope",
+            str(first_path),
+            "--decision-envelope",
+            str(second_path),
+            "--decision-key-id",
+            "k1",
+            "--decision-hmac-secret",
+            "secret",
+            "--decision-now",
+            "10",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    verification = payload["decision_verification"]
+    assert verification["status"] == "ambiguous"
+    assert verification["valid"] is False
+    assert verification["decision"] is None
+    assert verification["operator_ids"] == ["operator-1", "operator-2"]
+    assert verification["decision_applied"] is False
+    assert verification["automatic_action_taken"] is False
+
+
 def test_review_cli_rejects_tampered_decision_and_writes_report(tmp_path):
     source_path, envelope_path = _fixture(tmp_path)
     payload = json.loads(envelope_path.read_text(encoding="utf-8"))
