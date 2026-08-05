@@ -73,6 +73,40 @@ def test_conflicting_valid_decisions_are_ambiguous():
     assert report.valid_decision_count == 2
 
 
+def test_same_decision_from_multiple_operators_is_ambiguous_and_not_selected():
+    source, advisory, first, keys = _fixture()
+    second_record = create_operator_decision(advisory.to_dict(), "defer", "operator-2", decided_at=10)
+    second = sign_operator_decision(second_record, "k1", b"secret", config=EnvelopeConfig(issued_at=10), now=10)
+    report = consume_operator_decision(advisory, [first, second], keys, raw_source=source, now=10)
+    assert report.valid is False
+    assert report.status == "ambiguous"
+    assert report.reason == "multiple valid operator decisions require operator review"
+    assert report.decision is None
+    assert report.valid_decision_count == 2
+    assert report.operator_ids == ["operator-1", "operator-2"]
+    assert report.decision_applied is False
+    assert report.automatic_action_taken is False
+
+
+def test_jsonl_same_decision_from_multiple_operators_remains_audit_evidence():
+    source, advisory, first, keys = _fixture()
+    second_record = create_operator_decision(advisory.to_dict(), "defer", "operator-2", decided_at=10)
+    second = sign_operator_decision(second_record, "k1", b"secret", config=EnvelopeConfig(issued_at=10), now=10)
+    from core.signed_advisory_envelope import envelope_to_json
+    audit = consume_operator_decision_jsonl(
+        advisory,
+        envelope_to_json(first) + "\n" + envelope_to_json(second) + "\n",
+        keys,
+        raw_source=source,
+        now=10,
+    )
+    assert audit.report.status == "ambiguous"
+    assert audit.report.valid is False
+    assert audit.report.decision is None
+    assert [line.status for line in audit.lines] == ["valid", "valid"]
+    assert [line.operator_id for line in audit.lines] == ["operator-1", "operator-2"]
+
+
 def test_cli_consume_valid(tmp_path):
     source, advisory, envelope, _ = _fixture()
     advisory_path = tmp_path / "advisory.json"

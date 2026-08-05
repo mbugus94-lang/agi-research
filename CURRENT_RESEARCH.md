@@ -3487,3 +3487,52 @@ Preserve contradictory valid decisions as review evidence; never auto-select or 
 - https://github.com/elder-plinius/T3MP3ST
 - https://github.com/synthetic-sciences/openscience
 - https://github.com/VictorTaelin/OptMem
+
+## 2026-08-05 - Scheduled Run: Same-Decision Ambiguity Boundary
+
+### Research findings (past two weeks)
+
+- **PoTRE** (arXiv:2607.20268v1) uses heterogeneous parallel reasoning agents—adversarial refinement, hierarchical planning, search, and direct reasoning—with task-adaptive aggregation. The useful local signal is to keep specialized reasoning and aggregation explicit rather than treating one output as authoritative.
+- **Memory Provenance Laundering** (arXiv:2607.29167v1) proposes provenance-preserving memory gates because consolidation can erase source authority while retaining action-triggering content. This supports retaining operator identity and decision-line provenance in review reports.
+- **Σ-Mem** (arXiv:2607.27958v1) tracks peer competence and relationships from correctness feedback. For this project, multiple independently valid operator decisions are evidence about agreement, but they are not permission to silently select or apply a decision.
+- **SearchArt** (arXiv:2607.24850v1) combines verified evidence graphs with adaptive long-horizon search. The parallel for CAGE-1 is evidence-first reporting: derived advisories must remain tied to inspectable source records.
+- **Agentic incident response with digital twins** (arXiv:2608.02422v1) separates high-level rollout planning from operational execution and validates actions in a simulated environment. This reinforces the repository’s separation between review/advisory output and action authority.
+
+GitHub API activity signals on 2026-08-05 included `NousResearch/hermes-agent` (225,615 stars), `shareAI-lab/learn-claude-code` (73,246), `Panniantong/Agent-Reach` (66,579), `HKUDS/nanobot` (46,632), and `microsoft/agent-framework` (12,597). These are public metadata snapshots, not a controlled popularity ranking. The common direction is persistent personal agents, small inspectable harnesses, broad web access, and typed multi-agent orchestration.
+
+### Build: same-decision ambiguity coverage
+
+Added two tests to `experiments/test_cage1_decision_consumer.py`:
+
+- two valid operators issuing the same `defer` decision produce `status="ambiguous"`, no selected decision, preserved operator order, and `automatic_action_taken=False`;
+- the JSONL audit path keeps both lines as valid evidence while the aggregate report remains ambiguous and review-only.
+
+This closes the “multiple valid decisions, same value” boundary without changing `core/cage1_decision_consumer.py`. The consumer already refuses to select a decision when more than one valid record is present; the tests now lock that behavior down.
+
+### Validation
+
+- Focused consumer/review/advisory/fleet/trend/report regression: **79 passed**.
+- Complete CAGE-1 regression (`experiments/test_cage1_*.py`): **192 passed**.
+- `python -m compileall -q core cli experiments/test_cage1_decision_consumer.py` passed.
+- `git diff --check` passed.
+
+### Safety
+
+No policy, action, evidence, signed decision, or self-modification state was applied or mutated. Conflicting and duplicate valid decisions remain operator-review evidence.
+
+### Next priority
+
+Add a CLI regression for same-decision ambiguity only if the operator-facing CLI currently lacks coverage; otherwise leave the consumer contract stable and prioritize a new evidence-boundary test. Never auto-select or apply a decision.
+
+### Sources
+
+- https://arxiv.org/abs/2607.20268v1
+- https://arxiv.org/abs/2607.29167v1
+- https://arxiv.org/abs/2607.27958v1
+- https://arxiv.org/abs/2607.24850v1
+- https://arxiv.org/abs/2608.02422v1
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/shareAI-lab/learn-claude-code
+- https://github.com/Panniantong/Agent-Reach
+- https://github.com/HKUDS/nanobot
+- https://github.com/microsoft/agent-framework

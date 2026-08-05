@@ -1,3 +1,17 @@
+### 2026-08-05 - Scheduled Run: Same-Decision Ambiguity Boundary
+**Status**: COMPLETE — added duplicate-valid-decision coverage; focused consumer/review/advisory/fleet/trend/report regression: 79/79; complete CAGE-1 regression: 192/192; no automatic action.
+
+**Build**:
+- `experiments/test_cage1_decision_consumer.py` now verifies that two independently valid operators issuing the same `defer` decision remain `status="ambiguous"`, with no selected decision, preserved operator order, and `automatic_action_taken=False`.
+- JSONL audit coverage verifies both lines remain valid evidence while the aggregate report stays ambiguous and review-only.
+- No production code changed; the existing consumer refusal-to-select behavior is now locked down for same-value duplicates as well as conflicting values.
+
+**Research signal**: recent work on heterogeneous reasoning ensembles, provenance-preserving memory, reliability memory, verified search trajectories, and simulated execution supports explicit aggregation, retained source authority, and separation of review evidence from action authority.
+
+**Safety**: no policy, action, evidence, signed decision, or self-modification state was applied or mutated. Conflicting and duplicate valid decisions remain operator-review evidence.
+
+**Next priority**: add a CLI regression for same-decision ambiguity only if the operator-facing CLI lacks coverage; otherwise preserve the consumer contract and prioritize the next evidence-boundary test. Never auto-select or apply a decision.
+
 ### 2026-08-04 - Scheduled Run: Review-Gated Conflicting-Decision Fixture
 **Status**: COMPLETE — added a deterministic `cli.cage1_review --fixture conflicting-decisions` fleet fixture; conflicting valid decisions now produce a critical/escalate advisory; focused CAGE-1 review/advisory/fleet/trend/consumer regression: 67/67; broader CAGE-1 regression: 120/120; no automatic action.
 
