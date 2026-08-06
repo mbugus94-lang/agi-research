@@ -3582,3 +3582,67 @@ The CLI remains review-only. Duplicate or conflicting valid decisions are preser
 - https://github.com/NousResearch/hermes-agent
 - https://github.com/Panniantong/Agent-Reach
 - https://github.com/HKUDS/nanobot
+
+---
+
+# 2026-08-06 — Scheduled Run: Evidence-Projection Boundary Regression
+
+## Research summary
+
+The recent two-week arXiv search returned a strong runtime-and-verification cluster rather than a single AGI breakthrough:
+
+- **Argus: A General-Purpose Agentic Runtime for Long-Horizon Reasoning** ([arXiv:2608.05144](https://arxiv.org/abs/2608.05144v1), 2026-08-05) reports a fixed-weight runtime whose self-evolution happens in persistent state and control policy. Its useful architectural claim is that memories, skills, procedures, routing decisions, and rejected routes should enter durable state only through role-owned review and task-native verification. That is directly compatible with this repository's advisory-only, evidence-preserving posture.
+- **ContextWeave: A Real-World Workflow Benchmark** ([arXiv:2608.04830](https://arxiv.org/abs/2608.04830v1), 2026-08-05) evaluates memory inside longitudinal office workflows rather than isolated recall. Its warning is equally important: actionable experience improves continuation but can increase susceptibility to misleading recall. This supports keeping source-line provenance and schema status attached to derived review outputs.
+- **When Does Latent Communication Pay?** ([arXiv:2608.04893](https://arxiv.org/abs/2608.04893v1), 2026-08-05) audits relayed KV caches with mismatched-cache and zeroed-cache controls. The methodological takeaway is to test causal claims with controls instead of treating an aggregate benchmark gain as proof of the claimed mechanism; the same principle applies to fleet/trend evidence projections.
+- **A-SR: Self-Evolving Agentic LLMs for Symbolic Regression via Hierarchical Coordination** ([arXiv:2608.04872](https://arxiv.org/abs/2608.04872v1), 2026-08-05) routes role-conditioned evidence views and retains failure traces and validity diagnostics. This reinforces explicit evidence views and rejection history rather than scalarizing all outcomes into one score.
+- **A Taxonomy of Cognitive Capability Gaps in Generative and Agentic AI** ([arXiv:2608.02553](https://arxiv.org/abs/2608.02553v1), 2026-08-03) organizes gaps around persistent state, goal-directed autonomy, self-monitoring, environment interaction, and learning/adaptation. The repository currently has the strongest coverage in self-monitoring and governance; persistent-state and memory evaluation remain priorities.
+
+A direct arXiv API query for papers containing “agent” in `cs.AI` returned 628 records over the requested two-week window, so the entries above are a focused selection, not an exhaustive ranking. The AGI phrase query returned three records, including the cognitive-capability taxonomy above; this is why the agent-runtime papers are more informative for the current codebase than broad AGI-economics or multimodal-emotion papers.
+
+GitHub API activity signals on 2026-08-06 show several large, actively maintained open-source agent projects:
+
+- [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) — 226,504 stars, Python, pushed 2026-08-06; persistent personal-agent framing.
+- [`HKUDS/nanobot`](https://github.com/HKUDS/nanobot) — 46,705 stars, Python, pushed 2026-08-06; lightweight self-hosted agent with tools, memory, MCP, automation, and multi-agent workflows.
+- [`Panniantong/Agent-Reach`](https://github.com/Panniantong/Agent-Reach) — 67,442 stars, Python, pushed 2026-08-06; broad web access through a CLI without per-service API fees.
+- [`shareAI-lab/learn-claude-code`](https://github.com/shareAI-lab/learn-claude-code) — 73,422 stars, Python, pushed 2026-07-28; a small, inspectable agent harness whose premise is that Bash plus a model can form a minimal runtime.
+
+These are GitHub metadata snapshots, not a controlled popularity ranking. The common direction is persistent state, inspectable harnesses, broad tool access, and explicit runtime composition.
+
+## Build: composite evidence projection boundary
+
+The worktree already contained an uncommitted review-only regression test from the previous run. I preserved that user-authored change and made one narrow production fix in `core/cage1_advisory.py`.
+
+A composite source can contain both a canonical fleet envelope and a trend envelope. The evidence projection contract correctly uses the canonical fleet lines once, but advisory severity classification previously inspected the trend branch whenever a trend category was present. That caused trend-only invalid provenance—which was deliberately excluded from the canonical evidence view—to escalate a clean composite fleet to `critical`.
+
+The fix identifies a composite source and keeps its advisory classification on the fleet branch. It does not merge or mutate the excluded trend provenance; the raw trend envelope remains preserved for review. The new boundary test asserts:
+
+- only canonical fleet lines contribute to evidence counts;
+- the advisory remains `none` for a clean canonical fleet;
+- excluded trend-only provenance is not rendered as canonical evidence;
+- raw fleet and trend envelopes remain intact.
+
+## Validation
+
+- Focused CAGE-1 review/advisory/decision-consumer regression: **46 passed**.
+- `python -m py_compile core/cage1_advisory.py cli/cage1_review.py experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passed.
+
+## Safety
+
+No policy, action, signed decision, or self-modification state was applied. The change is a review-only classification correction and keeps automatic action disabled.
+
+## Next priority
+
+Add the smallest missing CLI regression for composite fleet/trend inputs if the operator-facing path does not already cover it; otherwise prioritize a new provenance-boundary experiment. Continue treating current research as design evidence, not permission for autonomous policy changes.
+
+## Sources
+
+- https://arxiv.org/abs/2608.05144v1
+- https://arxiv.org/abs/2608.04830v1
+- https://arxiv.org/abs/2608.04893v1
+- https://arxiv.org/abs/2608.04872v1
+- https://arxiv.org/abs/2608.02553v1
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/HKUDS/nanobot
+- https://github.com/Panniantong/Agent-Reach
+- https://github.com/shareAI-lab/learn-claude-code

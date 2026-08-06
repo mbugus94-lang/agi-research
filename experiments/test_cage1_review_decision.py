@@ -744,3 +744,32 @@ def test_advisory_markdown_projection_does_not_mutate_fleet_or_trend_evidence():
             assert advisory.raw_fleet == source
         assert "schema-invalid audit line" in markdown
         assert advisory.automatic_action_taken is False
+
+
+def test_composite_fleet_trend_projection_uses_canonical_fleet_lines_once():
+    from core.cage1_advisory import project_evidence_lines, project_evidence_status, project_review_advisory
+
+    source = {
+        "trend": {
+            "category": "cage1_decision_fleet_audit_trend",
+            "schema_version": "1.0",
+            "status": "stable",
+            "points": [{"snapshot_id": "trend-only", "line_provenance": [{"source_id": "trend-invalid.jsonl", "source_line_number": 44, "status": "invalid_schema"}]}],
+            "flagged_changes": [], "decision_applied": False, "automatic_action_taken": False,
+        },
+        "fleet": {
+            "category": "cage1_decision_fleet_audit", "schema_version": "1.0", "status": "valid",
+            "lines": [{"source_id": "fleet-canonical.jsonl", "source_line_number": 5, "status": "valid", "decision": "defer"}],
+        },
+    }
+
+    assert project_evidence_lines(source) == source["fleet"]["lines"]
+    assert project_evidence_status(source) == {"total": 1, "valid": 1, "invalid_schema": 0, "other": 0}
+    advisory = project_review_advisory(source)
+    assert advisory.evidence_status == {"total": 1, "valid": 1, "invalid_schema": 0, "other": 0}
+    assert advisory.severity == "none"
+    markdown = advisory.to_markdown()
+    assert "fleet-canonical.jsonl" in markdown
+    assert "trend-invalid.jsonl" not in markdown
+    assert advisory.raw_trend == source["trend"]
+    assert advisory.raw_fleet == source["fleet"]

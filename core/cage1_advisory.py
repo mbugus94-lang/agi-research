@@ -197,7 +197,8 @@ def project_review_advisory(source: Any, *, notes: str = "") -> CAGE1ReviewAdvis
     The raw envelopes are copied into the advisory for replay and review.
     """
     trend, fleet = _source_parts(source)
-    decision_trend = trend.get("category") == "cage1_decision_fleet_audit_trend"
+    composite_source = isinstance(source, Mapping) and isinstance(source.get("fleet"), Mapping)
+    decision_trend = trend.get("category") == "cage1_decision_fleet_audit_trend" and not composite_source
     if decision_trend:
         flags = trend.get("flagged_changes", [])
         flag_text = [str(item) for item in flags] if isinstance(flags, list) else []
