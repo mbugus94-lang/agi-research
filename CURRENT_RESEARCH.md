@@ -3696,3 +3696,59 @@ Preserve the composite evidence contract and add another provenance-boundary exp
 - https://github.com/HKUDS/nanobot
 - https://github.com/Panniantong/Agent-Reach
 - https://github.com/microsoft/agent-framework
+
+---
+
+# 2026-08-07 — Scheduled Run: Composite Decision Verification Boundary
+
+## Research summary
+
+The past-week search reinforced the repository's current direction: agent progress is clustering around runtime composition, persistent state, inspectable evidence, and evaluation rather than a single AGI breakthrough.
+
+- **Cross-Domain Hybrid OPD for Generalizable Search Agents** ([arXiv:2608.02101](https://arxiv.org/abs/2608.02101v1), Aug. 3) combines agentic reinforcement learning for planning/iterative retrieval with cross-domain on-policy distillation. The useful local lesson is to keep retrieval behavior and evidence grounding observable instead of collapsing them into an opaque final answer.
+- **A Self-Verifying Agent Instrument** ([arXiv:2608.04066](https://arxiv.org/abs/2608.04066v1), Aug. 4) uses run-validity gates, shadow instruments, and replayable append-only logs. This closely matches the repository's review-only, provenance-preserving audit boundary.
+- **Agentic Self-Healing for Data & AI Pipelines** ([arXiv:2608.01955](https://arxiv.org/abs/2608.01955v1), Aug. 3) argues for a controlled loop connecting telemetry, incident memory, deterministic policy, approval, guarded execution, verification, and learning. The separation between recommendation and execution remains the right safety boundary here.
+- **Architectural Implications of Agentic AI Workflows** ([arXiv:2608.04458](https://arxiv.org/abs/2608.04458v1), Aug. 5) characterizes agent workloads as many short, interdependent, host-orchestrated steps and recommends bounded runner pools and preserved affinity. For this project, that supports small deterministic validation steps over broad autonomous rewrites.
+- **Resourced Authority** ([arXiv:2608.06353](https://arxiv.org/abs/2608.06353v1), Aug. 6) continues the governance thread: authorization is bounded and the governing electorate itself can be manipulated. Operator identity, signed decisions, and ambiguity must remain explicit.
+
+The broad arXiv search produced hundreds of recent agent-related records; these are a focused selection for this codebase, not an exhaustive ranking. The GitHub API snapshots below are likewise activity signals rather than a controlled popularity ranking:
+
+- [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) — 226,986 stars; pushed 2026-08-07; Python; persistent personal-agent framing.
+- [`Panniantong/Agent-Reach`](https://github.com/Panniantong/Agent-Reach) — 68,238 stars; pushed 2026-08-06; Python; broad web access through a CLI.
+- [`HKUDS/nanobot`](https://github.com/HKUDS/nanobot) — 46,746 stars; pushed 2026-08-07; Python; lightweight self-hosted tools, memory, MCP, automation, and multi-agent workflows.
+- [`microsoft/agent-framework`](https://github.com/microsoft/agent-framework) — 12,658 stars; pushed 2026-08-07; Python; orchestration and deployment framework.
+
+## Build
+
+Added `test_review_cli_composite_input_verifies_decision_without_applying_it` to `experiments/test_cage1_review_decision.py`. The test passes a composite source with a clean canonical fleet envelope and excluded trend-only provenance through the operator-facing CLI, verifies a signed `defer` decision, and writes the verification report. It asserts:
+
+- canonical fleet evidence remains the only evidence counted;
+- raw evidence matches the advisory digest;
+- the decision is valid and preserved;
+- `decision_applied=False` and `automatic_action_taken=False` remain explicit in both stdout and the saved report.
+
+No production policy or execution behavior changed. This is one narrow validation task extending the previous composite evidence parity coverage.
+
+## Validation
+
+- Focused review/consumer regression: **39 passed**.
+- Complete CAGE-1 regression: **196 passed**.
+- `python -m compileall -q core cli experiments/test_cage1_review_decision.py` passed.
+- `git diff --check` passed.
+- Required repository structure remains present.
+
+## Safety and next priority
+
+The CLI remains verification-only: even a valid signed decision is never applied automatically. Next priority is a new provenance-boundary experiment only where an actually untested path exists; do not add duplicate coverage merely to increase counts. Keep policy, evidence repair, action application, and self-modification review-gated.
+
+## Sources
+
+- https://arxiv.org/abs/2608.02101v1
+- https://arxiv.org/abs/2608.04066v1
+- https://arxiv.org/abs/2608.01955v1
+- https://arxiv.org/abs/2608.04458v1
+- https://arxiv.org/abs/2608.06353v1
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/Panniantong/Agent-Reach
+- https://github.com/HKUDS/nanobot
+- https://github.com/microsoft/agent-framework

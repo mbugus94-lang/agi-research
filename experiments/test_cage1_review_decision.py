@@ -832,3 +832,85 @@ def test_review_cli_composite_input_keeps_canonical_fleet_evidence(tmp_path):
     assert "fleet-canonical.jsonl" in markdown_result.stdout
     assert "trend-invalid.jsonl" not in markdown_result.stdout
     assert "Automatic action taken: **no**" in markdown_result.stdout
+
+
+def test_review_cli_composite_input_verifies_decision_without_applying_it(tmp_path):
+    source = {
+        "trend": {
+            "category": "cage1_decision_fleet_audit_trend",
+            "schema_version": "1.0",
+            "status": "stable",
+            "points": [{
+                "snapshot_id": "trend-only",
+                "line_provenance": [{
+                    "source_id": "trend-invalid.jsonl",
+                    "source_line_number": 44,
+                    "status": "invalid_schema",
+                    "reason": "trend-only evidence is excluded from the canonical fleet view",
+                }],
+            }],
+            "flagged_changes": [],
+            "decision_applied": False,
+            "automatic_action_taken": False,
+        },
+        "fleet": {
+            "category": "cage1_decision_fleet_audit",
+            "schema_version": "1.0",
+            "status": "valid",
+            "lines": [{
+                "source_id": "fleet-canonical.jsonl",
+                "source_line_number": 5,
+                "status": "valid",
+                "decision": "defer",
+            }],
+            "decision_applied": False,
+            "automatic_action_taken": False,
+        },
+    }
+    advisory = project_review_advisory(source)
+    envelope = sign_operator_decision(
+        create_operator_decision(advisory.to_dict(), "defer", "operator-composite", decided_at=10),
+        "k1",
+        b"secret",
+        config=EnvelopeConfig(issued_at=10),
+        now=10,
+    )
+    source_path = tmp_path / "composite.json"
+    envelope_path = tmp_path / "decision.json"
+    report_path = tmp_path / "decision-report.json"
+    source_path.write_text(json.dumps(source), encoding="utf-8")
+    envelope_path.write_text(envelope_to_json(envelope), encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "cli.cage1_review",
+            "--trend-input",
+            str(source_path),
+            "--decision-envelope",
+            str(envelope_path),
+            "--decision-key-id",
+            "k1",
+            "--decision-hmac-secret",
+            "secret",
+            "--decision-now",
+            "10",
+            "--decision-report-out",
+            str(report_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    verification = payload["decision_verification"]
+    assert verification["valid"] is True
+    assert verification["status"] == "valid"
+    assert verification["decision"] == "defer"
+    assert verification["raw_evidence_status"] == "match"
+    assert verification["decision_applied"] is False
+    assert verification["automatic_action_taken"] is False
+    saved = json.loads(report_path.read_text(encoding="utf-8"))
+    assert saved["automatic_action_taken"] is False
+    assert payload["advisory"]["evidence_status"] == {"total": 1, "valid": 1, "invalid_schema": 0, "other": 0}
