@@ -3646,3 +3646,53 @@ Add the smallest missing CLI regression for composite fleet/trend inputs if the 
 - https://github.com/HKUDS/nanobot
 - https://github.com/Panniantong/Agent-Reach
 - https://github.com/shareAI-lab/learn-claude-code
+
+---
+
+# 2026-08-07 — Scheduled Run: Composite CLI Evidence Parity
+
+## Research summary
+
+This run's focused research found a strong evaluation, provenance, and runtime-assurance cluster:
+
+- **TRAJDEBUG** (arXiv:2608.06346v1, Aug. 6) traces error lifecycles in long-horizon agent trajectories and retains resolution status plus terminal impact. It supports keeping raw source lines and provenance attached to derived CAGE-1 findings.
+- **Beyond Top-K** (arXiv:2608.06305v1, Aug. 6) uses normalized lexical search, structural navigation, and bounded reads to produce replayable evidence trails; its reported advantage over dense retrieval is a reminder that inspectability can matter more than a single aggregate score.
+- **HarnessOpt-Bench** (arXiv:2608.06301v1, Aug. 6) uses held-out evaluations, fixed budgets, and versioned candidates to evaluate harness optimization. That is a useful model for this repository's review-only self-improvement rule: proposed changes need independent validation and must not auto-apply.
+- **Resourced Authority** (arXiv:2608.06353v1, Aug. 6) treats authorization as a bounded resource and calls manipulation of the governing electorate an open problem. This reinforces distinct operator identities, preserved decisions, and no silent selection.
+- **A Taxonomy of Cognitive Capability Gaps** (arXiv:2608.02553v1, Aug. 3) emphasizes persistent state, self-monitoring, environment interaction, and adaptation; longitudinal memory evaluation remains a gap here.
+
+Recent GitHub activity signals included `NousResearch/hermes-agent` (226,697 stars), `HKUDS/nanobot` (46,719), `Panniantong/Agent-Reach` (67,797), and `microsoft/agent-framework` (12,643), all checked 2026-08-07. These are metadata snapshots, not a popularity ranking; the shared direction is persistent state, broad tools, self-hosting, and explicit orchestration.
+
+## Build: composite CLI evidence parity
+
+Added `test_review_cli_composite_input_keeps_canonical_fleet_evidence` to `experiments/test_cage1_review_decision.py`. It passes a composite input with a clean canonical fleet envelope and schema-invalid trend-only provenance through the operator-facing CLI and verifies JSON/Markdown parity:
+
+- only the canonical fleet line is counted;
+- excluded trend-only provenance does not change severity or appear as canonical Markdown evidence;
+- raw fleet and trend envelopes remain preserved;
+- `automatic_action_taken=False` remains explicit.
+
+No production behavior changed. No policy, action, evidence repair, signed-decision selection, or self-modification state was applied.
+
+## Validation
+
+- Focused review regression: **24 passed**.
+- Complete CAGE-1 regression: **195 passed**.
+- Required repository structure verified.
+- `git diff --check` passed.
+
+## Next priority
+
+Preserve the composite evidence contract and add another provenance-boundary experiment only if it covers a real untested path. Keep all policy, action, evidence repair, signed-decision, and self-modification behavior review-gated.
+
+## Sources
+
+- https://arxiv.org/abs/2608.06346v1
+- https://arxiv.org/abs/2608.06305v1
+- https://arxiv.org/abs/2608.06301v1
+- https://arxiv.org/abs/2608.06353v1
+- https://arxiv.org/abs/2608.02553v1
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/HKUDS/nanobot
+- https://github.com/Panniantong/Agent-Reach
+- https://github.com/microsoft/agent-framework

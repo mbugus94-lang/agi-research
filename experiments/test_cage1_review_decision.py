@@ -773,3 +773,62 @@ def test_composite_fleet_trend_projection_uses_canonical_fleet_lines_once():
     assert "trend-invalid.jsonl" not in markdown
     assert advisory.raw_trend == source["trend"]
     assert advisory.raw_fleet == source["fleet"]
+
+
+def test_review_cli_composite_input_keeps_canonical_fleet_evidence(tmp_path):
+    source = {
+        "trend": {
+            "category": "cage1_decision_fleet_audit_trend",
+            "schema_version": "1.0",
+            "status": "stable",
+            "points": [{
+                "snapshot_id": "trend-only",
+                "line_provenance": [{
+                    "source_id": "trend-invalid.jsonl",
+                    "source_line_number": 44,
+                    "status": "invalid_schema",
+                    "reason": "trend-only evidence is excluded from the canonical fleet view",
+                }],
+            }],
+            "flagged_changes": [],
+            "decision_applied": False,
+            "automatic_action_taken": False,
+        },
+        "fleet": {
+            "category": "cage1_decision_fleet_audit",
+            "schema_version": "1.0",
+            "status": "valid",
+            "lines": [{
+                "source_id": "fleet-canonical.jsonl",
+                "source_line_number": 5,
+                "status": "valid",
+                "decision": "defer",
+            }],
+            "decision_applied": False,
+            "automatic_action_taken": False,
+        },
+    }
+    source_path = tmp_path / "composite.json"
+    source_path.write_text(json.dumps(source), encoding="utf-8")
+
+    json_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--trend-input", str(source_path)],
+        capture_output=True,
+        text=True,
+    )
+    assert json_result.returncode == 0, json_result.stderr
+    payload = json.loads(json_result.stdout)
+    assert payload["severity"] == "none"
+    assert payload["evidence_status"] == {"total": 1, "valid": 1, "invalid_schema": 0, "other": 0}
+    assert payload["raw_fleet"]["lines"][0]["source_id"] == "fleet-canonical.jsonl"
+    assert payload["raw_trend"]["points"][0]["line_provenance"][0]["source_id"] == "trend-invalid.jsonl"
+
+    markdown_result = subprocess.run(
+        [sys.executable, "-m", "cli.cage1_review", "--trend-input", str(source_path), "--format", "markdown"],
+        capture_output=True,
+        text=True,
+    )
+    assert markdown_result.returncode == 0, markdown_result.stderr
+    assert "fleet-canonical.jsonl" in markdown_result.stdout
+    assert "trend-invalid.jsonl" not in markdown_result.stdout
+    assert "Automatic action taken: **no**" in markdown_result.stdout
