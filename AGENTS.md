@@ -6751,3 +6751,13 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Safety**: test-only. No policy, action application, signed-decision verification, evidence repair, or self-modification behavior changed; `automatic_action_taken=False` remains asserted.
 
 **Next priority**: add a review-only Markdown assertion for the mixed-fleet fixture so valid decision evidence and schema-invalid evidence remain distinguishable in one report. Keep policy, action application, evidence repair, and self-modification review-gated.
+### 2026-08-09 - Scheduled Run: Composite Decision Tamper Boundary
+**Status**: COMPLETE - preserved and validated the composite signed-advisory tamper regression; 26/26 focused review tests pass; no production policy or action behavior changed.
+
+**Research signal**: Recent work on AOS, EASy, self-verifying agent instruments, HarnessCompass, TRAJDEBUG, and Beyond Top-K converges on explicit governance planes, dependency-aware planning, externally grounded verification, constrained self-improvement, and replayable provenance. Current GitHub activity signals included obra/superpowers, NousResearch/hermes-agent, anomalyco/opencode, and langflow-ai/langflow.
+
+**Build**: `experiments/test_cage1_review_decision.py::test_review_cli_rejects_tampered_composite_source_against_signed_advisory` signs a composite fleet/trend advisory, tampers with canonical fleet evidence, and verifies the operator-facing CLI marks the decision invalid with `advisory_mismatch`, selects no decision, preserves raw evidence, and keeps `decision_applied=False` and `automatic_action_taken=False`.
+
+**Safety**: Verification-only. No policy, action, evidence repair, signed-decision selection, or self-modification state was applied.
+
+**Next priority**: avoid duplicate provenance coverage; if no genuine gap remains, prioritize a substantive per-verb CAGE-1 distribution or fleet comparison delta while retaining digest lineage and raw evidence.

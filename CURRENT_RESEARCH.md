@@ -3752,3 +3752,63 @@ The CLI remains verification-only: even a valid signed decision is never applied
 - https://github.com/Panniantong/Agent-Reach
 - https://github.com/HKUDS/nanobot
 - https://github.com/microsoft/agent-framework
+
+---
+
+# 2026-08-09 — Scheduled Run: Composite Decision Tamper Boundary
+
+## Research summary
+
+This run's two-week research signal is architectural rather than a single AGI capability breakthrough. The strongest papers separate agent control from agent execution and insist that long-horizon progress be externally verifiable:
+
+- **The Agent Operating System (AOS)** ([arXiv:2608.03214](https://arxiv.org/abs/2608.03214v1)) separates a Control & Governance Plane—intent, policy, trust, authority, confidence, auditability, observability, and human oversight—from a Runtime & Coordination Plane—lifecycle, routing, context/memory coordination, scheduling, and runtime assurance. This is a close architectural analogue for the repository's advisory, decision, and execution boundaries.
+- **EASy: Towards Efficient LLM-Based Agentic System** ([arXiv:2608.04588](https://arxiv.org/abs/2608.04588v1)) combines milestone planning, dependency-aware execution graphs, heterogeneous executor profiles, cost-aware routing, and parallelization. The useful local implication is to keep plan construction and execution authorization distinct; efficiency does not justify bypassing review gates.
+- **A Self-Verifying Agent Instrument** ([arXiv:2608.04066](https://arxiv.org/abs/2608.04066v1)) reports a structural verification methodology for separating commitment drift from binding drift and explicitly discloses null task completion results. This reinforces the project's requirement to preserve failed or null outcomes rather than turn them into success claims.
+- **HarnessCompass** ([arXiv:2608.01918](https://arxiv.org/abs/2608.01918v1)) uses constrained, component-wise harness evolution and held-out validation. Its transfer lesson is directly relevant to the self-improvement rule here: candidate changes need independent validation and must remain proposals until reviewed.
+- **TRAJDEBUG** ([arXiv:2608.06346](https://arxiv.org/abs/2608.06346v1)) and **Beyond Top-K** ([arXiv:2608.06305](https://arxiv.org/abs/2608.06305v1)) both favor replayable, source-grounded traces over opaque aggregate scores. That supports retaining raw fleet/trend evidence and its provenance when a derived advisory is invalidated.
+
+A live GitHub API snapshot on 2026-08-09 identified these active open-source agent projects as useful ecosystem signals, not as a controlled popularity ranking:
+
+- [`obra/superpowers`](https://github.com/obra/superpowers) — 269,393 stars; pushed 2026-08-08; agentic skills framework and software-development methodology.
+- [`NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent) — 227,594 stars; pushed 2026-08-09; persistent personal-agent framing.
+- [`anomalyco/opencode`](https://github.com/anomalyco/opencode) — 195,164 stars; pushed 2026-08-09; open-source coding agent.
+- [`langflow-ai/langflow`](https://github.com/langflow-ai/langflow) — 152,963 stars; pushed 2026-08-09; visual platform for agentic workflows and deployments.
+
+The common trend is not “autonomy at any cost”; it is durable state, skills, orchestration, and verification becoming explicit runtime surfaces.
+
+## Build: signed-advisory tamper regression
+
+Completed the narrowest missing validation task from the previous run's composite CLI work. `experiments/test_cage1_review_decision.py` now covers a composite fleet/trend source that is signed into an advisory, then tampered in the canonical fleet line before CLI verification.
+
+The regression asserts that:
+
+- the canonical evidence projection remains the only evidence counted;
+- the raw evidence status is still reported separately as `match` because the consumer compares the projected raw envelope contract, not excluded trend provenance;
+- the signed advisory digest mismatch invalidates the decision;
+- no operator decision is selected from the invalid envelope;
+- `decision_applied=False` and `automatic_action_taken=False` remain explicit in both stdout and the saved report.
+
+This is verification-only. It changes no policy, action, evidence, or self-modification state.
+
+## Validation
+
+- Focused review regression: **26 passed**.
+- `git diff --check` passed.
+- Required repository structure remains present.
+
+## Next priority
+
+Only add another provenance-boundary test if it covers a genuinely untested operator path. Otherwise, prioritize the next substantive CAGE-1 adapter—per-verb outcome distributions or a fleet-level comparison delta—while preserving raw evidence, digest lineage, and review-only behavior.
+
+## Sources
+
+- https://arxiv.org/abs/2608.03214v1
+- https://arxiv.org/abs/2608.04588v1
+- https://arxiv.org/abs/2608.04066v1
+- https://arxiv.org/abs/2608.01918v1
+- https://arxiv.org/abs/2608.06346v1
+- https://arxiv.org/abs/2608.06305v1
+- https://github.com/obra/superpowers
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/anomalyco/opencode
+- https://github.com/langflow-ai/langflow
