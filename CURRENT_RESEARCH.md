@@ -3812,3 +3812,53 @@ Only add another provenance-boundary test if it covers a genuinely untested oper
 - https://github.com/NousResearch/hermes-agent
 - https://github.com/anomalyco/opencode
 - https://github.com/langflow-ai/langflow
+
+---
+
+# 2026-08-09 — Scheduled Run: Agent Research + Per-Verb CAGE-1 Profile
+
+## Research summary
+
+The two-week research scan points to a shift from isolated action checks toward resource-aware, trajectory-level assurance:
+
+- **Securing Agentic AI: From Per-Action Checks to Trajectory ...** ([arXiv:2608.01558](https://arxiv.org/html/2608.01558v1)) frames security as a property of behavior over time across reasoning, memory, tools, routing, containment, collaboration, and governance. This reinforces keeping per-action evidence replayable while adding trajectory/fleet views above it.
+- **AgentSLABench** ([arXiv:2608.00805](https://arxiv.org/abs/2608.00805)) evaluates correctness alongside latency, cost, CPU, memory, and network budgets in isolated environments. Its practical lesson for this repository is to retain action identity and outcome distributions so future CAGE-1 reports can join governance outcomes with resource profiles without collapsing them into one score.
+- **A Six-Axis Classification Framework for Autonomous AI Agents** ([arXiv:2608.05201](https://arxiv.org/html/2608.05201v1)) catalogs competing open-source architectures and emphasizes differences in autonomy, tools, memory, and deployment. It supports the project's modular approach rather than adding another monolithic agent loop.
+- **Continual Learning in Transition** ([arXiv:2608.06216](https://arxiv.org/html/2608.06216)) argues that longer context, memory, and skills alone do not establish autonomous capability expansion, cross-domain transfer, and robust long-horizon decisions. That is consistent with treating self-improvement as a proposal-and-review process, not an automatic code mutation.
+- **When Agentic AI Meets Integrated Sensing and Communications** ([arXiv:2608.05792](https://arxiv.org/html/2608.05792v1)) describes a closed loop of perception, world-model update, memory consolidation, planning, execution, evaluation, and adaptation, but notes that mature validated end-to-end implementations remain limited.
+
+Open-source activity signals checked this run were **NousResearch/hermes-agent** (persistent personal-agent architecture), **pydantic/pydantic-ai** (type-safe, model-agnostic agent framework; the repository page reported 19.1k stars), **Agent-Threat-Rule/agent-threat-rules** (open detection-rule standard for agent threats), and **agentscope-ai/AgentTeams** (multi-agent collaboration/runtime tooling). GitHub search results are activity signals, not a controlled trending ranking; stars and APIs change.
+
+## Build: per-verb CAGE-1 outcome profile
+
+Implemented `core/cage1_verb_profile.py` and `experiments/test_cage1_verb_profile.py`. The adapter groups governed audit rows by explicit `verb_name`, `action_type`, or `tool` identity, preserving a separate `__unattributed__` bucket when the source carries no action identity. It reports:
+
+- admitted, held, narrowed, quarantined, escalated, and refused counts per verb;
+- admission, non-admission, refusal, and escalation rates;
+- worst observed CAGE-1 state per verb;
+- deterministic ordering, SHA-256 report digest, JSON, Markdown, and JSONL loading.
+
+The adapter is read-only and deliberately does not modify the aggregate CAGE-1 evaluator, policy, action application, evidence, or self-improvement state. It is a narrow bridge from existing report rows to the per-verb metric identified as the previous priority.
+
+## Validation
+
+- `experiments/test_cage1_verb_profile.py`: **4/4 passed**.
+- Full focused CAGE-1 evaluation/advisory/compare/decision/fleet/report/review/trend + new per-verb regression: **201/201 passed**.
+- Required structure remains present: `README.md`, `CURRENT_RESEARCH.md`, `ARCHITECTURE.md`, `core/agent.py`, `core/memory.py`, `core/planner.py`, `core/reflection.py`, `skills/`, and `experiments/`.
+- Self-modification safety preserved: no code is automatically applied from research findings; this run only added a reviewed, deterministic reporting adapter and tests.
+
+## Next priority
+
+Join per-verb profiles to a review-only fleet comparison delta, preserving source row identity, report digests, raw evidence, and explicit unattributed rows. Do not turn per-verb rates into automatic policy or execution decisions.
+
+## Sources
+
+- https://arxiv.org/html/2608.01558v1
+- https://arxiv.org/abs/2608.00805
+- https://arxiv.org/html/2608.05201v1
+- https://arxiv.org/html/2608.06216
+- https://arxiv.org/html/2608.05792v1
+- https://github.com/NousResearch/hermes-agent
+- https://github.com/pydantic/pydantic-ai
+- https://github.com/Agent-Threat-Rule/agent-threat-rules
+- https://github.com/agentscope-ai/AgentTeams

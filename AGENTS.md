@@ -6761,3 +6761,12 @@ Core Insight: 9-principle constitution with multi-model review, amendment proces
 **Safety**: Verification-only. No policy, action, evidence repair, signed-decision selection, or self-modification state was applied.
 
 **Next priority**: avoid duplicate provenance coverage; if no genuine gap remains, prioritize a substantive per-verb CAGE-1 distribution or fleet comparison delta while retaining digest lineage and raw evidence.
+
+### 2026-08-09 - Scheduled Run: Per-Verb CAGE-1 Outcome Profile
+**Status**: COMPLETE - added read-only `core/cage1_verb_profile.py` with four validation tests; focused CAGE-1 evaluation/advisory/compare/decision/fleet/report/review/trend + per-verb regression passes 201/201. No policy, action, evidence, or self-modification state changed.
+
+**Research signal**: AgentSLABench (arXiv:2608.00805) adds correctness/resource budgets; Securing Agentic AI (arXiv:2608.01558) shifts assurance from isolated actions to trajectories; current architecture work emphasizes modular memory, tools, planning, and governance.
+
+**Build**: The adapter groups report rows by explicit `verb_name`, `action_type`, or `tool`, preserves missing identity as `__unattributed__`, computes per-verb admitted/non-admitted/refusal/escalation rates and worst state, and emits deterministic JSON/Markdown/digest output. It is reporting-only.
+
+**Next priority**: join per-verb profiles to a review-only fleet comparison delta while preserving row identity, digest lineage, raw evidence, and unattributed records.
