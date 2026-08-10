@@ -3910,3 +3910,58 @@ This is a reporting-only bridge. It does not select operator decisions, apply po
 - https://github.com/vitali87/code-graph-rag
 - https://github.com/livekit/agents
 - https://github.com/TencentCloud/TencentDB-Agent-Memory
+
+---
+
+# 2026-08-10 — Scheduled Run: Ordered Per-Verb CAGE-1 Fleet Aggregation
+
+## Research summary
+
+The two-week scan continued to show architecture and assurance converging around explicit control planes, long-horizon harnesses, cost-aware orchestration, and auditable experience memory:
+
+- **The Agent Operating System (AOS)** ([arXiv:2608.03214](https://arxiv.org/abs/2608.03214v1)) separates control/governance from runtime/coordination. The direct local implication is to keep fleet comparison read-only and distinct from policy or action authority.
+- **OneDayAgent** ([arXiv:2608.05013](https://arxiv.org/abs/2608.05013v1)) combines bounded decomposition, compressed execution memory, and final verification across multiple backends. This supports ordered snapshots with preserved lineage instead of one opaque aggregate score.
+- **EASy** ([arXiv:2608.04588](https://arxiv.org/abs/2608.04588v1)) uses milestone planning, dependency-aware execution graphs, heterogeneous executor profiles, and cost-aware routing. The useful repository lesson is to preserve per-verb deltas and coverage transitions before any operator interprets them.
+- **DCAS** ([arXiv:2608.06113](https://arxiv.org/abs/2608.06113v1)) finds that planning quality transfers better when separated from scaffold-specific conventions. This reinforces keeping comparison infrastructure independent of any particular execution scaffold.
+- **REAPER / Experience Memory** ([arXiv:2608.03420](https://arxiv.org/abs/2608.03420)) uses reflective episodic memory and fine-grained credit assignment without weight updates. It aligns with the project's no-auto-self-modification rule: retain evidence and proposed interpretations, but require review before changing behavior.
+- **HarnessCompass** ([arXiv:2608.01918](https://arxiv.org/abs/2608.01918v1)) reports held-out, component-wise harness evolution with rollback-aware constraints. Candidate improvements should remain independently validated proposals, never automatic mutations.
+
+GitHub activity signals checked this run included [`PrimeIntellect-ai/prime-agent`](https://github.com/PrimeIntellect-ai/prime-agent) (self-improving RLM coding agent), [`NVIDIA-NeMo/labs-OO-Agents`](https://github.com/NVIDIA-NeMo/labs-OO-Agents) (skills, memory, sandboxing, and ARC-AGI-3 harnesses), [`Meterless/Meterless`](https://github.com/Meterless/Meterless) (audited tiered memory and routing engines), and [`different-ai/openwork`](https://github.com/different-ai/openwork) (open-source collaborative coding-agent workflow). GitHub search results are activity signals rather than a controlled popularity ranking.
+
+## Build: ordered per-verb fleet aggregation
+
+Added `core/cage1_verb_fleet.py`, `cli/cage1_verb_fleet.py`, and `experiments/test_cage1_verb_fleet.py`. The read-only adapter consumes serialized per-verb comparison snapshots and:
+
+- aligns the union of verb identities across ordered snapshots;
+- preserves added and removed verbs as coverage changes rather than inventing zero rates;
+- reports per-verb snapshot counts, added/removed/changed/coverage-changed/unchanged counts, observation deltas, latest state, and status histograms;
+- retains snapshot IDs and baseline/current digest pairs for lineage;
+- emits JSON and Markdown through the CLI;
+- keeps `decision_applied=False` and `automatic_action_taken=False` explicit.
+
+A small semantic correction treats added or removed verbs as coverage changes in the derived boolean while preserving their separate counts. No policy, action application, evidence repair, operator decision, or self-modification state is changed.
+
+## Validation
+
+- New fleet tests: **5 passed**.
+- Adjacent per-verb comparison regression: **5 passed**.
+- Changed modules compile successfully.
+- `git diff --check` passed.
+- Required repository structure remains present.
+
+## Next priority
+
+Add a narrow, read-only CLI/report parity check for fleet JSON versus Markdown only if an operator-facing mismatch remains. Otherwise preserve the fleet lineage contract and consider a review-only join between per-verb fleet comparison and existing decision/advisory evidence. Never convert fleet deltas into automatic policy or execution actions.
+
+## Sources
+
+- https://arxiv.org/abs/2608.03214v1
+- https://arxiv.org/abs/2608.05013v1
+- https://arxiv.org/abs/2608.04588v1
+- https://arxiv.org/abs/2608.06113v1
+- https://arxiv.org/abs/2608.03420v1
+- https://arxiv.org/abs/2608.01918v1
+- https://github.com/PrimeIntellect-ai/prime-agent
+- https://github.com/NVIDIA-NeMo/labs-OO-Agents
+- https://github.com/Meterless/Meterless
+- https://github.com/different-ai/openwork

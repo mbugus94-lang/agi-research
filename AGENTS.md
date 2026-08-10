@@ -1,3 +1,18 @@
+### 2026-08-10 - Scheduled Run: Ordered Per-Verb CAGE-1 Fleet Aggregation
+**Status**: COMPLETE — added a read-only fleet aggregation over ordered per-verb comparison snapshots; 10 focused tests pass; no automatic action.
+
+**Build**:
+- Added `core/cage1_verb_fleet.py`, `cli/cage1_verb_fleet.py`, and `experiments/test_cage1_verb_fleet.py`.
+- Preserved unioned verb identity, ordered snapshot IDs, baseline/current digest lineage, added/removed coverage, status histograms, observation deltas, and latest state.
+- Added/removed verbs are treated as coverage changes without inventing zero rates.
+- Exported the fleet types/functions from `core/__init__.py`.
+
+**Safety**: read-only reporting only. Policy, evidence, signed decisions, action application, and self-modification remain review-gated; `decision_applied=False` and `automatic_action_taken=False` stay explicit.
+
+**Validation**: fleet + adjacent comparison regression: 10/10; changed modules compile; `git diff --check` passes.
+
+**Next priority**: preserve the fleet lineage contract and consider a review-only join with decision/advisory evidence. Do not convert fleet deltas into automatic actions.
+
 ### 2026-08-05 - Scheduled Run: Same-Decision Ambiguity Boundary
 **Status**: COMPLETE — added duplicate-valid-decision coverage; focused consumer/review/advisory/fleet/trend/report regression: 79/79; complete CAGE-1 regression: 192/192; no automatic action.
 

@@ -468,6 +468,16 @@ from .cage1_verb_compare import (
     compare_verb_profiles,
     load_profile,
 )
+from .cage1_verb_fleet import (
+    FLEET_CATEGORY as CAGE1_VERB_FLEET_CATEGORY,
+    SCHEMA_VERSION as CAGE1_VERB_FLEET_SCHEMA_VERSION,
+    VerbComparisonFleetProfile,
+    VerbComparisonFleetSummary,
+    VerbComparisonSnapshot,
+    aggregate_verb_comparisons,
+    aggregate_verb_comparison_files,
+    load_comparison,
+)
 from .cage1_trend import (
     CAGE1FleetTrend,
     CAGE1Trend,
