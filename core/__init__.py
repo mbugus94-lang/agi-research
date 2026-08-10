@@ -462,6 +462,12 @@ from .cage1_compare import (
     compare_evaluations,
     load_evaluation,
 )
+from .cage1_verb_compare import (
+    VerbOutcomeDelta,
+    VerbProfileComparison,
+    compare_verb_profiles,
+    load_profile,
+)
 from .cage1_trend import (
     CAGE1FleetTrend,
     CAGE1Trend,

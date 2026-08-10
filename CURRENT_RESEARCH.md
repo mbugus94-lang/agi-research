@@ -3862,3 +3862,51 @@ Join per-verb profiles to a review-only fleet comparison delta, preserving sourc
 - https://github.com/pydantic/pydantic-ai
 - https://github.com/Agent-Threat-Rule/agent-threat-rules
 - https://github.com/agentscope-ai/AgentTeams
+
+---
+
+# 2026-08-10 — Scheduled Run: Per-Verb CAGE-1 Comparison
+
+## Research summary
+
+The current-week arXiv scan is unusually aligned with this repository's safety and self-improvement boundaries:
+
+- **SkillProx** ([arXiv:2608.07449](https://arxiv.org/abs/2608.07449), Aug. 7) treats skills as mutable textual artifacts and couples diagnosis-driven edits with rollback and utility-aware refinement. The local lesson is to preserve candidate lineage and never turn a score improvement into automatic self-modification.
+- **TEPA** ([arXiv:2608.07429](https://arxiv.org/abs/2608.07429), Aug. 7) makes memory validity explicit, revokes stale precedents when fresh evidence conflicts, and preserves revoked history for audit. This supports treating missing per-verb rates as `coverage_changed`, not as zero performance.
+- **An End-to-End Agent Auditing Engine** ([arXiv:2608.07346](https://arxiv.org/abs/2608.07346), Aug. 7) standardizes task integration and execution traces for harness evaluation. It reinforces the value of a deterministic, machine-readable comparison layer above raw audit/profile snapshots.
+- **EMAS** ([arXiv:2608.07196](https://arxiv.org/abs/2608.07196), Aug. 7) revises multi-agent prompts/topology only after recurring diagnoses and paired validation against the incumbent. This is directly consistent with the project's review-only self-improvement rule.
+- **NiyamAI** ([arXiv:2608.07167](https://arxiv.org/abs/2608.07167), Aug. 7) proposes cryptographically verifiable intent-bound guardrails. It is a useful reminder that comparison output is evidence for an operator, not authority to change policy.
+- **BONSAI** ([arXiv:2608.07056](https://arxiv.org/abs/2608.07056), Aug. 7) optimizes skills for evolvability rather than a single held-out score. The practical implication is to retain per-verb trajectories and coverage transitions instead of collapsing them into one aggregate.
+
+Recent GitHub activity signals included `vitali87/code-graph-rag` (codebase graph retrieval), `livekit/agents` (realtime voice agents), and `TencentCloud/TencentDB-Agent-Memory` (team-level agent memory). These are ecosystem activity signals, not a controlled popularity ranking. The common direction is inspectable retrieval, persistent memory, and runtime orchestration.
+
+## Build: read-only per-verb comparison
+
+Added `core/cage1_verb_compare.py`, `cli/cage1_verb_compare.py`, and `experiments/test_cage1_verb_compare.py`.
+
+The adapter compares two serialized outputs from the existing per-verb profile builder. It aligns the union of verb names, preserves added and removed verbs, reports deltas for admitted/non-admitted/refusal/escalation rates, carries worst observed state changes, and exposes baseline/current report digests. Missing metric values are reported as `coverage_changed`; they are never coerced to zero. The CLI supports Markdown, JSON, and both-output modes and is verification-only: it does not modify profiles, policy, evidence, or self-improvement state.
+
+## Validation
+
+- New comparison tests: **5 passed**.
+- Existing per-verb profile regression: **4 passed**.
+- Broader CAGE-1 comparison/trend/fleet/report/review/advisory/decision regression: **99 passed**.
+- Changed modules compile successfully.
+- `git diff --check` passed.
+- Required structure remains present: `README.md`, `CURRENT_RESEARCH.md`, `ARCHITECTURE.md`, core agent/memory/planner/reflection modules, `skills/`, and `experiments/`.
+
+## Safety and next priority
+
+This is a reporting-only bridge. It does not select operator decisions, apply policy, repair evidence, or auto-apply self-modification. Next priority: add a read-only fleet aggregation over ordered per-verb comparison snapshots, preserving verb identity, added/removed coverage, digest lineage, and explicit ambiguity. Do not convert per-verb regressions into automatic actions.
+
+## Sources
+
+- https://arxiv.org/abs/2608.07449
+- https://arxiv.org/abs/2608.07429
+- https://arxiv.org/abs/2608.07346
+- https://arxiv.org/abs/2608.07196
+- https://arxiv.org/abs/2608.07167
+- https://arxiv.org/abs/2608.07056
+- https://github.com/vitali87/code-graph-rag
+- https://github.com/livekit/agents
+- https://github.com/TencentCloud/TencentDB-Agent-Memory
