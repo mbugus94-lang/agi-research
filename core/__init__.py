@@ -542,3 +542,11 @@ from .cage1_decision_fleet_trend import (
     trend_fleet_audits,
     write_fleet_audit_trend_jsonl,
 )
+from .cage1_verb_evidence_join import (
+    EvidenceRow,
+    JOIN_CATEGORY as CAGE1_VERB_EVIDENCE_JOIN_CATEGORY,
+    VerbEvidenceJoin,
+    VerbEvidenceJoinSummary,
+    join_verb_fleet_evidence,
+    load_json as load_cage1_join_json,
+)

@@ -3965,3 +3965,48 @@ Add a narrow, read-only CLI/report parity check for fleet JSON versus Markdown o
 - https://github.com/NVIDIA-NeMo/labs-OO-Agents
 - https://github.com/Meterless/Meterless
 - https://github.com/different-ai/openwork
+
+---
+
+# 2026-08-11 — Scheduled Run: Per-Verb Evidence Join
+
+## Research summary
+
+The current-week scan reinforced three design directions relevant to this repository:
+
+- **Architectural Implications of Agentic AI Workflows** ([arXiv:2608.04458](https://arxiv.org/html/2608.04458v1)) treats multi-agent execution as a resource-placement and orchestration problem. The local implication is to keep evidence projection separate from the execution authority that might consume it.
+- **Continual Learning in Transition** ([arXiv:2608.06216](https://arxiv.org/html/2608.06216)) argues that memory, skills, and context alone do not establish robust capability growth; selective forgetting and long-range consistency matter. The local implication is to preserve missing, revoked, and unattributed evidence rather than silently turning gaps into zeros.
+- **The Optimizer Is the Agent** ([arXiv:2608.06714](https://arxiv.org/abs/2608.06714)) uses persistent lessons and held-out evaluation for reasoning-driven search. This supports retaining replayable evidence and keeping any future policy or self-improvement change review-gated.
+- **EASy** ([arXiv:2608.04588](https://arxiv.org/abs/2608.04588)) and **OneDayAgent** ([arXiv:2608.05013](https://arxiv.org/abs/2608.05013)) emphasize milestone decomposition, execution memory, and final verification. The local design consequence is a narrow join layer that reconciles per-verb fleet metrics with decision evidence without applying decisions.
+
+Open-source activity signals included [`future-agi/future-agi`](https://github.com/future-agi/future-agi), [`NVIDIA-NeMo/labs-OO-Agents`](https://github.com/NVIDIA-NeMo/labs-OO-Agents), and [`openai/openai-agents-python`](https://github.com/openai/openai-agents-python). These are ecosystem signals, not a controlled popularity ranking.
+
+## Build: read-only per-verb evidence join
+
+Added `core/cage1_verb_evidence_join.py`, `cli/cage1_verb_evidence_join.py`, and `experiments/test_cage1_verb_evidence_join.py`.
+
+The new adapter joins ordered per-verb CAGE-1 fleet profiles with explicit decision-audit evidence by `verb_name`, falling back honestly to `action_type`, `tool`, nested detail identity, and finally `__unattributed__`. It preserves source IDs, physical line numbers, raw evidence rows, statuses, decisions, operator IDs, snapshot IDs, coverage changes, and observation deltas. Missing evidence is `unverified`; unmatched evidence produces `partial`; invalid evidence remains visible and is not counted as valid. JSON and Markdown output are available through the CLI.
+
+This is a reporting-only change. It does not repair evidence, select an operator decision, alter policy, execute an action, or apply self-modification. Both `decision_applied` and `automatic_action_taken` remain explicitly false.
+
+## Validation
+
+- New join tests: **5 passed**.
+- Adjacent per-verb fleet/comparison and decision/advisory regressions: **55 passed**.
+- `git diff --check` passed.
+- Required repository structure remains present.
+
+## Next priority
+
+Keep the join review-only. Add a provenance-boundary regression only if an operator path is still uncovered; otherwise consider a narrow Markdown/JSON parity check or stop expanding the reporting surface until a real consumer requires it.
+
+## Sources
+
+- https://arxiv.org/html/2608.04458v1
+- https://arxiv.org/html/2608.06216
+- https://arxiv.org/abs/2608.06714
+- https://arxiv.org/abs/2608.04588
+- https://arxiv.org/abs/2608.05013
+- https://github.com/future-agi/future-agi
+- https://github.com/NVIDIA-NeMo/labs-OO-Agents
+- https://github.com/openai/openai-agents-python
