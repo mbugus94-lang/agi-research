@@ -1,3 +1,12 @@
+### 2026-08-11 - Scheduled Run: Per-Verb Evidence Join Parity Regression
+**Status**: COMPLETE - added two JSON/Markdown parity and identity-fallback tests; focused evidence-join suite passes 7/7 and broader CAGE-1 regression passes 111/111. No policy, action, evidence repair, or self-modification behavior changed.
+
+**Build**: `experiments/test_cage1_verb_evidence_join.py` now checks that mixed valid evidence has identical sorted profile order, status/decision counts, source IDs, physical lines, and explicit review-only flags in JSON and Markdown. It also checks consistent fallback through `verb_name`, `action_type`, and nested `detail.tool`, with invalid rows retained but excluded from valid counts.
+
+**Safety**: test-only and review-only; `decision_applied=False` and `automatic_action_taken=False` remain explicit.
+
+**Next priority**: stop expanding the reporting surface unless a real consumer exposes a provenance gap. Any future fixture must preserve malformed/mixed-status evidence and keep policy, action application, evidence repair, and self-modification review-gated.
+
 ### 2026-08-10 - Scheduled Run: Ordered Per-Verb CAGE-1 Fleet Aggregation
 **Status**: COMPLETE — added a read-only fleet aggregation over ordered per-verb comparison snapshots; 10 focused tests pass; no automatic action.
 

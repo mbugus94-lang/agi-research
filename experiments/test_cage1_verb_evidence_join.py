@@ -118,3 +118,42 @@ def test_cli_json_and_markdown_are_read_only(tmp_path):
     assert payload["automatic_action_taken"] is False
     assert json.loads(out_path.read_text(encoding="utf-8"))["decision_applied"] is False
     assert json.loads(fleet_path.read_text(encoding="utf-8"))["profiles"][0]["verb_name"] == "read"
+
+
+def test_json_markdown_parity_preserves_sorted_profiles_and_provenance():
+    result = join_verb_fleet_evidence(
+        fleet(profile("write", state="refused", coverage=True, delta=2), profile("read")),
+        evidence(
+            row(verb_name="write", decision="reject", source_id="write.jsonl", line=8, operator="op-2"),
+            row(verb_name="read", source_id="read.jsonl", line=4),
+        ),
+    )
+    payload = json.loads(result.to_json())
+    markdown = result.to_markdown()
+    assert [item["verb_name"] for item in payload["profiles"]] == ["read", "write"]
+    assert payload["evidence_status_counts"] == {"valid": 2}
+    assert payload["decision_counts"] == {"defer": 1, "reject": 1}
+    assert markdown.index("| `read` |") < markdown.index("| `write` |")
+    assert "source=`read.jsonl`, line=4" in markdown
+    assert "source=`write.jsonl`, line=8" in markdown
+    assert "Decision applied: **no**" in markdown
+    assert payload["automatic_action_taken"] is False
+
+
+def test_identity_fallback_is_consistent_across_json_and_markdown():
+    result = join_verb_fleet_evidence(
+        fleet(profile("read"), profile("write"), profile("sync")),
+        evidence(
+            row(verb_name="read"),
+            {"status": "valid", "action_type": "write", "decision": "accept", "source_id": "action.jsonl", "line_number": 6},
+            {"status": "invalid_schema", "detail": {"tool": "sync"}, "source_id": "tool.jsonl", "source_line_number": 9},
+        ),
+    )
+    payload = json.loads(result.to_json())
+    markdown = result.to_markdown()
+    assert [item["verb_name"] for item in payload["profiles"]] == ["read", "sync", "write"]
+    assert [item["verb_name"] for item in payload["evidence_rows"]] == ["read", "write", "sync"]
+    assert "`valid`: verb=`write`, source=`action.jsonl`, line=6" in markdown
+    assert "`invalid_schema`: verb=`sync`, source=`tool.jsonl`, line=9" in markdown
+    assert payload["profiles"][1]["valid_evidence_count"] == 0
+    assert payload["profiles"][1]["evidence_status_counts"] == {"invalid_schema": 1}

@@ -4010,3 +4010,52 @@ Keep the join review-only. Add a provenance-boundary regression only if an opera
 - https://github.com/future-agi/future-agi
 - https://github.com/NVIDIA-NeMo/labs-OO-Agents
 - https://github.com/openai/openai-agents-python
+
+---
+
+# 2026-08-11 — Scheduled Run: Per-Verb Evidence Join Parity Regression
+
+## Research summary
+
+The past-two-week scan points to a consistent architecture direction: capable agents need explicit memory, bounded context, execution-grounded verification, and governance that remains separate from execution authority.
+
+- **Continual Learning in Transition** ([arXiv:2608.06216](https://arxiv.org/html/2608.06216)) argues that memory systems need selective forgetting and long-range consistency; larger context or more stored data alone does not establish AGI.
+- **The Optimizer Is the Agent** ([arXiv:2608.06714](https://arxiv.org/html/2608.06714v1)) reports that persistent lessons and execution tools materially affect reasoning-driven search, supporting replayable lessons and held-out evaluation rather than unverified self-modification.
+- **EviGraph: Evidence-Guided Autonomous Research Agents** ([arXiv:2608.04738](https://arxiv.org/html/2608.04738v1)) emphasizes evidence-guided research workflows and structured evaluation, directly reinforcing this repository's evidence-preservation boundary.
+- **WeClawArena** ([arXiv:2608.03499](https://arxiv.org/abs/2608.03499v1)) evaluates multi-party agents with workspace, policy, tool, message, and final-state traces, strengthening the case for preserving provenance across joins instead of reducing it to a score.
+- **Context Compaction Theory** ([arXiv:2608.01326](https://arxiv.org/abs/2608.01326v1)) formalizes bounded-context selection/generation as a communication problem; any future compaction layer should expose error and provenance rather than silently discard records.
+- **K-EXAONE 2.0** ([arXiv:2608.04505](https://arxiv.org/abs/2608.04505v1)) is a recent open-weight foundation-model report centered on agentic coding, tool use, long context, and safety. It is evidence of engineering progress, not proof of AGI.
+
+Open-source activity signals included [`PrimeIntellect-ai/prime-agent`](https://github.com/PrimeIntellect-ai/prime-agent), [`github/gh-aw`](https://github.com/github/gh-aw), and [`Krv-Labs/topos`](https://github.com/mcp/Krv-Labs/topos). These are current activity signals, not a controlled popularity ranking; `gh-aw`'s August 10 update specifically highlights compiler safety, secret redaction, MCP gateway logging, and pure-function coverage locking.
+
+## Build: JSON/Markdown parity regression
+
+Added two focused tests to `experiments/test_cage1_verb_evidence_join.py`:
+
+- Mixed valid evidence now asserts that JSON and Markdown preserve the same sorted per-verb order, status/decision counts, source IDs, physical line numbers, and explicit review-only flags.
+- Identity fallback through `action_type`, nested `detail.tool`, and explicit `verb_name` is asserted across both output formats; invalid evidence remains visible and is excluded from valid counts.
+
+This is test-only and review-only. No policy, operator decision, action application, evidence repair, or self-modification state is changed. `decision_applied=False` and `automatic_action_taken=False` remain explicit.
+
+## Validation
+
+- Focused evidence-join suite: **7 passed**.
+- Broader CAGE-1 regression: **111 passed**.
+- Changed modules compile successfully.
+- `git diff --check` passed.
+
+## Next priority
+
+Stop expanding the reporting surface unless a real consumer exposes a provenance gap. If new work is justified, prefer a review-only adversarial fixture for malformed and mixed-status evidence; do not convert joins or fleet deltas into automatic policy or execution actions.
+
+## Sources
+
+- https://arxiv.org/html/2608.06216
+- https://arxiv.org/abs/2608.06714v1
+- https://arxiv.org/html/2608.04738v1
+- https://arxiv.org/abs/2608.03499v1
+- https://arxiv.org/abs/2608.01326v1
+- https://arxiv.org/abs/2608.04505v1
+- https://github.com/PrimeIntellect-ai/prime-agent
+- https://github.com/github/gh-aw
+- https://github.com/mcp/Krv-Labs/topos
