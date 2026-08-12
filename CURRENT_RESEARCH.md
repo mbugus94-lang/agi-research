@@ -4059,3 +4059,28 @@ Stop expanding the reporting surface unless a real consumer exposes a provenance
 - https://github.com/PrimeIntellect-ai/prime-agent
 - https://github.com/github/gh-aw
 - https://github.com/mcp/Krv-Labs/topos
+
+# 2026-08-12 — Adversarial Mixed-Status Evidence Join Regression
+
+## Research
+
+The current weekly scan points to three converging AGI-system themes: continual post-deployment learning, harness/context design as a first-order capability factor, and safety/oversight for multi-agent populations. Recent arXiv material includes *Continual Learning in Transition* (arXiv:2608.06216), which frames persistent adaptation and forgetting resistance as central to agentic progress; *Beyond Simply Environment Scaling* (arXiv:2608.03571), which emphasizes interactive multimodal environments over static data; and recent work on agent governance and control such as *Parallax: Why AI Agents That Think Must Never Act* (arXiv:2604.12986). OpenAI reports that retaining reasoning and compaction in its ARC-AGI-3 harness changed performance materially, reinforcing that evaluation harnesses are part of the measured system rather than neutral plumbing. Google DeepMind and partners also issued a call centered on multi-agent safety, oversight, and control.
+
+Open-source discovery was noisy rather than a reliable popularity ranking. GitHub signals included small, newly updated agent runtimes and tool-use projects, plus established ecosystem references such as OpenAI Agents and agent orchestration collections. The useful engineering signal is not star count: it is the recurrence of explicit memory, tool boundaries, sandboxing, multi-agent coordination, and evaluation adapters.
+
+## Build
+
+Added one adversarial regression fixture to `experiments/test_cage1_verb_evidence_join.py`. It mixes valid, invalid-schema, and unknown-status evidence, exercises identity fallback through `detail.tool` and `action_type`, includes boolean and negative line-number edge cases, and asserts that: invalid evidence remains invalid; valid decisions are not invented from invalid rows; physical provenance is preserved; JSON and Markdown remain consistent; and the join stays review-only.
+
+No policy, operator decision, action, evidence repair, or self-modification state is changed or applied.
+
+## Validation
+
+- New focused suite: **8 passed**.
+- Adjacent CAGE-1 regression: **92 passed**.
+- Python compile check: passed.
+- `git diff --check`: passed.
+
+## Next priority
+
+Keep the evidence join read-only. The next worthwhile change is only a concrete, untested provenance boundary from a real consumer; otherwise prioritize stability and avoid adding aggregation without an operational need.

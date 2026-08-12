@@ -157,3 +157,43 @@ def test_identity_fallback_is_consistent_across_json_and_markdown():
     assert "`invalid_schema`: verb=`sync`, source=`tool.jsonl`, line=9" in markdown
     assert payload["profiles"][1]["valid_evidence_count"] == 0
     assert payload["profiles"][1]["evidence_status_counts"] == {"invalid_schema": 1}
+
+
+def test_adversarial_mixed_status_preserves_invalid_provenance_and_never_invents_validity():
+    result = join_verb_fleet_evidence(
+        fleet(profile("read"), profile("sync")),
+        evidence(
+            row(verb_name="read", source_id="valid.jsonl", line=4),
+            {
+                "status": "invalid_schema",
+                "detail": {"tool": "read"},
+                "source_id": "invalid.jsonl",
+                "source_line_number": True,
+                "decision": "accept",
+            },
+            {
+                "status": "unknown_status",
+                "action_type": "sync",
+                "source_id": "unknown.jsonl",
+                "line_number": -2,
+                "operator_id": "op-2",
+            },
+        ),
+    )
+    payload = json.loads(result.to_json())
+    markdown = result.to_markdown()
+    read_profile = next(item for item in payload["profiles"] if item["verb_name"] == "read")
+    sync_profile = next(item for item in payload["profiles"] if item["verb_name"] == "sync")
+    assert result.status == "matched"
+    assert payload["evidence_status_counts"] == {"invalid_schema": 1, "unknown_status": 1, "valid": 1}
+    assert read_profile["evidence_status_counts"] == {"invalid_schema": 1, "valid": 1}
+    assert read_profile["valid_evidence_count"] == 1
+    assert read_profile["decision_counts"] == {"defer": 1}
+    assert read_profile["evidence_rows"][1]["source_line_number"] is None
+    assert sync_profile["evidence_status_counts"] == {"unknown_status": 1}
+    assert sync_profile["valid_evidence_count"] == 0
+    assert sync_profile["evidence_rows"][0]["source_line_number"] == -2
+    assert "`invalid_schema`: verb=`read`, source=`invalid.jsonl`, line=unknown" in markdown
+    assert "`unknown_status`: verb=`sync`, source=`unknown.jsonl`, line=-2" in markdown
+    assert payload["decision_applied"] is False
+    assert payload["automatic_action_taken"] is False
