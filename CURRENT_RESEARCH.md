@@ -4084,3 +4084,47 @@ No policy, operator decision, action, evidence repair, or self-modification stat
 ## Next priority
 
 Keep the evidence join read-only. The next worthwhile change is only a concrete, untested provenance boundary from a real consumer; otherwise prioritize stability and avoid adding aggregation without an operational need.
+
+---
+
+# 2026-08-12 — Ambiguous Per-Verb Evidence Decision Regression
+
+## Research summary
+
+The official arXiv API scan for the past two weeks surfaced several directly relevant directions:
+
+- **Agentic Configuration Management (ACM)** ([arXiv:2608.11166](https://arxiv.org/abs/2608.11166v1), Aug. 11) models heterogeneous agent configurations as versioned, immutable configuration items with runtime provenance and dependency-aware impact propagation. The local implication is to distinguish a report's evidence identity from any decision authority and preserve provenance through every projection.
+- **Test-Time Self-Evolving GUI Visual Grounding** ([arXiv:2608.11191](https://arxiv.org/abs/2608.11191v1), Aug. 11) uses exploration, evaluation, reflection, and internalization, while explicitly calibrating against failed exploration. This supports keeping reflection and self-improvement proposals review-gated rather than silently mutating runtime behavior.
+- **Long-Horizon AI Research for Grothendieck Constant** ([arXiv:2608.11195](https://arxiv.org/abs/2608.11195v1), Aug. 11) reports a case study in which an AI research system contributed to mathematical progress, but also discusses the conditions and limitations of effective human-AI collaboration. It is evidence for structured, auditable research loops, not a general AGI claim.
+- **The Agent Operating System** ([arXiv:2608.03214](https://arxiv.org/abs/2608.03214v1)) separates governance/control from runtime/coordination. That separation remains the right boundary for this repository's read-only evidence adapters.
+- **EviGraph** ([arXiv:2608.04738](https://arxiv.org/abs/2608.04738v1)) treats evidence as a typed graph with checkpoints and localized repair. The local analogue is to retain invalid and conflicting evidence rows rather than collapsing them into a clean aggregate.
+
+GitHub activity signals included `openai/openai-agents-python` ([repository](https://github.com/openai/openai-agents-python)), `github/gh-aw` ([repository](https://github.com/github/gh-aw)), and `lixuan27/butterfly` ([repository](https://github.com/lixuan27/butterfly)). These are activity signals, not a controlled trending ranking. Their useful common signal is operational: session handling, safety gates, reproducible state, and replayable runtime behavior matter as much as raw model capability.
+
+## Build: explicit ambiguity in per-verb evidence joins
+
+Added a narrow review-only regression to `experiments/test_cage1_verb_evidence_join.py` and extended `core/cage1_verb_evidence_join.py` so a per-verb join now exposes `decision_review_status` (`missing`, `single`, or `ambiguous`) and summary-level `ambiguous_decision_count`. Multiple valid decision rows for the same verb are retained with their provenance and marked ambiguous; they are never selected or applied. The Markdown output now surfaces the ambiguity count and per-verb review status.
+
+This closes the provenance boundary identified in the prior run without adding another aggregation layer. Invalid or unknown-status rows remain excluded from valid decision counts but remain visible in the evidence trail. `decision_applied=False` and `automatic_action_taken=False` remain explicit.
+
+## Validation
+
+- Focused evidence-join suite: **9 passed**.
+- Python compile check: passed.
+- `git diff --check`: passed.
+- Required structure remains present: `README.md`, `CURRENT_RESEARCH.md`, `ARCHITECTURE.md`, core agent/memory/planner/reflection modules, `skills/`, and `experiments/`.
+
+## Next priority
+
+Stop expanding the reporting surface unless a real consumer exposes another provenance boundary. If one does, prefer a review-only fixture first. Do not convert per-verb ambiguity or fleet deltas into automatic policy, execution, or self-modification actions.
+
+## Sources
+
+- https://arxiv.org/abs/2608.11166v1
+- https://arxiv.org/abs/2608.11191v1
+- https://arxiv.org/abs/2608.11195v1
+- https://arxiv.org/abs/2608.03214v1
+- https://arxiv.org/abs/2608.04738v1
+- https://github.com/openai/openai-agents-python
+- https://github.com/github/gh-aw
+- https://github.com/lixuan27/butterfly

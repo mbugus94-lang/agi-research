@@ -197,3 +197,21 @@ def test_adversarial_mixed_status_preserves_invalid_provenance_and_never_invents
     assert "`unknown_status`: verb=`sync`, source=`unknown.jsonl`, line=-2" in markdown
     assert payload["decision_applied"] is False
     assert payload["automatic_action_taken"] is False
+
+
+def test_multiple_valid_decisions_are_ambiguous_and_not_selected():
+    result = join_verb_fleet_evidence(
+        fleet(profile("read")),
+        evidence(
+            row(verb_name="read", decision="accept", source_id="a.jsonl", line=3, operator="op-a"),
+            row(verb_name="read", decision="reject", source_id="b.jsonl", line=4, operator="op-b"),
+        ),
+    )
+    item = result.profiles[0]
+    assert result.status == "matched"
+    assert result.ambiguous_decision_count == 1
+    assert item.decision_review_status == "ambiguous"
+    assert item.decision_counts == {"accept": 1, "reject": 1}
+    assert item.operator_ids == ("op-a", "op-b")
+    assert result.decision_applied is False
+    assert result.automatic_action_taken is False

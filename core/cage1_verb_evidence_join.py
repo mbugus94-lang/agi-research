@@ -122,6 +122,7 @@ class VerbEvidenceJoin:
     evidence_status_counts: dict[str, int]
     valid_evidence_count: int
     decision_counts: dict[str, int]
+    decision_review_status: str
     operator_ids: tuple[str, ...]
     evidence_rows: tuple[EvidenceRow, ...]
 
@@ -136,6 +137,7 @@ class VerbEvidenceJoin:
             "evidence_status_counts": dict(self.evidence_status_counts),
             "valid_evidence_count": self.valid_evidence_count,
             "decision_counts": dict(self.decision_counts),
+            "decision_review_status": self.decision_review_status,
             "operator_ids": list(self.operator_ids),
             "evidence_rows": [row.to_dict() for row in self.evidence_rows],
         }
@@ -153,6 +155,7 @@ class VerbEvidenceJoinSummary:
     evidence_rows: tuple[EvidenceRow, ...]
     evidence_status_counts: dict[str, int]
     decision_counts: dict[str, int]
+    ambiguous_decision_count: int
     source_ids: tuple[str, ...]
     unmatched_identity_count: int
     unattributed_evidence_count: int
@@ -171,6 +174,7 @@ class VerbEvidenceJoinSummary:
             "evidence_rows": [row.to_dict() for row in self.evidence_rows],
             "evidence_status_counts": dict(self.evidence_status_counts),
             "decision_counts": dict(self.decision_counts),
+            "ambiguous_decision_count": self.ambiguous_decision_count,
             "source_ids": list(self.source_ids),
             "unmatched_identity_count": self.unmatched_identity_count,
             "unattributed_evidence_count": self.unattributed_evidence_count,
@@ -190,15 +194,16 @@ class VerbEvidenceJoinSummary:
             f"- Snapshots: **{len(self.snapshot_ids)}**",
             f"- Unmatched evidence identities: **{self.unmatched_identity_count}**",
             f"- Unattributed evidence rows: **{self.unattributed_evidence_count}**",
+            f"- Ambiguous decision profiles: **{self.ambiguous_decision_count}**",
             f"- Decision applied: **{'yes' if self.decision_applied else 'no'}**",
             f"- Automatic action taken: **{'yes' if self.automatic_action_taken else 'no'}**",
             "",
-            "| Verb | Join | Fleet state | Valid evidence | Decisions | Coverage changed |",
-            "|---|---|---|---:|---|---|",
+            "| Verb | Join | Decision review | Fleet state | Valid evidence | Decisions | Coverage changed |",
+            "|---|---|---|---|---:|---|---|",
         ]
         for item in self.profiles:
             decisions = ", ".join(f"{key}:{value}" for key, value in item.decision_counts.items()) or "none"
-            lines.append(f"| `{item.verb_name}` | `{item.join_status}` | `{item.latest_worst_state or 'none'}` | {item.valid_evidence_count} | {decisions} | {'yes' if item.coverage_changed else 'no'} |")
+            lines.append(f"| `{item.verb_name}` | `{item.join_status}` | `{item.decision_review_status}` | `{item.latest_worst_state or 'none'}` | {item.valid_evidence_count} | {decisions} | {'yes' if item.coverage_changed else 'no'} |")
         if self.evidence_rows:
             lines.extend(["", "## Evidence provenance", ""])
             for row in self.evidence_rows:
@@ -235,6 +240,7 @@ def join_verb_fleet_evidence(fleet: Any, evidence: Optional[Any] = None) -> Verb
         statuses = Counter(row.status for row in matched)
         valid_rows = [row for row in matched if row.status == "valid"]
         decisions = Counter(row.decision for row in valid_rows if row.decision)
+        decision_review_status = "missing" if not valid_rows else "single" if len(valid_rows) == 1 else "ambiguous"
         operators = tuple(sorted({row.operator_id for row in valid_rows if row.operator_id}))
         if profile is None:
             join_status = "unmatched_evidence"
@@ -251,7 +257,7 @@ def join_verb_fleet_evidence(fleet: Any, evidence: Optional[Any] = None) -> Verb
             coverage = bool(profile.get("coverage_changed", False))
             delta = profile.get("observation_delta") if isinstance(profile.get("observation_delta"), int) else None
             profile_status = str(profile.get("latest_status", ""))
-        joined.append(VerbEvidenceJoin(name, profile_status, state, coverage, delta, join_status, dict(sorted(statuses.items())), len(valid_rows), dict(sorted(decisions.items())), operators, tuple(matched)))
+        joined.append(VerbEvidenceJoin(name, profile_status, state, coverage, delta, join_status, dict(sorted(statuses.items())), len(valid_rows), dict(sorted(decisions.items())), decision_review_status, operators, tuple(matched)))
     unmatched_count = sum(1 for name in by_identity if name not in fleet_by_name and name != UNATTRIBUTED)
     unattributed_count = len(by_identity.get(UNATTRIBUTED, []))
     status = "unverified" if evidence_status == "missing" else "matched" if not unmatched_count and all(item.join_status in {"matched", "no_evidence"} for item in joined) else "partial"
@@ -266,6 +272,7 @@ def join_verb_fleet_evidence(fleet: Any, evidence: Optional[Any] = None) -> Verb
         tuple(rows),
         dict(sorted(Counter(row.status for row in rows).items())),
         dict(sorted(Counter(row.decision for row in rows if row.status == "valid" and row.decision).items())),
+        sum(1 for item in joined if item.decision_review_status == "ambiguous"),
         tuple(sorted({row.source_id for row in rows if row.source_id})),
         unmatched_count,
         unattributed_count,
